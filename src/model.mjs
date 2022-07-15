@@ -636,12 +636,12 @@ class Sql {
       } else if (Object.keys(rows).length) {
         this._insert = this._getInsertToken(rows, columns);
       } else {
-        return this.error("can't pass empty table to sql.insert");
+        return this.error("can't pass empty table to model.insert");
       }
     } else if (rows !== undefined) {
       this._insert = rows;
     } else {
-      return this.error("can't pass nil to sql.insert");
+      return this.error("can't pass nil to model.insert");
     }
     return this;
   }

@@ -1,6 +1,6 @@
 {
   "name": "@xiangnanscu/model",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "model",
   "main": "src/model.mjs",
   "scripts": {
@@ -36,7 +36,8 @@
     "vue": "^3.2.25"
   },
   "dependencies": {
-    "@xiangnanscu/field": "^0.2.0",
-    "@xiangnanscu/modelsql": "^0.1.0"
+    "@xiangnanscu/field": "^0.5.0",
+    "@xiangnanscu/modelsql": "^0.3.0",
+    "@xiangnanscu/sql": "^0.3.0"
   }
 }

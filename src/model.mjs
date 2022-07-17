@@ -197,6 +197,12 @@ class Model {
   static makeClass(options) {
     return this.makeModelClass(this.normalize(options));
   }
+  static async query(statement) {
+    const client = await this.pool.connect()
+    const res = await client.query(statement)
+    client.release()
+    return res
+  }
   static normalize(options) {
     assert(typeof options === "object", "model must be a table");
     let _extends = options.extends;
@@ -204,7 +210,7 @@ class Model {
     let optsFields = normalizeArrayAndHashFields(options.fields || {});
     let optsNames = options.fieldNames;
     if (!optsNames) {
-      optsNames = Object.keys(optsFields).sort();
+      optsNames = Object.keys(optsFields);
     }
     model.fieldNames = normalizeFieldNames([...optsNames]);
     model.fields = {};
@@ -278,6 +284,7 @@ class Model {
     class ConcreteModel extends this {
 
     }
+    Object.defineProperty(ConcreteModel, 'name', { value: `${model.tableName.toUpperCase()}Model` });
     let notAbstract = !model.abstract;
     if (notAbstract) {
       if (!model.tableName) {
@@ -349,15 +356,16 @@ class Model {
       }
     }
     if (!model.abstract) {
-      model.RecordClass = makeRecordClass(model, this);
+      model.Record = makeRecordClass(model, this);
     }
+    ConcreteModel.Sql = model.Sql
+    ConcreteModel.Record = model.Record
     ConcreteModel.abstract = model.abstract
     ConcreteModel.disableAutoPrimaryKey = model.disableAutoPrimaryKey
     ConcreteModel.defaultPrimaryKey = model.defaultPrimaryKey || 'id'
     ConcreteModel.tableName = model.tableName
     ConcreteModel.fieldNames = model.fieldNames
     ConcreteModel.fields = model.fields
-    ConcreteModel.Sql = model.Sql
     ConcreteModel.foreignKeys = model.foreignKeys
     ConcreteModel.names = model.names
     ConcreteModel.primaryKey = model.primaryKey
@@ -365,7 +373,6 @@ class Model {
     ConcreteModel.nameCache = model.nameCache
     ConcreteModel.labelToName = model.labelToName
     ConcreteModel.nameToLabel = model.nameToLabel
-    ConcreteModel.RecordClass = model.RecordClass
     return ConcreteModel
   }
   static mixWithBase(...varargs) {
@@ -422,56 +429,56 @@ class Model {
     return makeFieldFromJson(options);
   }
   static new(attrs) {
-    return new this.RecordClass(attrs);
+    return new this.Record(attrs);
   }
-  static all() {
-    let records = this.query("SELECT * FROM " + this.tableName);
+  static async all() {
+    let records = await this.query("SELECT * FROM " + this.tableName);
     for (let i = 0; i < records.length; i = i + 1) {
       records[i] = this.load(records[i]);
     }
     return records;
   }
-  static save(input, names, key) {
+  static async save(input, names, key) {
     key = key || this.primaryKey;
     if (input[key] !== undefined) {
-      return this.saveUpdate(input, names, key);
+      return await this.saveUpdate(input, names, key);
     } else {
-      return this.saveCreate(input, names, key);
+      return await this.saveCreate(input, names, key);
     }
   }
-  static saveCreate(input, names, key) {
+  static async saveCreate(input, names, key) {
     let data = this.validateCreate(input, names);
-    return this.createFrom(data, key);
+    return await this.createFrom(data, key);
   }
-  static saveUpdate(input, names, key) {
+  static async saveUpdate(input, names, key) {
     let data = this.validateUpdate(input, names);
     key = key || this.primaryKey;
     data[key] = input[key];
-    return this.updateFrom(data, key);
+    return await this.updateFrom(data, key);
   }
-  static saveFrom(data, key) {
+  static async saveFrom(data, key) {
     key = key || this.primaryKey;
     if (data[key] !== undefined) {
-      return this.updateFrom(data, key);
+      return await this.updateFrom(data, key);
     } else {
-      return this.createFrom(data, key);
+      return await this.createFrom(data, key);
     }
   }
-  static createFrom(data, key) {
+  static async createFrom(data, key) {
     key = key || this.primaryKey;
     let prepared = this.prepareForDb(data);
-    let created = Sql.prototype
+    let created = await Sql.prototype
       .insert.call(this.Sql.new(), prepared)
       .returning(key)
       .execr();
     data[key] = created[0][key];
     return this.new(data);
   }
-  static updateFrom(data, key) {
+  static async updateFrom(data, key) {
     key = key || this.primaryKey;
     let prepared = this.prepareForDb(data, undefined, true);
     let lookValue = assert(data[key], "no key provided for update");
-    let res = Sql.prototype
+    let res = await Sql.prototype
       .update.call(this.Sql.new(), prepared)
       .where({ [key]: lookValue })
       .execr();
@@ -700,29 +707,29 @@ class Model {
   static withValues(name, rows) {
     return this.Sql.new().withValues(name, rows);
   }
-  static upsert(rows, key, columns) {
-    return this.Sql.new().upsert(rows, key, columns);
+  static async upsert(rows, key, columns) {
+    return await this.Sql.new().upsert(rows, key, columns);
   }
-  static merge(rows, key, columns) {
-    return this.Sql.new().merge(rows, key, columns);
+  static async merge(rows, key, columns) {
+    return await this.Sql.new().merge(rows, key, columns);
   }
-  static updates(rows, key, columns) {
-    return this.Sql.new().updates(rows, key, columns);
+  static async updates(rows, key, columns) {
+    return await this.Sql.new().updates(rows, key, columns);
   }
-  static gets(keys) {
-    return this.Sql.new().gets(keys);
+  static async gets(keys) {
+    return await this.Sql.new().gets(keys);
   }
-  static mergeGets(rows, keys) {
-    return this.Sql.new().mergeGets(rows, keys);
+  static async mergeGets(rows, keys) {
+    return await this.Sql.new().mergeGets(rows, keys);
   }
-  static filter(kwargs) {
-    return this.Sql.new().filter(kwargs);
+  static async filter(kwargs) {
+    return await this.Sql.new().filter(kwargs);
   }
-  static get(...varargs) {
-    return this.Sql.new().get(...varargs);
+  static async get(...varargs) {
+    return await this.Sql.new().get(...varargs);
   }
-  static getOrCreate(...varargs) {
-    return this.Sql.new().getOrCreate(...varargs);
+  static async getOrCreate(...varargs) {
+    return await this.Sql.new().getOrCreate(...varargs);
   }
   static insert(...varargs) {
     return this.Sql.new().insert(...varargs);

@@ -1,7 +1,8 @@
 <script setup>
-import { computed } from 'vue';
+import { computed, onMounted } from 'vue';
 import MainPage from './components/MainPage.vue'
 import packages from '../package.json'
+
 
 const githubRepoUrl = computed(() => {
   let matched = packages.name.match(/@(\w+)\/(\w+)/)

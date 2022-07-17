@@ -1,18 +1,30 @@
 import Field from '@xiangnanscu/field'
 import Modelsql from '@xiangnanscu/modelsql'
-import ModelClass from './model.mjs'
+import Model from './model.mjs'
+import pg from "pg"
+
+const pool = new pg.Pool({
+  host: 'localhost',
+  user: 'postgres',
+  password: '111111',
+  database: 'shiye',
+  max: 20,
+  idleTimeoutMillis: 30000,
+  connectionTimeoutMillis: 2000,
+})
 
 
 
-
-let bank = ModelClass.makeClass({
+let bank = Model.makeClass({
+  pool,
   tableName: "bank",
   fields: {
     amount: { label: "余额", type: "float" },
     addr: { label: "地址" },
   },
 });
-let usr = ModelClass.makeClass({
+let usr = Model.makeClass({
+  pool,
   tableName: "usr",
   fields: {
     bankId: { label: "银行", reference: bank },
@@ -20,21 +32,26 @@ let usr = ModelClass.makeClass({
     age: { label: "年龄" },
   },
 });
-let info = ModelClass.makeClass({
+let info = Model.makeClass({
+  pool,
   tableName: "info",
   fields: {
     code: { label: "身份证号", unique: true },
     sex: { label: "性别" },
   },
 });
-let profile = ModelClass.makeClass({
+let profile = Model.makeClass({
+  pool,
   tableName: "profile",
   fields: {
+    id: { type: 'integer' },
+    sfzh: {type: 'sfzh'},
     usrId: { label: "用户", reference: usr },
     infoId: { label: "信息", reference: info, referenceColumn: "code" },
     name: { label: "姓名" },
   },
 });
+
 console.log(profile.whereNot({ usrId: "a" }).statement());
 console.log(
   profile
@@ -131,6 +148,11 @@ console.log(
     .statement()
 );
 console.log(profile.insert({ name: "1" }).returning("name").statement());
+const {rows} = await pool.query("select xm,dwmc from profile limit 2")
+console.log(rows)
 test('select', () => {
   expect(1).toBe(1)
+});
+test('query profile', () => {
+  expect(profile.select("id","sfzh").where({id__lt:100}).limit(1).execr()).toBe(1)
 });

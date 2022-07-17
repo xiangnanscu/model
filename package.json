@@ -1,6 +1,6 @@
 {
   "name": "@xiangnanscu/model",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "model",
   "main": "src/model.mjs",
   "scripts": {
@@ -38,6 +38,8 @@
   "dependencies": {
     "@xiangnanscu/field": "^0.5.0",
     "@xiangnanscu/modelsql": "^0.3.0",
-    "@xiangnanscu/sql": "^0.3.0"
+    "@xiangnanscu/sql": "^0.3.0",
+    "pg": "^8.7.3",
+    "pg-native": "^3.0.0"
   }
 }

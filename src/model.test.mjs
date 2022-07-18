@@ -12,8 +12,8 @@ const sql = postgres({
   idle_timeout: 20,
   connect_timeout: 2,
 })
-const query = (statement) => {
-  return sql.unsafe(statement)
+const query = async (statement) => {
+  return await sql.unsafe(statement)
 }
 
 let bank = Model.makeClass({
@@ -150,7 +150,12 @@ console.log(
 );
 console.log(profile.insert({ name: "1" }).returning("name").statement());
 const rows = await profile.query("select xm,dwmc from profile limit 2")
-console.log({rows})
+console.log(info)
+await info.merge([{ id:1, "code": "1", "sex": "男" }], "id")
+console.log(await info.all())
+for (const e of rows) {
+  console.log(e)
+}
 test('select', () => {
   expect(1).toBe(1)
 });

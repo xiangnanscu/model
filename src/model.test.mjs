@@ -10,7 +10,7 @@ const sql = postgres({
   host: 'localhost',
   user: 'postgres',
   password: '111111',
-  database: 'shiye',
+  database: 'test',
   max: 20,
   idle_timeout: 20,
   connect_timeout: 2,

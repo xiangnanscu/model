@@ -3,6 +3,9 @@ import Modelsql from '@xiangnanscu/modelsql'
 import Model from './model.mjs'
 import postgres from 'postgres'
 
+function print() {
+  console.log.apply(this, arguments)
+}
 const sql = postgres({
   host: 'localhost',
   user: 'postgres',
@@ -15,7 +18,7 @@ const sql = postgres({
 const query = async (statement) => {
   return await sql.unsafe(statement)
 }
-
+await query(`drop table if exists info;create table info(id integer,code varchar(10),sex varchar(5))`)
 let bank = Model.makeClass({
   query,
   tableName: "bank",
@@ -150,8 +153,8 @@ console.log(
 );
 console.log(profile.insert({ name: "1" }).returning("name").statement());
 const rows = await profile.query("select xm,dwmc from profile limit 2")
-console.log(info)
-await info.merge([{ id:1, "code": "1", "sex": "男" }], "id")
+const bsql = await info.commit(false).merge([{ id: 1, "code": "1", "sex": "男" }, { id: 2, "code": "2", "sex": "女" }], "id")
+console.log(await bsql.execr())
 console.log(await info.all())
 for (const e of rows) {
   console.log(e)

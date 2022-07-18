@@ -1,22 +1,21 @@
 import Field from '@xiangnanscu/field'
 import Modelsql from '@xiangnanscu/modelsql'
 import Model from './model.mjs'
-import pg from "pg"
+import postgres from 'postgres'
 
-const pool = new pg.Pool({
+const query = postgres({
   host: 'localhost',
   user: 'postgres',
   password: '111111',
   database: 'shiye',
   max: 20,
-  idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 2000,
+  idle_timeout: 20,
+  connect_timeout: 2,
 })
 
 
-
 let bank = Model.makeClass({
-  pool,
+  query,
   tableName: "bank",
   fields: {
     amount: { label: "余额", type: "float" },
@@ -24,7 +23,7 @@ let bank = Model.makeClass({
   },
 });
 let usr = Model.makeClass({
-  pool,
+  query,
   tableName: "usr",
   fields: {
     bankId: { label: "银行", reference: bank },
@@ -33,7 +32,7 @@ let usr = Model.makeClass({
   },
 });
 let info = Model.makeClass({
-  pool,
+  query,
   tableName: "info",
   fields: {
     code: { label: "身份证号", unique: true },
@@ -41,7 +40,7 @@ let info = Model.makeClass({
   },
 });
 let profile = Model.makeClass({
-  pool,
+  query,
   tableName: "profile",
   fields: {
     id: { type: 'integer' },
@@ -148,8 +147,8 @@ console.log(
     .statement()
 );
 console.log(profile.insert({ name: "1" }).returning("name").statement());
-const {rows} = await pool.query("select xm,dwmc from profile limit 2")
-console.log(rows)
+const rows = await profile.query("select xm,dwmc from profile limit 2")
+console.log({rows})
 test('select', () => {
   expect(1).toBe(1)
 });

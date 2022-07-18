@@ -155,27 +155,27 @@ function makeRecordClass(model, cls) {
     constructor(data) {
       return Object.assign(this, data);
     }
-    delete(key) {
+    async delete(key) {
       key = key || model.primaryKey;
-      return cls.delete(model, { [key]: this[key] }).exec();
+      return await cls.delete(model, { [key]: this[key] }).exec();
     }
-    save(names, key) {
-      return cls.save(model, this, names, key);
+    async save(names, key) {
+      return await cls.save(model, this, names, key);
     }
-    saveCreate(names, key) {
-      return cls.saveCreate(model, this, names, key);
+    async saveCreate(names, key) {
+      return await cls.saveCreate(model, this, names, key);
     }
-    saveUpdate(names, key) {
-      return cls.saveUpdate(model, this, names, key);
+    async saveUpdate(names, key) {
+      return await cls.saveUpdate(model, this, names, key);
     }
-    saveFrom(key) {
-      return cls.saveFrom(model, this, key);
+    async saveFrom(key) {
+      return await cls.saveFrom(model, this, key);
     }
-    createFrom(key) {
-      return cls.createFrom(model, this, key);
+    async createFrom(key) {
+      return await cls.createFrom(model, this, key);
     }
-    updateFrom(key) {
-      return cls.updateFrom(model, this, key);
+    async updateFrom(key) {
+      return await cls.updateFrom(model, this, key);
     }
     validate(names, key) {
       return cls.validate(model, this, names, key);
@@ -192,16 +192,15 @@ function makeRecordClass(model, cls) {
 
 
 class Model {
+  static ValidateError = ValidateError;
+  static ValidateBatchError = ValidateBatchError
   static baseModel = baseModel;
   static makeFieldFromJson = makeFieldFromJson;
   static makeClass(options) {
     return this.makeModelClass(this.normalize(options));
   }
   static async query(statement) {
-    const client = await this.pool.connect()
-    const res = await client.query(statement)
-    client.release()
-    return res
+    throw new Error("you must implement query method")
   }
   static normalize(options) {
     assert(typeof options === "object", "model must be a table");
@@ -360,6 +359,7 @@ class Model {
     }
     ConcreteModel.Sql = model.Sql
     ConcreteModel.Record = model.Record
+    ConcreteModel.query = model.query
     ConcreteModel.abstract = model.abstract
     ConcreteModel.disableAutoPrimaryKey = model.disableAutoPrimaryKey
     ConcreteModel.defaultPrimaryKey = model.defaultPrimaryKey || 'id'

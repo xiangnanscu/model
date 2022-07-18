@@ -3,7 +3,7 @@ import Modelsql from '@xiangnanscu/modelsql'
 import Model from './model.mjs'
 import postgres from 'postgres'
 
-const query = postgres({
+const sql = postgres({
   host: 'localhost',
   user: 'postgres',
   password: '111111',
@@ -12,7 +12,9 @@ const query = postgres({
   idle_timeout: 20,
   connect_timeout: 2,
 })
-
+const query = (statement) => {
+  return sql.unsafe(statement)
+}
 
 let bank = Model.makeClass({
   query,

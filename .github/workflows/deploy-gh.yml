@@ -17,7 +17,12 @@ jobs:
           registry-url: https://registry.npmjs.org
           check-latest: true
           cache: 'npm'
-
+      - uses: harmon758/postgresql-action@v1
+        with:
+          postgresql version: '14'
+          postgresql db: 'test'
+          postgresql user: 'postgres'
+          postgresql password: '111111'
       - name: Upgrade npm ✨
         run: npm i -g npm@latest
 

@@ -16,6 +16,7 @@ const sql = postgres({
   connect_timeout: 2,
 })
 const query = async (statement) => {
+  console.log(statement)
   return await sql.unsafe(statement)
 }
 await query(`drop table if exists info;create table info(id integer,code varchar(10),sex varchar(5))`)
@@ -152,16 +153,9 @@ console.log(
     .statement()
 );
 console.log(profile.insert({ name: "1" }).returning("name").statement());
-const rows = await profile.query("select xm,dwmc from profile limit 2")
 const bsql = await info.commit(false).merge([{ id: 1, "code": "1", "sex": "男" }, { id: 2, "code": "2", "sex": "女" }], "id")
 console.log(await bsql.execr())
 console.log(await info.all())
-for (const e of rows) {
-  console.log(e)
-}
 test('select', () => {
   expect(1).toBe(1)
-});
-test('query profile', () => {
-  expect(profile.select("id","sfzh").where({id__lt:100}).limit(1).execr()).toBe(1)
 });

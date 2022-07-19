@@ -101,13 +101,16 @@ function isFieldClass(t) {
 class ValidateError extends Error {
   constructor({ name, message, label, httpCode }) {
     super(message)
-    Object.assign(this, { name, label, httpCode })
+    Object.assign(this, { name, label, httpCode, message })
   }
 }
 class ValidateBatchError extends ValidateError {
   constructor({ name, message, label, httpCode, index }) {
     super({ name, message, label, httpCode })
     this.index = index
+  }
+  toString() {
+    return `FIELD ERROR: ${this.name}(${this.label})+${this.message}`
   }
 }
 function checkUpsertKey(rows, key) {
@@ -618,7 +621,7 @@ class Model {
           cleaned[index] = this.validateCreate(row, columns);;
         } catch (error) {
           if (error instanceof ValidateError) {
-            throw new ValidateBatchError({ ...error, index })
+            throw new ValidateBatchError({ ...error, index, message: error.message })
           } else {
             throw error
           }

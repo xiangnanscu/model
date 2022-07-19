@@ -3,7 +3,7 @@ import Modelsql from '@xiangnanscu/modelsql'
 import Model from './model.mjs'
 import postgres from 'postgres'
 
-function print() {
+function p() {
   console.log.apply(this, arguments)
 }
 const sql = postgres({
@@ -16,7 +16,7 @@ const sql = postgres({
   connect_timeout: 2,
 })
 const query = async (statement) => {
-  console.log(statement)
+  p(statement)
   return await sql.unsafe(statement)
 }
 await query(`drop table if exists info;create table info(id integer,code varchar(10),sex varchar(5))`)
@@ -57,8 +57,8 @@ let profile = Model.makeClass({
   },
 });
 
-console.log(profile.whereNot({ usrId: "a" }).statement());
-console.log(
+p(profile.whereNot({ usrId: "a" }).statement());
+p(
   profile
     .where({
       usrId__bankId__amount__gt: 100,
@@ -66,11 +66,11 @@ console.log(
     })
     .statement()
 );
-console.log(profile.where("id", 1).orWhere({ id: 2 }).select("id").statement());
-console.log(
+p(profile.where("id", 1).orWhere({ id: 2 }).select("id").statement());
+p(
   profile.where({ usrId__name__contains: "a", usrId__name: "b" }).statement()
 );
-console.log(
+p(
   profile
     .where({
       usrId__name__contains: "a",
@@ -79,7 +79,7 @@ console.log(
     })
     .statement()
 );
-console.log(
+p(
   profile
     .where({
       usrId__name__contains: "a",
@@ -88,38 +88,38 @@ console.log(
     .orWhereNot({ usrId__bankId__amount__gt: 100 })
     .statement()
 );
-console.log(profile.whereIn("name", ["foo", "bar"]).statement());
-console.log(profile.whereIn(["id", "name"], usr.select("id", "name")).statement());
-console.log(profile.whereExists(usr.where("id=1")).statement());
-console.log(profile.where("name", "in", ["foo", "bar"]).statement());
-console.log(
+p(profile.whereIn("name", ["foo", "bar"]).statement());
+p(profile.whereIn(["id", "name"], usr.select("id", "name")).statement());
+p(profile.whereExists(usr.where("id=1")).statement());
+p(profile.where("name", "in", ["foo", "bar"]).statement());
+p(
   profile.whereNull("name").orWhereNot({ name__null: false }).statement()
 );
-console.log(
+p(
   profile
     .whereNull("name")
     .orWhereNot({ name__in: ["foo", "bar"] })
     .statement()
 );
-console.log(
+p(
   profile
     .whereNull("name")
     .whereNot({ name__notin: ["foo", "bar"] })
     .statement()
 );
-console.log(
+p(
   profile.loadFk("usrId", "name", "age").loadFk("infoId", "sex").statement()
 );
-console.log(profile.select(["id", "name"]).select("usrId as u").statement());
-console.log(profile.select(["id", "name"]).select("usrId").statement());
-console.log(profile.where({ name: "a", id: 1, foo: 2 }).statement());
-console.log(profile.where("name", "a").statement());
-console.log(profile.where("name", "like", "a").statement());
-console.log(usr.whereIn("name", ["foo", "bar"]).statement());
-console.log(usr.whereIn("names", ["foo", "bar"]).statement());
-console.log(usr.whereNull("name").orWhereBetween("age", 1, 10).statement());
-console.log(usr.whereExists(profile.where("name", "bar")).statement());
-console.log(
+p(profile.select(["id", "name"]).select("usrId as u").statement());
+p(profile.select(["id", "name"]).select("usrId").statement());
+p(profile.where({ name: "a", id: 1, foo: 2 }).statement());
+p(profile.where("name", "a").statement());
+p(profile.where("name", "like", "a").statement());
+p(usr.whereIn("name", ["foo", "bar"]).statement());
+p(usr.whereIn("names", ["foo", "bar"]).statement());
+p(usr.whereNull("name").orWhereBetween("age", 1, 10).statement());
+p(usr.whereExists(profile.where("name", "bar")).statement());
+p(
   profile
     .whereOr({
       usrId__bankId__amount__gt: 10,
@@ -143,19 +143,20 @@ let cb4 = function (sql) {
 let cb5 = function (sql) {
   return this.whereNot({ a: 1, b: "whereNot" });
 };
-console.log(
+p(
   profile.where(cb1).where(cb2).where(cb3).where(cb4).where(cb5).statement()
 );
-console.log(
+p(
   profile
     .select(true, false, true)
     .whereNot({ name: "a", id: 1, foo: true })
     .statement()
 );
-console.log(profile.insert({ name: "1" }).returning("name").statement());
+p(profile.insert({ name: "1" }).returning("name").statement());
 const bsql = await info.commit(false).merge([{ id: 1, "code": "1", "sex": "男" }, { id: 2, "code": "2", "sex": "女" }], "id")
-console.log(await bsql.execr())
-console.log(await info.all())
+p(await bsql.execr())
+p(await info.all())
 test('select', () => {
   expect(1).toBe(1)
 });
+await sql.end()

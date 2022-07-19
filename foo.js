@@ -1,9 +1,9 @@
-function bar() {
-  return [1, 2]
+function bar(a, b) {
+  console.log({a, b})
+  return a
 }
-function foo(a, b) {
-  [a, b] = bar()
-  return [a, b]
+function foo(...args) {
+  return bar(...args)
 }
 
-console.log(foo())
+console.log(foo({x:1}))

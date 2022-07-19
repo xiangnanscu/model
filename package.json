@@ -36,9 +36,9 @@
     "vue": "^3.2.37"
   },
   "dependencies": {
-    "@xiangnanscu/field": "latest",
+    "@xiangnanscu/field": "^0.7.0",
     "@xiangnanscu/modelsql": "latest",
-    "@xiangnanscu/sql": "latest",
+    "@xiangnanscu/sql": "^0.5.0",
     "postgres": "^3.2.4"
   }
 }

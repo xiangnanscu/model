@@ -160,34 +160,34 @@ function makeRecordClass(model, cls) {
     }
     async delete(key) {
       key = key || model.primaryKey;
-      return await cls.delete(model, { [key]: this[key] }).exec();
+      return await cls.delete({ [key]: this[key] }).exec();
     }
     async save(names, key) {
-      return await cls.save(model, this, names, key);
+      return await cls.save(this, names, key);
     }
     async saveCreate(names, key) {
-      return await cls.saveCreate(model, this, names, key);
+      return await cls.saveCreate(this, names, key);
     }
     async saveUpdate(names, key) {
-      return await cls.saveUpdate(model, this, names, key);
+      return await cls.saveUpdate(this, names, key);
     }
     async saveFrom(key) {
-      return await cls.saveFrom(model, this, key);
+      return await cls.saveFrom(this, key);
     }
     async createFrom(key) {
-      return await cls.createFrom(model, this, key);
+      return await cls.createFrom(this, key);
     }
     async updateFrom(key) {
-      return await cls.updateFrom(model, this, key);
+      return await cls.updateFrom(this, key);
     }
     validate(names, key) {
-      return cls.validate(model, this, names, key);
+      return cls.validate(this, names, key);
     }
     validateUpdate(names) {
-      return cls.validateUpdate(model, this, names);
+      return cls.validateUpdate(this, names);
     }
     validateCreate(names) {
-      return cls.validateCreate(model, this, names);
+      return cls.validateCreate(this, names);
     }
   }
   return Record
@@ -358,7 +358,7 @@ class Model {
       }
     }
     if (!model.abstract) {
-      model.Record = makeRecordClass(model, this);
+      model.Record = makeRecordClass(model, ConcreteModel);
     }
     ConcreteModel.Sql = model.Sql
     ConcreteModel.Record = model.Record
@@ -481,13 +481,14 @@ class Model {
     key = key || this.primaryKey;
     let prepared = this.prepareForDb(data, undefined, true);
     let lookValue = assert(data[key], "no key provided for update");
-    let res = await Sql.prototype
+    let updateResult = await Sql.prototype
       .update.call(this.Sql.new(), prepared)
       .where({ [key]: lookValue })
+      .returning(key)
       .execr();
-    if (res.affectedRows === 1) {
+    if (updateResult.length === 1) {
       return this.new(data);
-    } else if (res.affectedRows === 0) {
+    } else if (updateResult.length === 0) {
       throw new Error(
         `update failed, record does not exist(model:${this.tableName}, key:${key}, value:${lookValue})`
       );

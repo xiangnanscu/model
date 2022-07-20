@@ -1,4 +1,4 @@
-import Model from './model.mjs'
+import Model from './src/model.mjs'
 import postgres from 'postgres'
 
 function p() {

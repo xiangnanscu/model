@@ -1,6 +1,6 @@
 {
   "name": "@xiangnanscu/model",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "model",
   "main": "src/model.mjs",
   "scripts": {
@@ -13,6 +13,7 @@
     "rr": "npm run rename && npm run replace",
     "replace": "find .  -type d \\( -name .git -o -name node_modules \\) -prune -o  -type f  -exec  sed -i s/model/model/g {} \\;",
     "rename": "rename s/sql/model/g src/*",
+    "u": "ncu -u && npm install",
     "test": "yarn node --experimental-vm-modules $(yarn bin jest)"
   },
   "repository": {
@@ -37,8 +38,8 @@
   },
   "dependencies": {
     "@xiangnanscu/field": "^0.7.0",
-    "@xiangnanscu/modelsql": "latest",
-    "@xiangnanscu/sql": "^0.5.0",
+    "@xiangnanscu/modelsql": "^0.11.0",
+    "@xiangnanscu/sql": "^0.6.0",
     "postgres": "^3.2.4"
   }
 }

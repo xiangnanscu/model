@@ -7,12 +7,12 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "prerelease": "npm --no-git-tag-version version minor",
+    "prerelease": "npm run u && npm --no-git-tag-version version minor",
     "release": "push_option=release npm run push",
     "push": "git add . && git commit -am \"${msg:-push}\" && git push --push-option=${push_option:-nothing}",
     "rr": "npm run rename && npm run replace",
     "replace": "find .  -type d \\( -name .git -o -name node_modules \\) -prune -o  -type f  -exec  sed -i s/model/model/g {} \\;",
-    "rename": "rename s/sql/model/g src/*",
+    "rename": "rename s/model/model/g src/*",
     "u": "ncu -u && npm install",
     "test": "yarn node --experimental-vm-modules $(yarn bin jest)"
   },
@@ -37,7 +37,7 @@
     "vue": "^3.2.37"
   },
   "dependencies": {
-    "@xiangnanscu/field": "^0.7.0",
+    "@xiangnanscu/field": "^0.8.0",
     "@xiangnanscu/modelsql": "^0.11.0",
     "@xiangnanscu/sql": "^0.6.0",
     "postgres": "^3.2.4"

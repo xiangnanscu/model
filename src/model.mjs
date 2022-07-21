@@ -218,7 +218,7 @@ class Model {
     model.fields = {};
     for (let name of optsNames) {
       checkReserved(name);
-      if (false) {
+      if (name!=='name' && this[name] !== undefined) {
         throw new Error(
           `field name "${name}" conflicts with model class attributes`
         );
@@ -524,10 +524,11 @@ class Model {
     }
     return prepared;
   }
+  static skipValidate(skip) {
+    return this.Sql.new().skipValidate(skip);
+  }
   static validate(input, names, key) {
-    if (input === true || input === false) {
-      return this.Sql.new().validate(input);
-    } else if (input[key || this.primaryKey]) {
+    if (input[key || this.primaryKey] !== undefined) {
       return this.validateUpdate(input, names);
     } else {
       return this.validateCreate(input, names);

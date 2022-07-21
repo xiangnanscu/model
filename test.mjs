@@ -177,4 +177,10 @@ it("insert raise max batch error", () => {
   expect(() => Usr.insert([{ name: "u2", age: 2 }, { name: "u1", age: 500 }]))
     .toThrow(expect.objectContaining({ name: "age", message: `值不能大于${Usr.fields.age.max}`,label:"年龄",index:1 }))
 })
+
+it("insert skip max batch error", () => {
+  expect(Usr.skipValidate().insert([{ name: "u2", age: 2 }, { name: "u1", age: 500 }]))
+    .toMatchObject({ "_skipValidate": true})
+})
+
 await sql.end()

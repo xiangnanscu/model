@@ -46,8 +46,6 @@
   },
   "dependencies": {
     "@xiangnanscu/field": "^0.8.0",
-    "@xiangnanscu/modelsql": "^0.15.0",
-    "@xiangnanscu/sql": "^0.6.0",
     "postgres": "^3.2.4"
   }
 }

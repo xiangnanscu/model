@@ -218,7 +218,7 @@ class Model {
     model.fields = {};
     for (let name of optsNames) {
       checkReserved(name);
-      if (name!=='name' && this[name] !== undefined) {
+      if (name !== 'name' && this[name] !== undefined) {
         throw new Error(
           `field name "${name}" conflicts with model class attributes`
         );

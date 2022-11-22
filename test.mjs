@@ -14,11 +14,11 @@ const sql = postgres({
   idle_timeout: 20,
   connect_timeout: 2,
 });
-const query = async (statement) => {
-  // p(statement)
+const defaultQuery = async (statement) => {
+  p(statement)
   return await sql.unsafe(statement);
 };
-await query(`
+await defaultQuery(`
 DROP TABLE IF EXISTS profile;
 DROP TABLE IF EXISTS usr;
 
@@ -32,7 +32,7 @@ CREATE TABLE profile (
   info varchar(50));
 `);
 const Usr = Model.createModel({
-  query,
+  defaultQuery,
   tableName: "usr",
   fields: {
     name: { label: "姓名", unique: true, maxlength: 4, minlength: 1 },
@@ -40,7 +40,7 @@ const Usr = Model.createModel({
   },
 });
 const Profile = Model.createModel({
-  query,
+  defaultQuery,
   tableName: "profile",
   fields: {
     usrName: { label: "用户", reference: Usr, referenceColumn: "name" },
@@ -163,11 +163,12 @@ const u1 = await Usr.get({ name: "u1" });
 test("test saveCreate", async () => {
   expect(u1).toMatchObject({ name: "u1", age: 50 });
 });
-usr_from_saveCreate.age = 33;
+
+usr_from_saveCreate.age = 66;
 await usr_from_saveCreate.save();
 const u1_after_save = await Usr.get({ name: "u1" });
 test("test save", async () => {
-  expect(u1_after_save).toMatchObject({ name: "u1", age: 33 });
+  expect(u1_after_save).toMatchObject({ name: "u1", age: 66 });
 });
 
 await Usr.saveUpdate({ name: "u1", age: 13 }, ["age"], "name");

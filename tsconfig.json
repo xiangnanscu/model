@@ -21,9 +21,9 @@
       "DOM"
     ],
     "skipLibCheck": true,
+    "allowJs": true,
     "noEmit": true
   },
-  "allowJs": true,
   "include": [
     "src/**/*.ts",
     "src/**/*.d.ts",

@@ -4,6 +4,7 @@ require("@rushstack/eslint-patch/modern-module-resolution");
 module.exports = {
   root: true,
   rules: {
+    semi: [0, "never"],
     "prefer-const": [
       "error",
       {

@@ -15,20 +15,18 @@ const npmUrl = `https://www.npmjs.com/package/${packages.name}`;
 </script>
 
 <template>
-  <h1>
-    <a :href="githubRepoUrl">{{ packages.name }}</a
-    >-<a :href="npmUrl">{{ packages.version }}</a>
-  </h1>
-  <MainPage />
+
+  <a-layout theme="light">
+    <a-layout-header theme="light">
+      <h1>
+        <a :href="githubRepoUrl">{{ packages.name }}</a
+        >-<a :href="npmUrl">{{ packages.version }}</a>
+      </h1></a-layout-header
+    >
+    <a-layout-content><MainPage /></a-layout-content>
+  </a-layout>
 </template>
 
 <style>
-#app {
-  font-family: Avenir, Helvetica, Arial, sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  text-align: center;
-  color: #2c3e50;
-  margin-top: 60px;
-}
+
 </style>

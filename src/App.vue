@@ -1,22 +1,24 @@
 <script setup>
-import { computed, onMounted } from 'vue';
-import MainPage from './components/MainPage.vue'
-import packages from '../package.json'
-
+import { computed, onMounted } from "vue";
+import MainPage from "./components/MainPage.vue";
+import packages from "../package.json";
 
 const githubRepoUrl = computed(() => {
-  let matched = packages.name.match(/@(\w+)\/(\w+)/)
+  const matched = packages.name.match(/@(\w+)\/(\w+)/);
   if (matched) {
-    return `https://github.com/${matched[1]}/${matched[2]}.git`
+    return `https://github.com/${matched[1]}/${matched[2]}.git`;
   } else {
-    return `https://github.com/xiangnanscu/${packages.name}.git`
+    return `https://github.com/xiangnanscu/${packages.name}.git`;
   }
-})
-const npmUrl = `https://www.npmjs.com/package/${packages.name}`
+});
+const npmUrl = `https://www.npmjs.com/package/${packages.name}`;
 </script>
 
 <template>
-  <h1><a :href="githubRepoUrl">{{ packages.name }}</a>-<a :href="npmUrl">{{ packages.version }}</a></h1>
+  <h1>
+    <a :href="githubRepoUrl">{{ packages.name }}</a
+    >-<a :href="npmUrl">{{ packages.version }}</a>
+  </h1>
   <MainPage />
 </template>
 

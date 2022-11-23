@@ -1,10 +1,10 @@
 import Field from "@xiangnanscu/field";
 
-let DEFAULT_STRING_MAXLENGTH = 256;
-let FOREIGN_KEY = 2;
-let NON_FOREIGN_KEY = 3;
-let END = 4;
-let COMPARE_OPERATORS = {
+const DEFAULT_STRING_MAXLENGTH = 256;
+const FOREIGN_KEY = 2;
+const NON_FOREIGN_KEY = 3;
+const END = 4;
+const COMPARE_OPERATORS = {
   lt: "<",
   lte: "<=",
   gt: ">",
@@ -12,7 +12,7 @@ let COMPARE_OPERATORS = {
   ne: "<>",
   eq: "=",
 };
-let IS_PG_KEYWORDS = {
+const IS_PG_KEYWORDS = {
   ALL: true,
   ANALYSE: true,
   ANALYZE: true,
@@ -114,7 +114,7 @@ let IS_PG_KEYWORDS = {
   WINDOW: true,
   WITH: true,
 };
-let NON_MERGE_NAMES = {
+const NON_MERGE_NAMES = {
   sql: true,
   fields: true,
   fieldNames: true,
@@ -135,7 +135,7 @@ const SHARED_NAMES = [
   "nameCache",
   "labelToName",
   "nameToLabel",
-  "XodelInstanceMeta",
+  "Record",
   "defaultQuery",
 ];
 const getLocalTime = Field.basefield.getLocalTime;
@@ -162,7 +162,7 @@ const stringFormat = (s, ...varargs) => {
   }
   return res.join("");
 };
-let baseModel = {
+const baseModel = {
   abstract: true,
   fieldNames: Array(["id", "ctime", "utime"]),
   fields: {
@@ -179,7 +179,7 @@ function _prefixWith_V(column) {
   return "V." + column;
 }
 function map(tbl, func) {
-  let res = [];
+  const res = [];
   for (let i = 0; i < tbl.length; i = i + 1) {
     res[i] = func(tbl[i]);
   }
@@ -198,8 +198,8 @@ function checkReserved(name) {
 }
 function normalizeArrayAndHashFields(fields) {
   assert(typeof fields === "object", "you must provide fields for a model");
-  let alignedFields = [];
-  for (let [name, field] of Object.entries(fields)) {
+  const alignedFields = [];
+  for (const [name, field] of Object.entries(fields)) {
     if (typeof name === "number") {
       assert(
         field.name,
@@ -217,15 +217,15 @@ function normalizeFieldNames(fieldNames) {
     typeof fieldNames === "object",
     "you must provide field_names for a model"
   );
-  for (let name of fieldNames) {
+  for (const name of fieldNames) {
     assert(typeof name === "string", "element of field_names must be string");
   }
   return Array(fieldNames);
 }
 function getForeignObject(attrs, prefix) {
-  let fk = {};
-  let n = prefix.length;
-  for (let [k, v] of Object.entries(attrs)) {
+  const fk = {};
+  const n = prefix.length;
+  for (const [k, v] of Object.entries(attrs)) {
     if (k.slice(0, n) === prefix) {
       fk[k.slice(n)] = v;
       delete attrs[k];
@@ -233,39 +233,35 @@ function getForeignObject(attrs, prefix) {
   }
   return fk;
 }
-function makeRecordMeta(model) {
-  function RecordMeta(attrs) {
-    Object.assign(this, attrs);
+function makeRecordClass(model) {
+  class Record {
+    constructor(attrs) {
+      Object.assign(this, attrs);
+    }
+    async delete(key) {
+      key = key || model.primaryKey;
+      return await model.delete({ [key]: this[key] }).exec();
+    }
+    async save(names, key) {
+      return await model.save(this, names, key);
+    }
+    async saveCreate(names, key) {
+      return await model.saveCreate(this, names, key);
+    }
+    async saveUpdate(names, key) {
+      return await model.saveUpdate(this, names, key);
+    }
+    validate(names, key) {
+      return model.validate(this, names, key);
+    }
+    validateUpdate(names) {
+      return model.validateUpdate(this, names);
+    }
+    validateCreate(names) {
+      return model.validateCreate(this, names);
+    }
   }
-  RecordMeta.prototype.delete = function (key) {
-    key = key || model.primaryKey;
-    return model.delete({ [key]: this[key] }).exec();
-  };
-  RecordMeta.prototype.save = function (names, key) {
-    return model.save(this, names, key);
-  };
-  RecordMeta.prototype.saveCreate = function (names, key) {
-    return model.saveCreate(this, names, key);
-  };
-  RecordMeta.prototype.saveUpdate = function (names, key) {
-    return model.saveUpdate(this, names, key);
-  };
-  RecordMeta.prototype.createFrom = function (key) {
-    return model.createFrom(this, key);
-  };
-  RecordMeta.prototype.updateFrom = function (key) {
-    return model.updateFrom(this, key);
-  };
-  RecordMeta.prototype.validate = function (names, key) {
-    return model.validate(this, names, key);
-  };
-  RecordMeta.prototype.validateUpdate = function (names) {
-    return model.validateUpdate(this, names);
-  };
-  RecordMeta.prototype.validateCreate = function (names) {
-    return model.validateCreate(this, names);
-  };
-  return RecordMeta;
+  return Record;
 }
 function assert(bool, errMsg) {
   if (!bool) {
@@ -293,7 +289,7 @@ function checkUpsertKey(rows, key) {
   assert(key, "no key for upsert");
   if (rows instanceof Array) {
     if (typeof key === "string") {
-      for (let [i, row] of rows.entries()) {
+      for (const [i, row] of rows.entries()) {
         if (row[key] === undefined || row[key] === "") {
           throw new ValidateBatchError({
             message: "value of key is required for upsert/merge",
@@ -303,9 +299,9 @@ function checkUpsertKey(rows, key) {
         }
       }
     } else {
-      for (let row of rows) {
+      for (const row of rows) {
         let emptyKeys = true;
-        for (let k of key) {
+        for (const k of key) {
           if (!(row[k] === undefined || row[k] === "")) {
             emptyKeys = false;
             break;
@@ -324,7 +320,7 @@ function checkUpsertKey(rows, key) {
       });
     }
   } else {
-    for (let k of key) {
+    for (const k of key) {
       if (rows[k] === undefined || rows[k] === "") {
         throw new ValidateError({
           name: k,
@@ -336,7 +332,7 @@ function checkUpsertKey(rows, key) {
   return [rows, key];
 }
 function makeFieldFromJson(json, kwargs) {
-  let options = { ...json, ...kwargs };
+  const options = { ...json, ...kwargs };
   if (!options.type) {
     if (options.reference) {
       options.type = "foreignkey";
@@ -352,7 +348,7 @@ function makeFieldFromJson(json, kwargs) {
   ) {
     options.maxlength = DEFAULT_STRING_MAXLENGTH;
   }
-  let fcls = Field[options.type];
+  const fcls = Field[options.type];
   if (!fcls) {
     throw new Error("invalid field type:" + String(options.type));
   }
@@ -364,9 +360,9 @@ function makeToken(s) {
   }
   return rawToken;
 }
-let DEFAULT = makeToken("DEFAULT");
-let NULL = makeToken("NULL");
-let PG_SET_MAP = {
+const DEFAULT = makeToken("DEFAULT");
+const NULL = makeToken("NULL");
+const PG_SET_MAP = {
   _union: "UNION",
   _unionAll: "UNION ALL",
   _except: "EXCEPT",
@@ -396,7 +392,7 @@ function _escapeFactory(isLiteral, isBracket) {
       if (value.length === 0) {
         throw new Error("empty array as Sql value is not allowed");
       }
-      let token = value.map(asSqlToken).join(", ");
+      const token = value.map(asSqlToken).join(", ");
       if (isBracket) {
         return "(" + token + ")";
       } else {
@@ -410,15 +406,15 @@ function _escapeFactory(isLiteral, isBracket) {
   }
   return asSqlToken;
 }
-let asLiteral = _escapeFactory(true, true);
-let asToken = _escapeFactory(false, false);
+const asLiteral = _escapeFactory(true, true);
+const asToken = _escapeFactory(false, false);
 function getCteReturningValues(columns, literals) {
-  let values = [];
-  for (let col of columns) {
+  const values = [];
+  for (const col of columns) {
     values.push(asToken(col));
   }
   if (literals) {
-    for (let e of literals) {
+    for (const e of literals) {
       values.push(asLiteral(e));
     }
   }
@@ -436,192 +432,194 @@ function getReturningToken(opts) {
 function assembleSql(opts) {
   let statement;
   if (opts.update) {
-    let from = (opts.from && " FROM " + opts.from) || "";
-    let where = (opts.where && " WHERE " + opts.where) || "";
-    let returning = getReturningToken(opts);
+    const from = (opts.from && " FROM " + opts.from) || "";
+    const where = (opts.where && " WHERE " + opts.where) || "";
+    const returning = getReturningToken(opts);
     statement = `UPDATE ${opts.tableName} SET ${opts.update}${from}${where}${returning}`;
   } else if (opts.insert) {
-    let returning = getReturningToken(opts);
+    const returning = getReturningToken(opts);
     statement = `INSERT INTO ${opts.tableName} ${opts.insert}${returning}`;
   } else if (opts.delete) {
-    let using = (opts.using && " USING " + opts.using) || "";
-    let where = (opts.where && " WHERE " + opts.where) || "";
-    let returning = getReturningToken(opts);
+    const using = (opts.using && " USING " + opts.using) || "";
+    const where = (opts.where && " WHERE " + opts.where) || "";
+    const returning = getReturningToken(opts);
     statement = `DELETE FROM ${opts.tableName}${using}${where}${returning}`;
   } else {
-    let from = opts.from || opts.tableName;
-    let where = (opts.where && " WHERE " + opts.where) || "";
-    let group = (opts.group && " GROUP BY " + opts.group) || "";
-    let having = (opts.having && " HAVING " + opts.having) || "";
-    let order = (opts.order && " ORDER BY " + opts.order) || "";
-    let limit = (opts.limit && " LIMIT " + opts.limit) || "";
-    let offset = (opts.offset && " OFFSET " + opts.offset) || "";
-    let distinct = (opts.distinct && "DISTINCT ") || "";
-    let select = opts.select || "*";
+    const from = opts.from || opts.tableName;
+    const where = (opts.where && " WHERE " + opts.where) || "";
+    const group = (opts.group && " GROUP BY " + opts.group) || "";
+    const having = (opts.having && " HAVING " + opts.having) || "";
+    const order = (opts.order && " ORDER BY " + opts.order) || "";
+    const limit = (opts.limit && " LIMIT " + opts.limit) || "";
+    const offset = (opts.offset && " OFFSET " + opts.offset) || "";
+    const distinct = (opts.distinct && "DISTINCT ") || "";
+    const select = opts.select || "*";
     statement = `SELECT ${distinct}${select} FROM ${from}${where}${group}${having}${order}${limit}${offset}`;
   }
   return (opts.with && `WITH ${opts.with} ${statement}`) || statement;
 }
 
-function XodelProxy(attrs) {
-  Object.assign(this, attrs);
+class ModelProxy {
+  constructor(attrs) {
+    Object.assign(this, attrs);
+  }
+  static createProxy(modelclass) {
+    return new this({
+      modelclass: modelclass,
+      tableName: modelclass.tableName,
+      fieldNames: modelclass.fieldNames,
+      fields: modelclass.fields,
+      abstract: modelclass.abstract,
+    });
+  }
+  new(attr) {
+    return this.modelclass.new(attr);
+  }
+  async all() {
+    return await this.modelclass.all();
+  }
+  async save(input, names, key) {
+    return await this.modelclass.save(input, names, key);
+  }
+  async saveCreate(input, names, key) {
+    return await this.modelclass.saveCreate(input, names, key);
+  }
+  async saveUpdate(input, names, key) {
+    return await this.modelclass.saveUpdate(input, names, key);
+  }
+  validate(input, names, key) {
+    return this.modelclass.validate(input, names, key);
+  }
+  validateCreate(input, names) {
+    return this.modelclass.validateCreate(input, names);
+  }
+  validateUpdate(input, names) {
+    return this.modelclass.validateUpdate(input, names);
+  }
+  load(data) {
+    return this.modelclass.load(data);
+  }
+  async count(cond, op, dval) {
+    return await this.modelclass.count(cond, op, dval);
+  }
+  async filter(kwargs) {
+    return await this.modelclass.filter(kwargs);
+  }
+  async getOrCreate(params, defaults) {
+    return await this.modelclass.newSql().getOrCreate(params, defaults);
+  }
+  select(a, b, ...varargs) {
+    return this.modelclass.newSql().select(a, b, ...varargs);
+  }
+  as(tableAlias) {
+    return this.modelclass.newSql().as(tableAlias);
+  }
+  limit(n) {
+    return this.modelclass.newSql().limit(n);
+  }
+  offset(n) {
+    return this.modelclass.newSql().offset(n);
+  }
+  commit(bool) {
+    return this.modelclass.newSql().commit(bool);
+  }
+  skipValidate(bool) {
+    return this.modelclass.newSql().skipValidate(bool);
+  }
+  with(name, token) {
+    return this.modelclass.newSql().with(name, token);
+  }
+  withValues(name, rows) {
+    return this.modelclass.newSql().withValues(name, rows);
+  }
+  insert(rows, columns) {
+    return this.modelclass.newSql().insert(rows, columns);
+  }
+  async get(cond, op, dval) {
+    return await this.modelclass.newSql().get(cond, op, dval);
+  }
+  update(row, columns) {
+    return this.modelclass.newSql().update(row, columns);
+  }
+  delete(a, b, c) {
+    return this.modelclass.newSql().delete(a, b, c);
+  }
+  getMerge(rows, key) {
+    return this.modelclass.newSql().getMerge(rows, key);
+  }
+  async getMultiple(keys, columns) {
+    return await this.modelclass.newSql().getMultiple(keys, columns);
+  }
+  async merge(rows, key, columns) {
+    return await this.modelclass.newSql().merge(rows, key, columns);
+  }
+  async upsert(rows, key, columns) {
+    return await this.modelclass.newSql().upsert(rows, key, columns);
+  }
+  async updates(rows, key, columns) {
+    return await this.modelclass.newSql().updates(rows, key, columns);
+  }
+  group(...varargs) {
+    return this.modelclass.newSql().group(...varargs);
+  }
+  groupBy(...varargs) {
+    return this.modelclass.newSql().groupBy(...varargs);
+  }
+  order(...varargs) {
+    return this.modelclass.newSql().order(...varargs);
+  }
+  orderBy(...varargs) {
+    return this.modelclass.newSql().orderBy(...varargs);
+  }
+  join(joinArgs, key, op, val) {
+    return this.modelclass.newSql().join(joinArgs, key, op, val);
+  }
+  leftJoin(joinArgs, key, op, val) {
+    return this.modelclass.newSql().leftJoin(joinArgs, key, op, val);
+  }
+  rightJoin(joinArgs, key, op, val) {
+    return this.modelclass.newSql().rightJoin(joinArgs, key, op, val);
+  }
+  fullJoin(joinArgs, key, op, val) {
+    return this.modelclass.newSql().fullJoin(joinArgs, key, op, val);
+  }
+  loadFk(fkName, selectNames, ...varargs) {
+    return this.modelclass.newSql().loadFk(fkName, selectNames, ...varargs);
+  }
+  where(cond, op, dval) {
+    return this.modelclass.newSql().where(cond, op, dval);
+  }
+  whereOr(cond, op, dval) {
+    return this.modelclass.newSql().whereOr(cond, op, dval);
+  }
+  whereNot(cond, op, dval) {
+    return this.modelclass.newSql().whereNot(cond, op, dval);
+  }
+  whereExists(builder) {
+    return this.modelclass.newSql().whereExists(builder);
+  }
+  whereNotExists(builder) {
+    return this.modelclass.newSql().whereNotExists(builder);
+  }
+  whereIn(cols, range) {
+    return this.modelclass.newSql().whereIn(cols, range);
+  }
+  whereNotIn(cols, range) {
+    return this.modelclass.newSql().whereNotIn(cols, range);
+  }
+  whereNull(col) {
+    return this.modelclass.newSql().whereNull(col);
+  }
+  whereNotNull(col) {
+    return this.modelclass.newSql().whereNotNull(col);
+  }
+  whereBetween(col, low, high) {
+    return this.modelclass.newSql().whereBetween(col, low, high);
+  }
+  whereNotBetween(col, low, high) {
+    return this.modelclass.newSql().whereNotBetween(col, low, high);
+  }
 }
-XodelProxy.createProxy = function (modelclass) {
-  return new this({
-    modelclass: modelclass,
-    tableName: modelclass.tableName,
-    fieldNames: modelclass.fieldNames,
-    fields: modelclass.fields,
-    abstract: modelclass.abstract,
-  });
-};
-XodelProxy.prototype.new = function (attr) {
-  return this.modelclass.new(attr);
-};
-XodelProxy.prototype.all = async function () {
-  return await this.modelclass.all();
-};
-XodelProxy.prototype.save = async function (input, names, key) {
-  return await this.modelclass.save(input, names, key);
-};
-XodelProxy.prototype.saveCreate = async function (input, names, key) {
-  return await this.modelclass.saveCreate(input, names, key);
-};
-XodelProxy.prototype.saveUpdate = async function (input, names, key) {
-  return await this.modelclass.saveUpdate(input, names, key);
-};
-XodelProxy.prototype.validate = function (input, names, key) {
-  return this.modelclass.validate(input, names, key);
-};
-XodelProxy.prototype.validateCreate = function (input, names) {
-  return this.modelclass.validateCreate(input, names);
-};
-XodelProxy.prototype.validateUpdate = function (input, names) {
-  return this.modelclass.validateUpdate(input, names);
-};
-XodelProxy.prototype.load = function (data) {
-  return this.modelclass.load(data);
-};
-XodelProxy.prototype.count = async function (cond, op, dval) {
-  return await this.modelclass.count(cond, op, dval);
-};
-XodelProxy.prototype.filter = async function (kwargs) {
-  return await this.modelclass.filter(kwargs);
-};
-XodelProxy.prototype.getOrCreate = async function (params, defaults) {
-  return await this.modelclass.newSql().getOrCreate(params, defaults);
-};
-XodelProxy.prototype.select = function (a, b, ...varargs) {
-  return this.modelclass.newSql().select(a, b, ...varargs);
-};
-XodelProxy.prototype.as = function (tableAlias) {
-  return this.modelclass.newSql().as(tableAlias);
-};
-XodelProxy.prototype.limit = function (n) {
-  return this.modelclass.newSql().limit(n);
-};
-XodelProxy.prototype.offset = function (n) {
-  return this.modelclass.newSql().offset(n);
-};
-XodelProxy.prototype.commit = function (bool) {
-  return this.modelclass.newSql().commit(bool);
-};
-XodelProxy.prototype.skipValidate = function (bool) {
-  return this.modelclass.newSql().skipValidate(bool);
-};
-XodelProxy.prototype.with = function (name, token) {
-  return this.modelclass.newSql().with(name, token);
-};
-XodelProxy.prototype.withValues = function (name, rows) {
-  return this.modelclass.newSql().withValues(name, rows);
-};
-XodelProxy.prototype.insert = function (rows, columns) {
-  return this.modelclass.newSql().insert(rows, columns);
-};
-XodelProxy.prototype.get = async function (cond, op, dval) {
-  return await this.modelclass.newSql().get(cond, op, dval);
-};
-XodelProxy.prototype.update = function (row, columns) {
-  return this.modelclass.newSql().update(row, columns);
-};
-XodelProxy.prototype.delete = function (a, b, c) {
-  return this.modelclass.newSql().delete(a, b, c);
-};
-XodelProxy.prototype.getMerge = function (rows, key) {
-  return this.modelclass.newSql().getMerge(rows, key);
-};
-XodelProxy.prototype.getMultiple = async function (keys, columns) {
-  return await this.modelclass.newSql().getMultiple(keys, columns);
-};
-XodelProxy.prototype.merge = async function (rows, key, columns) {
-  return await this.modelclass.newSql().merge(rows, key, columns);
-};
-XodelProxy.prototype.upsert = async function (rows, key, columns) {
-  return await this.modelclass.newSql().upsert(rows, key, columns);
-};
-XodelProxy.prototype.updates = async function (rows, key, columns) {
-  return await this.modelclass.newSql().updates(rows, key, columns);
-};
-XodelProxy.prototype.group = function (...varargs) {
-  return this.modelclass.newSql().group(...varargs);
-};
-XodelProxy.prototype.groupBy = function (...varargs) {
-  return this.modelclass.newSql().groupBy(...varargs);
-};
-XodelProxy.prototype.order = function (...varargs) {
-  return this.modelclass.newSql().order(...varargs);
-};
-XodelProxy.prototype.orderBy = function (...varargs) {
-  return this.modelclass.newSql().orderBy(...varargs);
-};
-XodelProxy.prototype.join = function (joinArgs, key, op, val) {
-  return this.modelclass.newSql().join(joinArgs, key, op, val);
-};
-XodelProxy.prototype.leftJoin = function (joinArgs, key, op, val) {
-  return this.modelclass.newSql().leftJoin(joinArgs, key, op, val);
-};
-XodelProxy.prototype.rightJoin = function (joinArgs, key, op, val) {
-  return this.modelclass.newSql().rightJoin(joinArgs, key, op, val);
-};
-XodelProxy.prototype.fullJoin = function (joinArgs, key, op, val) {
-  return this.modelclass.newSql().fullJoin(joinArgs, key, op, val);
-};
-XodelProxy.prototype.loadFk = function (fkName, selectNames, ...varargs) {
-  return this.modelclass.newSql().loadFk(fkName, selectNames, ...varargs);
-};
-XodelProxy.prototype.where = function (cond, op, dval) {
-  return this.modelclass.newSql().where(cond, op, dval);
-};
-XodelProxy.prototype.whereOr = function (cond, op, dval) {
-  return this.modelclass.newSql().whereOr(cond, op, dval);
-};
-XodelProxy.prototype.whereNot = function (cond, op, dval) {
-  return this.modelclass.newSql().whereNot(cond, op, dval);
-};
-XodelProxy.prototype.whereExists = function (builder) {
-  return this.modelclass.newSql().whereExists(builder);
-};
-XodelProxy.prototype.whereNotExists = function (builder) {
-  return this.modelclass.newSql().whereNotExists(builder);
-};
-XodelProxy.prototype.whereIn = function (cols, range) {
-  return this.modelclass.newSql().whereIn(cols, range);
-};
-XodelProxy.prototype.whereNotIn = function (cols, range) {
-  return this.modelclass.newSql().whereNotIn(cols, range);
-};
-XodelProxy.prototype.whereNull = function (col) {
-  return this.modelclass.newSql().whereNull(col);
-};
-XodelProxy.prototype.whereNotNull = function (col) {
-  return this.modelclass.newSql().whereNotNull(col);
-};
-XodelProxy.prototype.whereBetween = function (col, low, high) {
-  return this.modelclass.newSql().whereBetween(col, low, high);
-};
-XodelProxy.prototype.whereNotBetween = function (col, low, high) {
-  return this.modelclass.newSql().whereNotBetween(col, low, high);
-};
 
 class Model {
   static ValidateError = ValidateError;
@@ -640,8 +638,8 @@ class Model {
     return new this(self);
   }
   static createModel(options) {
-    let XodelClass = this.makeModelClass(this.normalize(options));
-    return XodelProxy.createProxy(XodelClass);
+    const XodelClass = this.makeModelClass(this.normalize(options));
+    return ModelProxy.createProxy(XodelClass);
   }
   static makeModelClass(opts) {
     class ConcreteModel extends this {
@@ -682,11 +680,11 @@ class Model {
       prepareDbRows(rows, columns, isUpdate) {
         return ConcreteModel.prepareDbRows.call(this, rows, columns, isUpdate);
       }
-      validateCreate(input, names) {
-        return ConcreteModel.validateCreate.call(this, input, names);
-      }
       validate(input, names, key) {
         return ConcreteModel.validate.call(this, input, names, key);
+      }
+      validateCreate(input, names) {
+        return ConcreteModel.validateCreate.call(this, input, names);
       }
       validateUpdate(input, names) {
         return ConcreteModel.validateUpdate.call(this, input, names);
@@ -706,7 +704,7 @@ class Model {
     //   };
     // }
     if (!ConcreteModel.tableName) {
-      let namesHint =
+      const namesHint =
         (ConcreteModel.fieldNames && ConcreteModel.fieldNames.join(",")) ||
         "no field_names";
       throw new Error(
@@ -717,7 +715,7 @@ class Model {
     let pkDefined = false;
     ConcreteModel.foreignKeys = {};
     ConcreteModel.names = [];
-    for (let [name, field] of Object.entries(ConcreteModel.fields)) {
+    for (const [name, field] of Object.entries(ConcreteModel.fields)) {
       let fkModel = field.reference;
       if (fkModel === "self") {
         fkModel = ConcreteModel;
@@ -727,7 +725,7 @@ class Model {
         ConcreteModel.foreignKeys[name] = field;
       }
       if (field.primaryKey) {
-        let pkName = field.name;
+        const pkName = field.name;
         assert(
           !pkDefined,
           `duplicated primary key: "${pkName}" and "${pkDefined}"`
@@ -742,7 +740,7 @@ class Model {
         ConcreteModel.names.push(name);
       }
     }
-    let pkName = ConcreteModel.defaultPrimaryKey || "id";
+    const pkName = ConcreteModel.defaultPrimaryKey || "id";
     ConcreteModel.primaryKey = pkName;
     ConcreteModel.fields[pkName] = Field.integer.new({
       name: pkName,
@@ -753,7 +751,7 @@ class Model {
     ConcreteModel.nameCache = {};
     ConcreteModel.labelToName = {};
     ConcreteModel.nameToLabel = {};
-    for (let [name, field] of Object.entries(ConcreteModel.fields)) {
+    for (const [name, field] of Object.entries(ConcreteModel.fields)) {
       ConcreteModel.labelToName[field.label] = name;
       ConcreteModel.nameToLabel[name] = field.label;
       ConcreteModel.nameCache[name] = ConcreteModel.tableName + "." + name;
@@ -761,19 +759,19 @@ class Model {
         field.dbType = ConcreteModel.fields[field.referenceColumn].dbType;
       }
     }
-    ConcreteModel.XodelInstanceMeta = makeRecordMeta(ConcreteModel, this);
+    ConcreteModel.Record = makeRecordClass(ConcreteModel, this);
     for (const name of SHARED_NAMES) {
       ConcreteModel.prototype[name] = ConcreteModel[name];
     }
     return ConcreteModel;
   }
   static normalize(options) {
-    let _extends = options._extends;
-    let model = {};
-    let optsFields = normalizeArrayAndHashFields(options.fields || []);
+    const _extends = options._extends;
+    const model = {};
+    const optsFields = normalizeArrayAndHashFields(options.fields || []);
     let optsNames = options.fieldNames;
     if (!optsNames) {
-      let selfNames = Object.keys(optsFields);
+      const selfNames = Object.keys(optsFields);
       if (_extends) {
         optsNames = unique([..._extends.fieldNames, ...selfNames]);
       } else {
@@ -782,7 +780,7 @@ class Model {
     }
     model.fieldNames = normalizeFieldNames(clone(optsNames));
     model.fields = [];
-    for (let name of optsNames) {
+    for (const name of optsNames) {
       checkReserved(name);
       if (name !== "name" && this[name] !== undefined) {
         throw new Error(
@@ -791,7 +789,7 @@ class Model {
       }
       let field = optsFields[name];
       if (!field) {
-        let tname = options.tableName || "[abstract model]";
+        const tname = options.tableName || "[abstract model]";
         if (_extends) {
           field = _extends.fields[name];
           if (!field) {
@@ -804,7 +802,7 @@ class Model {
         }
       } else if (!(field instanceof Field.basefield)) {
         if (_extends) {
-          let pfield = _extends.fields[name];
+          const pfield = _extends.fields[name];
           if (pfield) {
             field = { ...pfield.getOptions(), ...field };
             if (pfield.model && field.model) {
@@ -827,7 +825,7 @@ class Model {
         });
       }
     }
-    for (let [key, value] of Object.entries(options)) {
+    for (const [key, value] of Object.entries(options)) {
       if (model[key] === undefined && !NON_MERGE_NAMES[key]) {
         model[key] = value;
       }
@@ -866,14 +864,14 @@ class Model {
     }
   }
   static mergeModel(a, b) {
-    let A = (a.__normalized__ && a) || this.normalize(a);
-    let B = (b.__normalized__ && b) || this.normalize(b);
-    let C = [];
-    let fieldNames = unique([...A.fieldNames, ...B.fieldNames]);
-    let fields = [];
-    for (let name of fieldNames) {
-      let af = A.fields[name];
-      let bf = B.fields[name];
+    const A = (a.__normalized__ && a) || this.normalize(a);
+    const B = (b.__normalized__ && b) || this.normalize(b);
+    const C = [];
+    const fieldNames = unique([...A.fieldNames, ...B.fieldNames]);
+    const fields = [];
+    for (const name of fieldNames) {
+      const af = A.fields[name];
+      const bf = B.fields[name];
       if (af && bf) {
         fields[name] = Model.mergeField(af, bf);
       } else if (af) {
@@ -885,8 +883,8 @@ class Model {
         );
       }
     }
-    for (let M of [A, B]) {
-      for (let [key, value] of Object.entries(M)) {
+    for (const M of [A, B]) {
+      for (const [key, value] of Object.entries(M)) {
         if (!NON_MERGE_NAMES[key]) {
           C[key] = value;
         }
@@ -897,9 +895,9 @@ class Model {
     return this.normalize(C);
   }
   static mergeField(a, b) {
-    let aopts = a instanceof Field ? a.getOptions() : clone(a);
-    let bopts = b instanceof Field ? b.getOptions() : clone(b);
-    let options = { ...aopts, ...bopts };
+    const aopts = a instanceof Field ? a.getOptions() : clone(a);
+    const bopts = b instanceof Field ? b.getOptions() : clone(b);
+    const options = { ...aopts, ...bopts };
     if (aopts.model && bopts.model) {
       options.model = this.mergeModel(aopts.model, bopts.model);
     }
@@ -909,7 +907,7 @@ class Model {
     return await this.newSql().where(kwargs).exec();
   }
   static async count(cond, op, dval) {
-    let res = await this.newSql()
+    const res = await this.newSql()
       .select("count(*)")
       .where(cond, op, dval)
       .compact()
@@ -917,7 +915,7 @@ class Model {
     return res[0][0];
   }
   static async all() {
-    let records = await this.defaultQuery("SELECT * FROM " + this.tableName);
+    const records = await this.defaultQuery("SELECT * FROM " + this.tableName);
     for (let i = 0; i < records.length; i = i + 1) {
       records[i] = this.load(records[i]);
     }
@@ -932,25 +930,25 @@ class Model {
     }
   }
   static async saveCreate(input, names, key) {
-    let data = this.validateCreate(input, names);
+    const data = this.validateCreate(input, names);
     return await this.createFrom(data, key);
   }
   static async saveUpdate(input, names, key) {
-    let data = this.validateUpdate(input, names);
+    const data = this.validateUpdate(input, names);
     key = key || this.primaryKey;
     data[key] = input[key];
     return await this.updateFrom(data, key);
   }
   static newRecord(data) {
-    return new this.XodelInstanceMeta(data);
+    return new this.Record(data);
   }
   static newSql() {
     return new this({ tableName: this.tableName });
   }
   static async createFrom(data, key) {
     key = key || this.primaryKey;
-    let prepared = this.prepareForDb(data);
-    let created = await this.newSql()
+    const prepared = this.prepareForDb(data);
+    const created = await this.newSql()
       ._baseInsert(prepared)
       ._baseReturning(key)
       .execr();
@@ -959,9 +957,9 @@ class Model {
   }
   static async updateFrom(data, key) {
     key = key || this.primaryKey;
-    let prepared = this.prepareForDb(data, undefined, true);
-    let lookValue = assert(data[key], "no key provided for update");
-    let updateResult = await this.newSql()
+    const prepared = this.prepareForDb(data, undefined, true);
+    const lookValue = assert(data[key], "no key provided for update");
+    const updateResult = await this.newSql()
       ._baseUpdate(prepared)
       .where({ [key]: lookValue })
       .returning(key)
@@ -986,10 +984,10 @@ class Model {
     }
   }
   static validateCreate(input, names) {
-    let data = {};
+    const data = {};
     let value;
-    for (let name of names || this.names) {
-      let field = this.fields[name];
+    for (const name of names || this.names) {
+      const field = this.fields[name];
       if (!field) {
         throw new Error(
           `invalid field name '${name}' for model '${this.tableName}'`
@@ -1030,10 +1028,10 @@ class Model {
     }
   }
   static validateUpdate(input, names) {
-    let data = {};
+    const data = {};
     let value;
-    for (let name of names || this.names) {
-      let field = this.fields[name];
+    for (const name of names || this.names) {
+      const field = this.fields[name];
       if (!field) {
         throw new Error(
           `invalid field name '${name}' for model '${this.tableName}'`
@@ -1068,19 +1066,19 @@ class Model {
     if (typeof err === "object") {
       return err;
     }
-    let captured = /^(?<name>.+?)~(?<message>.+?)$/.exec(err);
+    const captured = /^(?<name>.+?)~(?<message>.+?)$/.exec(err);
     if (!captured) {
       throw new Error("can't parse this model error message: " + err);
     } else {
-      let { name, message } = captured.groups;
-      let label = this.nameToLabel[name];
+      const { name, message } = captured.groups;
+      const label = this.nameToLabel[name];
       return { name: name, err: message, label: label, httpCode: 422 };
     }
   }
   static load(data) {
-    for (let name of this.names) {
-      let field = this.fields[name];
-      let value = data[name];
+    for (const name of this.names) {
+      const field = this.fields[name];
+      const value = data[name];
       if (value !== undefined) {
         if (!field.load) {
           data[name] = value;
@@ -1096,7 +1094,7 @@ class Model {
     columns = columns || this.getKeys(rows);
     if (rows instanceof Array) {
       cleaned = [];
-      for (let [index, row] of rows.entries()) {
+      for (const [index, row] of rows.entries()) {
         try {
           cleaned[index] = this.validateCreate(row, columns);
         } catch (error) {
@@ -1121,7 +1119,7 @@ class Model {
     columns = columns || this.getKeys(rows);
     if (rows instanceof Array) {
       cleaned = [];
-      for (let [index, row] of rows.entries()) {
+      for (const [index, row] of rows.entries()) {
         try {
           cleaned[index] = this.validateUpdate(row, columns);
         } catch (error) {
@@ -1138,40 +1136,40 @@ class Model {
     return [cleaned, columns];
   }
   static validateCreateRows(rows, key, columns) {
-    let [checkedRows, checkedKey] = checkUpsertKey(
+    const [checkedRows, checkedKey] = checkUpsertKey(
       rows,
       key || this.primaryKey
     );
-    let [cleanedRows, cleanedColumns] = this.validateCreateData(
+    const [cleanedRows, cleanedColumns] = this.validateCreateData(
       checkedRows,
       columns
     );
-    return [cleanedRows, cleanedColumns, checkedKey];
+    return [cleanedRows, checkedKey, cleanedColumns];
   }
   static validateUpdateRows(rows, key, columns) {
-    let [checkedRows, checkedKey] = checkUpsertKey(
+    const [checkedRows, checkedKey] = checkUpsertKey(
       rows,
       key || this.primaryKey
     );
-    let [cleanedRows, cleanedColumns] = this.validateUpdateData(
+    const [cleanedRows, cleanedColumns] = this.validateUpdateData(
       checkedRows,
       columns
     );
-    return [cleanedRows, cleanedColumns, checkedKey];
+    return [cleanedRows, checkedKey, cleanedColumns];
   }
   static prepareDbRows(rows, columns, isUpdate) {
     let cleaned;
     columns = columns || this.getKeys(rows);
     if (rows instanceof Array) {
       cleaned = [];
-      for (let [i, row] of rows.entries()) {
+      for (const [i, row] of rows.entries()) {
         cleaned[i] = this.prepareForDb(row, columns, isUpdate);
       }
     } else {
       cleaned = this.prepareForDb(rows, columns, isUpdate);
     }
     if (isUpdate) {
-      let utime = this.autoNowName;
+      const utime = this.autoNowName;
       if (utime && !columns.includes(utime)) {
         columns.push(utime);
       }
@@ -1181,18 +1179,18 @@ class Model {
     }
   }
   static prepareForDb(data, columns, isUpdate) {
-    let prepared = {};
-    for (let name of columns || this.names) {
-      let field = this.fields[name];
+    const prepared = {};
+    for (const name of columns || this.names) {
+      const field = this.fields[name];
       if (!field) {
         throw new Error(
           `invalid field name '${name}' for model '${this.tableName}'`
         );
       }
-      let value = data[name];
+      const value = data[name];
       if (field.prepareForDb && value !== undefined) {
         try {
-          let val = field.prepareForDb(value, data);
+          const val = field.prepareForDb(value, data);
           prepared[name] = val;
         } catch (error) {
           throw new ValidateError({
@@ -1211,11 +1209,11 @@ class Model {
     return prepared;
   }
   static getKeys(rows) {
-    let columns = [];
+    const columns = [];
     if (rows instanceof Array) {
-      let d = [];
-      for (let row of rows) {
-        for (let k of Object.keys(row)) {
+      const d = [];
+      for (const row of rows) {
+        for (const k of Object.keys(row)) {
           if (!d[k]) {
             d[k] = true;
             columns.push(k);
@@ -1223,7 +1221,7 @@ class Model {
         }
       }
     } else {
-      for (let k of Object.keys(rows)) {
+      for (const k of Object.keys(rows)) {
         columns.push(k);
       }
     }
@@ -1233,7 +1231,7 @@ class Model {
     return this.statement();
   }
   _baseSelect(a, b, ...varargs) {
-    let s = Model.prototype._baseGetSelectToken.call(this, a, b, ...varargs);
+    const s = Model.prototype._baseGetSelectToken.call(this, a, b, ...varargs);
     if (!this._select) {
       this._select = s;
     } else if (s !== undefined && s !== "") {
@@ -1292,11 +1290,11 @@ class Model {
   }
   _baseMerge(rows, key, columns) {
     [rows, columns] = this._getCteValuesLiteral(rows, columns, false);
-    let cteName = `V(${columns.join(", ")})`;
-    let cteValues = `(VALUES ${asToken(rows)})`;
-    let joinCond = this._getJoinConditions(key, "V", "T");
-    let valsColumns = columns.map(_prefixWith_V);
-    let insertSubquery = Model.new({ tableName: "V" })
+    const cteName = `V(${columns.join(", ")})`;
+    const cteValues = `(VALUES ${asToken(rows)})`;
+    const joinCond = this._getJoinConditions(key, "V", "T");
+    const valsColumns = columns.map(_prefixWith_V);
+    const insertSubquery = Model.new({ tableName: "V" })
       ._baseSelect(valsColumns)
       ._baseLeftJoin("U AS T", joinCond)
       ._baseWhereNull("T." + (Array.isArray(key) ? key[0] : key));
@@ -1336,8 +1334,8 @@ class Model {
   _baseUpdates(rows, key, columns) {
     if (rows instanceof Model) {
       columns = columns || rows._returningArgs.flat();
-      let cteName = `V(${columns.join(", ")})`;
-      let joinCond = this._getJoinConditions(
+      const cteName = `V(${columns.join(", ")})`;
+      const joinCond = this._getJoinConditions(
         key,
         "V",
         this._as || this.tableName
@@ -1351,9 +1349,9 @@ class Model {
       throw new Error("empty rows passed to updates");
     } else {
       [rows, columns] = this._getCteValuesLiteral(rows, columns, false);
-      let cteName = `V(${columns.join(", ")})`;
-      let cteValues = `(VALUES ${asToken(rows)})`;
-      let joinCond = this._getJoinConditions(
+      const cteName = `V(${columns.join(", ")})`;
+      const cteValues = `(VALUES ${asToken(rows)})`;
+      const joinCond = this._getJoinConditions(
         key,
         "V",
         this._as || this.tableName
@@ -1371,17 +1369,17 @@ class Model {
     }
     columns = columns || this.getKeys(keys[0]);
     [keys, columns] = this._getCteValuesLiteral(keys, columns, false);
-    let joinCond = this._getJoinConditions(
+    const joinCond = this._getJoinConditions(
       columns,
       "V",
       this._as || this.tableName
     );
-    let cteName = `V(${columns.join(", ")})`;
-    let cteValues = `(VALUES ${asToken(keys)})`;
+    const cteName = `V(${columns.join(", ")})`;
+    const cteValues = `(VALUES ${asToken(keys)})`;
     return this.with(cteName, cteValues).rightJoin("V", joinCond);
   }
   _baseReturning(a, b, ...varargs) {
-    let s = this._baseGetSelectToken(a, b, ...varargs);
+    const s = this._baseGetSelectToken(a, b, ...varargs);
     if (!this._returning) {
       this._returning = s;
     } else if (s !== undefined && s !== "") {
@@ -1412,40 +1410,40 @@ class Model {
     return this;
   }
   _baseJoin(rightTable, key, op, val) {
-    let joinToken = this._getJoinToken("INNER", rightTable, key, op, val);
+    const joinToken = this._getJoinToken("INNER", rightTable, key, op, val);
     this._from = `${this._from || this.getTable()} ${joinToken}`;
     return this;
   }
   _baseLeftJoin(rightTable, key, op, val) {
-    let joinToken = this._getJoinToken("LEFT", rightTable, key, op, val);
+    const joinToken = this._getJoinToken("LEFT", rightTable, key, op, val);
     this._from = `${this._from || this.getTable()} ${joinToken}`;
     return this;
   }
   _baseRightJoin(rightTable, key, op, val) {
-    let joinToken = this._getJoinToken("RIGHT", rightTable, key, op, val);
+    const joinToken = this._getJoinToken("RIGHT", rightTable, key, op, val);
     this._from = `${this._from || this.getTable()} ${joinToken}`;
     return this;
   }
   _baseFullJoin(rightTable, key, op, val) {
-    let joinToken = this._getJoinToken("FULL", rightTable, key, op, val);
+    const joinToken = this._getJoinToken("FULL", rightTable, key, op, val);
     this._from = `${this._from || this.getTable()} ${joinToken}`;
     return this;
   }
   _baseWhere(cond, op, dval) {
-    let whereToken = this._baseGetConditionToken(cond, op, dval);
+    const whereToken = this._baseGetConditionToken(cond, op, dval);
     return this._handleWhereToken(whereToken, "(%s) AND (%s)");
   }
   _baseGetConditionTokenFromTable(kwargs, logic) {
-    let tokens = [];
+    const tokens = [];
     if (Array.isArray(kwargs)) {
-      for (let value of kwargs) {
-        let token = Model.prototype._baseGetConditionToken.call(this, value);
+      for (const value of kwargs) {
+        const token = Model.prototype._baseGetConditionToken.call(this, value);
         if (token !== undefined && token !== "") {
           tokens.push("(" + token + ")");
         }
       }
     } else {
-      for (let [k, value] of Object.entries(kwargs)) {
+      for (const [k, value] of Object.entries(kwargs)) {
         tokens.push(`${k} = ${asLiteral(value)}`);
       }
     }
@@ -1457,17 +1455,17 @@ class Model {
   }
   _baseGetConditionToken(cond, op, dval) {
     if (op === undefined) {
-      let argtype = typeof cond;
+      const argtype = typeof cond;
       if (argtype === "object") {
         return Model.prototype._baseGetConditionTokenFromTable.call(this, cond);
       } else if (argtype === "string") {
         return cond;
       } else if (argtype === "function") {
-        let oldWhere = this._where;
+        const oldWhere = this._where;
         delete this._where;
-        let res = cond.call(this);
+        const res = cond.call(this);
         if (res === this) {
-          let groupWhere = this._where;
+          const groupWhere = this._where;
           if (groupWhere === undefined) {
             throw new Error(
               "no where token generate after calling condition function"
@@ -1490,7 +1488,7 @@ class Model {
     }
   }
   _baseWhereIn(cols, range) {
-    let inToken = this._getInToken(cols, range);
+    const inToken = this._getInToken(cols, range);
     if (this._where) {
       this._where = `(${this._where}) AND ${inToken}`;
     } else {
@@ -1499,7 +1497,7 @@ class Model {
     return this;
   }
   _baseWhereNotIn(cols, range) {
-    let notInToken = this._getInToken(cols, range, "NOT IN");
+    const notInToken = this._getInToken(cols, range, "NOT IN");
     if (this._where) {
       this._where = `(${this._where}) AND ${notInToken}`;
     } else {
@@ -1540,7 +1538,7 @@ class Model {
     return this;
   }
   _baseOrWhereIn(cols, range) {
-    let inToken = this._getInToken(cols, range);
+    const inToken = this._getInToken(cols, range);
     if (this._where) {
       this._where = `${this._where} OR ${inToken}`;
     } else {
@@ -1549,7 +1547,7 @@ class Model {
     return this;
   }
   _baseOrWhereNotIn(cols, range) {
-    let notInToken = this._getInToken(cols, range, "NOT IN");
+    const notInToken = this._getInToken(cols, range, "NOT IN");
     if (this._where) {
       this._where = `${this._where} OR ${notInToken}`;
     } else {
@@ -1590,20 +1588,20 @@ class Model {
     return this;
   }
   _rowsToArray(rows, columns) {
-    let c = columns.length;
-    let n = rows.length;
-    let res = new Array(n);
-    let fields = this.fields;
+    const c = columns.length;
+    const n = rows.length;
+    const res = new Array(n);
+    const fields = this.fields;
     for (let i = 0; i < n; i = i + 1) {
       res[i] = new Array(c);
     }
-    for (let [i, col] of columns.entries()) {
+    for (const [i, col] of columns.entries()) {
       for (let j = 0; j < n; j = j + 1) {
-        let v = rows[j][col];
+        const v = rows[j][col];
         if (v !== undefined && v !== "") {
           res[j][i] = v;
         } else if (fields[col]) {
-          let dft = fields[col].default;
+          const dft = fields[col].default;
           if (dft !== undefined) {
             res[j][i] = fields[col].getDefault(rows[j]);
           } else {
@@ -1617,16 +1615,16 @@ class Model {
     return res;
   }
   _getInsertValuesToken(row, columns) {
-    let valueList = [];
+    const valueList = [];
     if (!columns) {
       columns = [];
-      for (let [k, v] of Object.entries(row)) {
+      for (const [k, v] of Object.entries(row)) {
         columns.push(k);
         valueList.push(v);
       }
     } else {
-      for (let col of columns) {
-        let v = row[col];
+      for (const col of columns) {
+        const v = row[col];
         if (v !== undefined) {
           valueList.push(v);
         } else {
@@ -1642,19 +1640,19 @@ class Model {
     return [map(rows, asLiteral), columns];
   }
   _getUpdateTokenWithPrefix(columns, key, tableName) {
-    let tokens = [];
+    const tokens = [];
     if (typeof key === "string") {
-      for (let col of columns) {
+      for (const col of columns) {
         if (col !== key) {
           tokens.push(`${col} = ${tableName}.${col}`);
         }
       }
     } else {
-      let sets = [];
-      for (let k of key) {
+      const sets = [];
+      for (const k of key) {
         sets[k] = true;
       }
-      for (let col of columns) {
+      for (const col of columns) {
         if (!sets[col]) {
           tokens.push(`${col} = ${tableName}.${col}`);
         }
@@ -1665,7 +1663,7 @@ class Model {
   _getSelectToken(a, b, ...varargs) {
     if (b === undefined) {
       if (Array.isArray(a)) {
-        let tokens = a.map((e) => this._getSelectColumn(e));
+        const tokens = a.map((e) => this._getSelectColumn(e));
         return asToken(tokens);
       } else if (typeof a === "string") {
         return this._getSelectColumn(a);
@@ -1676,7 +1674,7 @@ class Model {
       a = this._getSelectColumn(a);
       b = this._getSelectColumn(b);
       let s = asToken(a) + ", " + asToken(b);
-      for (let name of varargs) {
+      for (const name of varargs) {
         s = s + ", " + asToken(this._getSelectColumn(name));
       }
       return s;
@@ -1685,28 +1683,28 @@ class Model {
   _getSelectTokenLiteral(a, b, ...varargs) {
     if (b === undefined) {
       if (Array.isArray(a)) {
-        let tokens = a.map(asLiteral);
+        const tokens = a.map(asLiteral);
         return asToken(tokens);
       } else {
         return asLiteral(a);
       }
     } else {
       let s = asLiteral(a) + ", " + asLiteral(b);
-      for (let name of varargs) {
+      for (const name of varargs) {
         s = s + ", " + asLiteral(name);
       }
       return s;
     }
   }
   _getUpdateToken(row, columns) {
-    let kv = [];
+    const kv = [];
     if (!columns) {
-      for (let [k, v] of Object.entries(row)) {
+      for (const [k, v] of Object.entries(row)) {
         kv.push(`${k} = ${asLiteral(v)}`);
       }
     } else {
-      for (let k of columns) {
-        let v = row[k];
+      for (const k of columns) {
+        const v = row[k];
         kv.push(`${k} = ${(v !== undefined && asLiteral(v)) || "DEFAULT"}`);
       }
     }
@@ -1722,7 +1720,10 @@ class Model {
     }
   }
   _getInsertToken(row, columns) {
-    let [valuesToken, insertColumns] = this._getInsertValuesToken(row, columns);
+    const [valuesToken, insertColumns] = this._getInsertValuesToken(
+      row,
+      columns
+    );
     return `(${asToken(insertColumns)}) VALUES ${valuesToken}`;
   }
   _getBulkInsertToken(rows, columns) {
@@ -1730,7 +1731,7 @@ class Model {
     return `(${asToken(columns)}) VALUES ${asToken(rows)}`;
   }
   _setSelectSubqueryInsertToken(subQuery, columns) {
-    let columnsToken = asToken(columns || subQuery._select || "");
+    const columnsToken = asToken(columns || subQuery._select || "");
     if (columnsToken !== "") {
       this._insert = `(${columnsToken}) ${subQuery.statement()}`;
     } else {
@@ -1738,11 +1739,11 @@ class Model {
     }
   }
   _setCudSubqueryInsertToken(subQuery) {
-    let cteReturn = subQuery._cteReturning;
+    const cteReturn = subQuery._cteReturning;
     if (cteReturn) {
-      let cteColumns = cteReturn.columns;
-      let insertColumns = [...cteColumns, ...cteReturn.literalColumns];
-      let cudSelectQuery = Model.new({ tableName: "d" })._baseSelect(
+      const cteColumns = cteReturn.columns;
+      const insertColumns = [...cteColumns, ...cteReturn.literalColumns];
+      const cudSelectQuery = Model.new({ tableName: "d" })._baseSelect(
         insertColumns
       );
       this.with(`d(${asToken(insertColumns)})`, subQuery);
@@ -1750,8 +1751,8 @@ class Model {
         insertColumns
       )}) ${cudSelectQuery.statement()}`;
     } else if (subQuery._returningArgs) {
-      let insertColumns = subQuery._returningArgs.flat();
-      let cudSelectQuery = Model.new({ tableName: "d" })._baseSelect(
+      const insertColumns = subQuery._returningArgs.flat();
+      const cudSelectQuery = Model.new({ tableName: "d" })._baseSelect(
         insertColumns
       );
       this.with(`d(${asToken(insertColumns)})`, subQuery);
@@ -1761,8 +1762,11 @@ class Model {
     }
   }
   _getUpsertToken(row, key, columns) {
-    let [valuesToken, insertColumns] = this._getInsertValuesToken(row, columns);
-    let insertToken = `(${asToken(
+    const [valuesToken, insertColumns] = this._getInsertValuesToken(
+      row,
+      columns
+    );
+    const insertToken = `(${asToken(
       insertColumns
     )}) VALUES ${valuesToken} ON CONFLICT (${this._getSelectToken(key)})`;
     if (
@@ -1780,7 +1784,7 @@ class Model {
   }
   _getBulkUpsertToken(rows, key, columns) {
     [rows, columns] = this._getBulkInsertValuesToken(rows, columns);
-    let insertToken = `(${asToken(columns)}) VALUES ${asToken(
+    const insertToken = `(${asToken(columns)}) VALUES ${asToken(
       rows
     )} ON CONFLICT (${this._baseGetSelectToken(key)})`;
     if (
@@ -1797,8 +1801,8 @@ class Model {
     }
   }
   _getUpsertQueryToken(rows, key, columns) {
-    let columnsToken = this._getSelectToken(columns);
-    let insertToken = `(${columnsToken}) ${rows.statement()} ON CONFLICT (${this._getSelectToken(
+    const columnsToken = this._getSelectToken(columns);
+    const insertToken = `(${columnsToken}) ${rows.statement()} ON CONFLICT (${this._getSelectToken(
       key
     )})`;
     if (
@@ -1848,12 +1852,12 @@ class Model {
     }
   }
   _getUpdateQueryToken(subSelect, columns) {
-    let columnsToken =
+    const columnsToken =
       (columns && this._getSelectToken(columns)) || subSelect._select;
     return `(${columnsToken}) = (${subSelect.statement()})`;
   }
   _baseGetUpdateQueryToken(subSelect, columns) {
-    let columnsToken =
+    const columnsToken =
       (columns && this._baseGetSelectToken(columns)) || subSelect._select;
     return `(${columnsToken}) = (${subSelect.statement()})`;
   }
@@ -1861,8 +1865,8 @@ class Model {
     if (typeof key === "string") {
       return `${leftTable}.${key} = ${rightTable}.${key}`;
     }
-    let res = [];
-    for (let k of key) {
+    const res = [];
+    for (const k of key) {
       res.push(`${leftTable}.${k} = ${rightTable}.${k}`);
     }
     return res.join(" AND ");
@@ -1870,9 +1874,9 @@ class Model {
   _getCteValuesLiteral(rows, columns, noCheck) {
     columns = columns || this.getKeys(rows);
     rows = this._rowsToArray(rows, columns);
-    let firstRow = rows[0];
-    for (let [i, col] of columns.entries()) {
-      let [field] = this._findFieldModel(col);
+    const firstRow = rows[0];
+    for (const [i, col] of columns.entries()) {
+      const [field] = this._findFieldModel(col);
       if (field) {
         firstRow[i] = `${asLiteral(firstRow[i])}::${field.dbType}`;
       } else if (noCheck) {
@@ -1883,7 +1887,7 @@ class Model {
         );
       }
     }
-    let res = [];
+    const res = [];
     res[0] = "(" + asToken(firstRow) + ")";
     for (let i = 1; i < rows.length; i = i + 1) {
       res[i] = asLiteral(rows[i]);
@@ -1909,11 +1913,11 @@ class Model {
   }
   _registerJoinModel(joinArgs, joinType) {
     joinType = joinType || joinArgs.joinType || "INNER";
-    let find = true;
-    let model = joinArgs.model || this;
-    let fkModel = joinArgs.fkModel;
-    let column = joinArgs.column;
-    let fkColumn = joinArgs.fkColumn;
+    // let find = true;
+    const model = joinArgs.model || this;
+    const fkModel = joinArgs.fkModel;
+    const column = joinArgs.column;
+    const fkColumn = joinArgs.fkColumn;
     let joinKey;
     if (joinArgs.joinKey === undefined) {
       if (this.tableName === model.tableName) {
@@ -1929,7 +1933,7 @@ class Model {
     }
     let joinObj = this._joinKeys[joinKey];
     if (!joinObj) {
-      find = false;
+      // find = false;
       joinObj = {
         joinType: joinType,
         model: model,
@@ -1939,23 +1943,23 @@ class Model {
         fkColumn: fkColumn,
         fkAlias: "T" + this._getJoinNumber(),
       };
-      let joinTable = `${fkModel.tableName} ${joinObj.fkAlias}`;
-      let joinCond = `${joinObj.alias}.${joinObj.column} = ${joinObj.fkAlias}.${joinObj.fkColumn}`;
+      const joinTable = `${fkModel.tableName} ${joinObj.fkAlias}`;
+      const joinCond = `${joinObj.alias}.${joinObj.column} = ${joinObj.fkAlias}.${joinObj.fkColumn}`;
       this._handleJoin(joinType, joinTable, joinCond);
       this._joinKeys[joinKey] = joinObj;
     }
     return joinObj; // [joinObj, find];
   }
   _findFieldModel(col) {
-    let field = this.fields[col];
+    const field = this.fields[col];
     if (field) {
       return [field, this, this._as || this.tableName];
     }
     if (!this._joinKeys) {
       return [false];
     }
-    for (let joinObj of Object.values(this._joinKeys)) {
-      let fkField = joinObj.fkModel.fields[col];
+    for (const joinObj of Object.values(this._joinKeys)) {
+      const fkField = joinObj.fkModel.fields[col];
       if (joinObj.model.tableName === this.tableName && fkField) {
         return [
           fkField,
@@ -1998,14 +2002,14 @@ class Model {
         op = e;
         state = END;
       } else if (state === FOREIGN_KEY) {
-        let fieldOfFk = fkModel.fields[e];
+        const fieldOfFk = fkModel.fields[e];
         if (fieldOfFk) {
           if (!joinKey) {
             joinKey = fieldName + "__" + fkModel.tableName;
           } else {
             joinKey = joinKey + "__" + fieldName;
           }
-          let joinObj = this._registerJoinModel({
+          const joinObj = this._registerJoinModel({
             joinKey: joinKey,
             model: model,
             column: fieldName,
@@ -2044,7 +2048,7 @@ class Model {
     if (!this._joinKeys) {
       return key;
     }
-    for (let joinObj of Object.values(this._joinKeys)) {
+    for (const joinObj of Object.values(this._joinKeys)) {
       if (
         joinObj.model.tableName === this.tableName &&
         joinObj.fkModel.fields[key]
@@ -2104,16 +2108,16 @@ class Model {
     return this;
   }
   _getConditionTokenFromTable(kwargs, logic) {
-    let tokens = [];
+    const tokens = [];
     if (Array.isArray(kwargs)) {
-      for (let value of kwargs) {
-        let token = this._getConditionToken(value);
+      for (const value of kwargs) {
+        const token = this._getConditionToken(value);
         if (token !== undefined && token !== "") {
           tokens.push("(" + token + ")");
         }
       }
     } else {
-      for (let [k, value] of Object.entries(kwargs)) {
+      for (const [k, value] of Object.entries(kwargs)) {
         tokens.push(this._getExprToken(value, ...this._getWhereKey(k)));
       }
     }
@@ -2181,8 +2185,8 @@ class Model {
     return statement;
   }
   statement() {
-    let tableName = this.getTable();
-    let statement = assembleSql({
+    const tableName = this.getTable();
+    const statement = assembleSql({
       tableName: tableName,
       with: this._with,
       join: this._join,
@@ -2205,7 +2209,7 @@ class Model {
     return statement;
   }
   with(name, token) {
-    let withToken = this._getWithToken(name, token);
+    const withToken = this._getWithToken(name, token);
     if (this._with) {
       this._with = `${this._with}, ${withToken}`;
     } else {
@@ -2238,40 +2242,29 @@ class Model {
   withValues(name, rows) {
     let columns = this.getKeys(rows[0]);
     [rows, columns] = this._getCteValuesLiteral(rows, columns, true);
-    let cteName = `${name}(${columns.join(", ")})`;
-    let cteValues = `(VALUES ${asToken(rows)})`;
+    const cteName = `${name}(${columns.join(", ")})`;
+    const cteValues = `(VALUES ${asToken(rows)})`;
     return this.with(cteName, cteValues);
   }
   insert(rows, columns) {
     if (!(rows instanceof Model)) {
-      let vrows, vcolumns, prows, pcolumns;
       if (!this._skipValidate) {
-        [vrows, vcolumns] = this.validateCreateData(rows, columns);
-      } else {
-        vrows = rows;
-        vcolumns = columns;
+        [rows, columns] = this.validateCreateData(rows, columns);
       }
-      [prows, pcolumns] = this.prepareDbRows(vrows, vcolumns);
-      return Model.prototype._baseInsert.call(this, prows, pcolumns);
-    } else {
-      return Model.prototype._baseInsert.call(this, rows, columns);
+      [rows, columns] = this.prepareDbRows(rows, columns);
     }
+    return Model.prototype._baseInsert.call(this, rows, columns);
   }
   update(row, columns) {
     if (typeof row === "string") {
       return Model.prototype._baseUpdate.call(this, row);
     } else if (!(row instanceof Model)) {
-      let vrow;
       if (!this._skipValidate) {
-        vrow = this.validateUpdate(row, columns);
-      } else {
-        vrow = row;
+        row = this.validateUpdate(row, columns);
       }
-      let [prow, pcolumns] = this.prepareDbRows(vrow, columns, true);
-      return Model.prototype._baseUpdate.call(this, prow, pcolumns);
-    } else {
-      return Model.prototype._baseUpdate.call(this, row, columns);
+      [row, columns] = this.prepareDbRows(row, columns, true);
     }
+    return Model.prototype._baseUpdate.call(this, row, columns);
   }
   async getMultiple(keys, columns) {
     if (this._commit === undefined || this._commit) {
@@ -2286,17 +2279,12 @@ class Model {
     if (rows.length === 0) {
       throw new Error("empty rows passed to merge");
     }
-    let vrows, vcolumns, prows, pcolumns, vkey;
     if (!this._skipValidate) {
-      [vrows, vcolumns, vkey] = this.validateCreateRows(rows, key, columns);
-    } else {
-      vrows = rows;
-      vkey = key;
-      vcolumns = columns;
+      [rows, key, columns] = this.validateCreateRows(rows, key, columns);
     }
-    [prows, pcolumns] = this.prepareDbRows(vrows, vcolumns, false);
+    [rows, columns] = this.prepareDbRows(rows, columns, false);
     Model.prototype._baseMerge
-      .call(this, prows, vkey, pcolumns)
+      .call(this, rows, key, columns)
       .returning(key)
       .compact();
     if (this._commit === undefined || this._commit) {
@@ -2309,17 +2297,12 @@ class Model {
     if (rows.length === 0) {
       throw new Error("empty rows passed to merge");
     }
-    let vrows, vcolumns, prows, pcolumns, vkey;
     if (!this._skipValidate) {
-      [vrows, vcolumns, vkey] = this.validateCreateRows(rows, key, columns);
-    } else {
-      vrows = rows;
-      vkey = key;
-      vcolumns = columns;
+      [rows, key, columns] = this.validateCreateRows(rows, key, columns);
     }
-    [prows, pcolumns] = this.prepareDbRows(vrows, vcolumns, false);
+    [rows, columns] = this.prepareDbRows(rows, columns, false);
     Model.prototype._baseUpsert
-      .call(this, prows, vkey, pcolumns)
+      .call(this, rows, key, columns)
       .returning(key)
       .compact();
     if (this._commit === undefined || this._commit) {
@@ -2332,17 +2315,12 @@ class Model {
     if (rows.length === 0) {
       throw new Error("empty rows passed to merge");
     }
-    let vrows, vcolumns, prows, pcolumns, vkey;
     if (!this._skipValidate) {
-      [vrows, vcolumns, vkey] = this.validateUpdateRows(rows, key, columns);
-    } else {
-      vrows = rows;
-      vkey = key;
-      vcolumns = columns;
+      [rows, key, columns] = this.validateUpdateRows(rows, key, columns);
     }
-    [prows, pcolumns] = this.prepareDbRows(vrows, vcolumns, true);
+    [rows, columns] = this.prepareDbRows(rows, columns, true);
     Model.prototype._baseUpdates
-      .call(this, prows, vkey, pcolumns)
+      .call(this, rows, key, columns)
       .returning(key)
       .compact();
     if (this._commit === undefined || this._commit) {
@@ -2354,13 +2332,13 @@ class Model {
   async getMerge(rows, key) {
     let columns = this.getKeys(rows[0]);
     [rows, columns] = this._getCteValuesLiteral(rows, columns, true);
-    let joinCond = this._getJoinConditions(
+    const joinCond = this._getJoinConditions(
       key,
       "V",
       this._as || this.tableName
     );
-    let cteName = `V(${columns.join(", ")})`;
-    let cteValues = `(VALUES ${asToken(rows)})`;
+    const cteName = `V(${columns.join(", ")})`;
+    const cteValues = `(VALUES ${asToken(rows)})`;
     Model.prototype._baseSelect
       .call(this, "V.*")
       .with(cteName, cteValues)
@@ -2372,8 +2350,8 @@ class Model {
     }
   }
   copy() {
-    let copySql = {};
-    for (let [key, value] of Object.entries(this)) {
+    const copySql = {};
+    for (const [key, value] of Object.entries(this)) {
       if (typeof value === "object") {
         copySql[key] = clone(value);
       } else {
@@ -2394,7 +2372,7 @@ class Model {
     return this;
   }
   select(a, b, ...varargs) {
-    let s = this._getSelectToken(a, b, ...varargs);
+    const s = this._getSelectToken(a, b, ...varargs);
     if (!this._select) {
       this._select = s;
     } else if (s !== undefined && s !== "") {
@@ -2403,7 +2381,7 @@ class Model {
     return this;
   }
   selectLiteral(a, b, ...varargs) {
-    let s = this._getSelectTokenLiteral(a, b, ...varargs);
+    const s = this._getSelectTokenLiteral(a, b, ...varargs);
     if (!this._select) {
       this._select = s;
     } else if (s !== undefined && s !== "") {
@@ -2412,7 +2390,7 @@ class Model {
     return this;
   }
   returning(a, b, ...varargs) {
-    let s = this._getSelectToken(a, b, ...varargs);
+    const s = this._getSelectToken(a, b, ...varargs);
     if (!this._returning) {
       this._returning = s;
     } else if (s !== undefined && s !== "") {
@@ -2428,7 +2406,7 @@ class Model {
     return this;
   }
   returningLiteral(a, b, ...varargs) {
-    let s = this._getSelectTokenLiteral(a, b, ...varargs);
+    const s = this._getSelectTokenLiteral(a, b, ...varargs);
     if (!this._returning) {
       this._returning = s;
     } else if (s !== undefined && s !== "") {
@@ -2535,27 +2513,27 @@ class Model {
     return this;
   }
   where(cond, op, dval) {
-    let whereToken = this._getConditionToken(cond, op, dval);
+    const whereToken = this._getConditionToken(cond, op, dval);
     return this._handleWhereToken(whereToken, "(%s) AND (%s)");
   }
   whereOr(cond, op, dval) {
-    let whereToken = this._getConditionTokenOr(cond, op, dval);
+    const whereToken = this._getConditionTokenOr(cond, op, dval);
     return this._handleWhereToken(whereToken, "(%s) AND (%s)");
   }
   orWhereOr(cond, op, dval) {
-    let whereToken = this._getConditionTokenOr(cond, op, dval);
+    const whereToken = this._getConditionTokenOr(cond, op, dval);
     return this._handleWhereToken(whereToken, "%s OR %s");
   }
   whereNot(cond, op, dval) {
-    let whereToken = this._getConditionTokenNot(cond, op, dval);
+    const whereToken = this._getConditionTokenNot(cond, op, dval);
     return this._handleWhereToken(whereToken, "(%s) AND (%s)");
   }
   orWhere(cond, op, dval) {
-    let whereToken = this._getConditionToken(cond, op, dval);
+    const whereToken = this._getConditionToken(cond, op, dval);
     return this._handleWhereToken(whereToken, "%s OR %s");
   }
   orWhereNot(cond, op, dval) {
-    let whereToken = this._getConditionTokenNot(cond, op, dval);
+    const whereToken = this._getConditionTokenNot(cond, op, dval);
     return this._handleWhereToken(whereToken, "%s OR %s");
   }
   whereExists(builder) {
@@ -2582,7 +2560,7 @@ class Model {
         range
       );
     } else {
-      let res = cols.map((e) => this._getColumn(e));
+      const res = cols.map((e) => this._getColumn(e));
       return Model.prototype._baseWhereIn.call(this, res, range);
     }
   }
@@ -2717,7 +2695,7 @@ class Model {
     return this;
   }
   havingIn(cols, range) {
-    let inToken = this._getInToken(cols, range);
+    const inToken = this._getInToken(cols, range);
     if (this._having) {
       this._having = `(${this._having}) AND ${inToken}`;
     } else {
@@ -2726,7 +2704,7 @@ class Model {
     return this;
   }
   havingNotIn(cols, range) {
-    let notInToken = this._getInToken(cols, range, "NOT IN");
+    const notInToken = this._getInToken(cols, range, "NOT IN");
     if (this._having) {
       this._having = `(${this._having}) AND ${notInToken}`;
     } else {
@@ -2807,7 +2785,7 @@ class Model {
     return this;
   }
   orHavingIn(cols, range) {
-    let inToken = this._getInToken(cols, range);
+    const inToken = this._getInToken(cols, range);
     if (this._having) {
       this._having = `${this._having} OR ${inToken}`;
     } else {
@@ -2816,7 +2794,7 @@ class Model {
     return this;
   }
   orHavingNotIn(cols, range) {
-    let notInToken = this._getInToken(cols, range, "NOT IN");
+    const notInToken = this._getInToken(cols, range, "NOT IN");
     if (this._having) {
       this._having = `${this._having} OR ${notInToken}`;
     } else {
@@ -2857,8 +2835,8 @@ class Model {
     return this;
   }
   async exists() {
-    let statement = `SELECT EXISTS (${this.select("").limit(1).statement()})`;
-    let res = await this.defaultQuery(statement);
+    const statement = `SELECT EXISTS (${this.select("").limit(1).statement()})`;
+    const res = await this.defaultQuery(statement);
     return res;
   }
   compact() {
@@ -2884,7 +2862,7 @@ class Model {
     return this;
   }
   async flat(depth) {
-    let res = await this.compact().execr();
+    const res = await this.compact().execr();
     return res.flat(depth);
   }
   async get(cond, op, dval) {
@@ -2901,14 +2879,14 @@ class Model {
     }
   }
   async getOrCreate(params, defaults) {
-    let records = await this.where(params).limit(2).exec();
+    const records = await this.where(params).limit(2).exec();
     if (records.length === 1) {
       return [records[0], false];
     } else if (records.length === 0) {
-      let pk = this.primaryKey;
-      let data = { ...params, ...defaults };
+      const pk = this.primaryKey;
+      const data = { ...params, ...defaults };
       //**
-      let res = await this.newSql().insert(data).returning(pk).execr();
+      const res = await this.newSql().insert(data).returning(pk).execr();
       data[pk] = res[0][pk];
       return [this.newRecord(data), true];
     } else {
@@ -2916,7 +2894,7 @@ class Model {
     }
   }
   async asSet() {
-    let res = (await this.compact().execr()).flat();
+    const res = (await this.compact().execr()).flat();
     return new Set(res);
   }
   // async query(statement) {
@@ -2927,8 +2905,8 @@ class Model {
     return await this.raw().exec();
   }
   async exec() {
-    let statement = this.statement();
-    let records = await this.defaultQuery(statement);
+    const statement = this.statement();
+    const records = await this.defaultQuery(statement);
     if (this._raw) {
       return records;
     } else if (
@@ -2936,18 +2914,18 @@ class Model {
       (!this._update && !this._insert && !this._delete)
     ) {
       if (!this._loadFk) {
-        for (let [i, record] of records.entries()) {
+        for (const [i, record] of records.entries()) {
           records[i] = this.load(record);
         }
       } else {
-        let fields = this.fields;
-        let fieldNames = this.fieldNames;
-        for (let [i, record] of records.entries()) {
-          for (let name of fieldNames) {
-            let field = fields[name];
-            let value = record[name];
+        const fields = this.fields;
+        const fieldNames = this.fieldNames;
+        for (const [i, record] of records.entries()) {
+          for (const name of fieldNames) {
+            const field = fields[name];
+            const value = record[name];
             if (value !== undefined) {
-              let fkModel = this._loadFk[name];
+              const fkModel = this._loadFk[name];
               if (!fkModel) {
                 if (!field.load) {
                   record[name] = value;
@@ -2970,15 +2948,15 @@ class Model {
     }
   }
   loadFk(fkName, selectNames, ...varargs) {
-    let fk = this.foreignKeys[fkName];
+    const fk = this.foreignKeys[fkName];
     if (fk === undefined) {
       throw new Error(
         fkName + (" is not a valid forein key name for " + this.tableName)
       );
     }
-    let fkModel = fk.reference;
-    let joinKey = fkName + "__" + fkModel.tableName;
-    let joinObj = this._registerJoinModel({
+    const fkModel = fk.reference;
+    const joinKey = fkName + "__" + fkModel.tableName;
+    const joinObj = this._registerJoinModel({
       joinKey: joinKey,
       column: fkName,
       fkModel: fkModel,
@@ -2991,18 +2969,18 @@ class Model {
     if (!selectNames) {
       return this;
     }
-    let rightAlias = joinObj.fkAlias;
+    const rightAlias = joinObj.fkAlias;
     let fks;
     if (typeof selectNames === "object") {
-      let res = [];
-      for (let fkn of selectNames) {
+      const res = [];
+      for (const fkn of selectNames) {
         assert(fkModel.fields[fkn], "invalid field name for fk model: " + fkn);
         res.push(`${rightAlias}.${fkn} AS ${fkName}__${fkn}`);
       }
       fks = res.join(", ");
     } else if (selectNames === "*") {
-      let res = [];
-      for (let fkn of fkModel.fieldNames) {
+      const res = [];
+      for (const fkn of fkModel.fieldNames) {
         res.push(`${rightAlias}.${fkn} AS ${fkName}__${fkn}`);
       }
       fks = res.join(", ");
@@ -3013,7 +2991,7 @@ class Model {
       );
       fks = `${rightAlias}.${selectNames} AS ${fkName}__${selectNames}`;
       for (let i = 0; i < varargs.length; i = i + 1) {
-        let fkn = varargs[i];
+        const fkn = varargs[i];
         assert(fkModel.fields[fkn], "invalid field name for fk model: " + fkn);
         fks = `${fks}, ${rightAlias}.${fkn} AS ${fkName}__${fkn}`;
       }

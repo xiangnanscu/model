@@ -22,6 +22,7 @@
     "replace": "find .  -type d \\( -name .git -o -name node_modules \\) -prune -o  -type f  -exec  sed -i s/model/model/g {} \\;",
     "rename": "rename s/model/model/g src/*",
     "u": "ncu -u && npm install",
+    "commit": "git add . && git commit -am \"${msg-message: } $(date +%Y-%m-%d_%H:%M:%S)\"",
     "reset:npm": "rm -rf node_modules && rm package-lock.json && npm install",
     "test": "yarn node --experimental-vm-modules $(yarn bin jest)"
   },

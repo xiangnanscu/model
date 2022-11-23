@@ -185,16 +185,6 @@ function map(tbl, func) {
   }
   return res;
 }
-function dict(a, b) {
-  let res = [];
-  for (let [key, value] of Object.entries(a)) {
-    res[key] = value;
-  }
-  for (let [key, value] of Object.entries(b)) {
-    res[key] = value;
-  }
-  return res;
-}
 function checkReserved(name) {
   assert(
     typeof name === "string",
@@ -232,9 +222,6 @@ function normalizeFieldNames(fieldNames) {
   }
   return Array(fieldNames);
 }
-function isFieldClass(t) {
-  return typeof t === "object" && t.__isFieldClass__;
-}
 function getForeignObject(attrs, prefix) {
   let fk = {};
   let n = prefix.length;
@@ -246,7 +233,7 @@ function getForeignObject(attrs, prefix) {
   }
   return fk;
 }
-function makeRecordMeta(model, cls) {
+function makeRecordMeta(model) {
   function RecordMeta(attrs) {
     Object.assign(this, attrs);
   }
@@ -698,11 +685,14 @@ class Model {
       validateCreate(input, names) {
         return ConcreteModel.validateCreate.call(this, input, names);
       }
+      validate(input, names, key) {
+        return ConcreteModel.validate.call(this, input, names, key);
+      }
       validateUpdate(input, names) {
         return ConcreteModel.validateUpdate.call(this, input, names);
       }
-      _getKeys(rows) {
-        return ConcreteModel._getKeys.call(this, rows);
+      getKeys(rows) {
+        return ConcreteModel.getKeys.call(this, rows);
       }
     }
     const className = {
@@ -812,7 +802,7 @@ class Model {
         } else {
           throw new Error(`'${tname}' field name '${name}' is not in fields`);
         }
-      } else if (!isFieldClass(field)) {
+      } else if (!(field instanceof Field.basefield)) {
         if (_extends) {
           let pfield = _extends.fields[name];
           if (pfield) {
@@ -828,7 +818,7 @@ class Model {
           }
         }
       }
-      if (!isFieldClass(field)) {
+      if (!(field instanceof Field.basefield)) {
         model.fields[name] = makeFieldFromJson(field, { name: name });
       } else {
         model.fields[name] = makeFieldFromJson(field.getOptions(), {
@@ -879,7 +869,7 @@ class Model {
     let A = (a.__normalized__ && a) || this.normalize(a);
     let B = (b.__normalized__ && b) || this.normalize(b);
     let C = [];
-    let fieldNames = (A.fieldNames + B.fieldNames).uniq();
+    let fieldNames = unique([...A.fieldNames, ...B.fieldNames]);
     let fields = [];
     for (let name of fieldNames) {
       let af = A.fields[name];
@@ -907,9 +897,9 @@ class Model {
     return this.normalize(C);
   }
   static mergeField(a, b) {
-    let aopts = (a.__isFieldClass__ && a.getOptions()) || clone(a);
-    let bopts = (b.__isFieldClass__ && b.getOptions()) || clone(b);
-    let options = dict(aopts, bopts);
+    let aopts = a instanceof Field ? a.getOptions() : clone(a);
+    let bopts = b instanceof Field ? b.getOptions() : clone(b);
+    let options = { ...aopts, ...bopts };
     if (aopts.model && bopts.model) {
       options.model = this.mergeModel(aopts.model, bopts.model);
     }
@@ -987,36 +977,6 @@ class Model {
         `not 1 record are updated(model:${this.tableName}, key:${key}, value:${lookValue})`
       );
     }
-  }
-  static prepareForDb(data, columns, isUpdate) {
-    let prepared = {};
-    for (let name of columns || this.names) {
-      let field = this.fields[name];
-      if (!field) {
-        throw new Error(
-          `invalid field name '${name}' for model '${this.tableName}'`
-        );
-      }
-      let value = data[name];
-      if (field.prepareForDb && value !== undefined) {
-        try {
-          let val = field.prepareForDb(value, data);
-          prepared[name] = val;
-        } catch (error) {
-          throw new ValidateError({
-            name: name,
-            message: error.message,
-            label: field.label,
-          });
-        }
-      } else {
-        prepared[name] = value;
-      }
-    }
-    if (isUpdate && this.autoNowName) {
-      prepared[this.autoNowName] = getLocalTime();
-    }
-    return prepared;
   }
   static validate(input, names, key) {
     if (input[key || this.primaryKey] !== undefined) {
@@ -1133,7 +1093,7 @@ class Model {
   }
   static validateCreateData(rows, columns) {
     let cleaned;
-    columns = columns || this._getKeys(rows);
+    columns = columns || this.getKeys(rows);
     if (rows instanceof Array) {
       cleaned = [];
       for (let [index, row] of rows.entries()) {
@@ -1158,7 +1118,7 @@ class Model {
   }
   static validateUpdateData(rows, columns) {
     let cleaned;
-    columns = columns || this._getKeys(rows);
+    columns = columns || this.getKeys(rows);
     if (rows instanceof Array) {
       cleaned = [];
       for (let [index, row] of rows.entries()) {
@@ -1201,7 +1161,7 @@ class Model {
   }
   static prepareDbRows(rows, columns, isUpdate) {
     let cleaned;
-    columns = columns || this._getKeys(rows);
+    columns = columns || this.getKeys(rows);
     if (rows instanceof Array) {
       cleaned = [];
       for (let [i, row] of rows.entries()) {
@@ -1220,7 +1180,37 @@ class Model {
       return [cleaned, columns];
     }
   }
-  static _getKeys(rows) {
+  static prepareForDb(data, columns, isUpdate) {
+    let prepared = {};
+    for (let name of columns || this.names) {
+      let field = this.fields[name];
+      if (!field) {
+        throw new Error(
+          `invalid field name '${name}' for model '${this.tableName}'`
+        );
+      }
+      let value = data[name];
+      if (field.prepareForDb && value !== undefined) {
+        try {
+          let val = field.prepareForDb(value, data);
+          prepared[name] = val;
+        } catch (error) {
+          throw new ValidateError({
+            name: name,
+            message: error.message,
+            label: field.label,
+          });
+        }
+      } else {
+        prepared[name] = value;
+      }
+    }
+    if (isUpdate && this.autoNowName) {
+      prepared[this.autoNowName] = getLocalTime();
+    }
+    return prepared;
+  }
+  static getKeys(rows) {
     let columns = [];
     if (rows instanceof Array) {
       let d = [];
@@ -1379,7 +1369,7 @@ class Model {
     if (keys.length === 0) {
       throw new Error("empty keys passed to get_multiple");
     }
-    columns = columns || this._getKeys(keys[0]);
+    columns = columns || this.getKeys(keys[0]);
     [keys, columns] = this._getCteValuesLiteral(keys, columns, false);
     let joinCond = this._getJoinConditions(
       columns,
@@ -1647,7 +1637,7 @@ class Model {
     return [asLiteral(valueList), columns];
   }
   _getBulkInsertValuesToken(rows, columns) {
-    columns = columns || this._getKeys(rows);
+    columns = columns || this.getKeys(rows);
     rows = this._rowsToArray(rows, columns);
     return [map(rows, asLiteral), columns];
   }
@@ -1878,7 +1868,7 @@ class Model {
     return res.join(" AND ");
   }
   _getCteValuesLiteral(rows, columns, noCheck) {
-    columns = columns || this._getKeys(rows);
+    columns = columns || this.getKeys(rows);
     rows = this._rowsToArray(rows, columns);
     let firstRow = rows[0];
     for (let [i, col] of columns.entries()) {
@@ -2166,8 +2156,9 @@ class Model {
     if (!this[innerAttr]) {
       this[innerAttr] = otherSql.statement();
     } else {
-      this[innerAttr] = `(${this[innerAttr]}) ${PG_SET_MAP[innerAttr]
-        } (${otherSql.statement()})`;
+      this[innerAttr] = `(${this[innerAttr]}) ${
+        PG_SET_MAP[innerAttr]
+      } (${otherSql.statement()})`;
     }
     this.statement = this._statementForSet;
     return this;
@@ -2245,7 +2236,7 @@ class Model {
     return this;
   }
   withValues(name, rows) {
-    let columns = this._getKeys(rows[0]);
+    let columns = this.getKeys(rows[0]);
     [rows, columns] = this._getCteValuesLiteral(rows, columns, true);
     let cteName = `${name}(${columns.join(", ")})`;
     let cteValues = `(VALUES ${asToken(rows)})`;
@@ -2361,7 +2352,7 @@ class Model {
     }
   }
   async getMerge(rows, key) {
-    let columns = this._getKeys(rows[0]);
+    let columns = this.getKeys(rows[0]);
     [rows, columns] = this._getCteValuesLiteral(rows, columns, true);
     let joinCond = this._getJoinConditions(
       key,

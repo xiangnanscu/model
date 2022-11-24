@@ -8,7 +8,7 @@ function p() {
 const sql = postgres({
   host: "localhost",
   user: "postgres",
-  password: "postgres",
+  password: "111111",
   database: "postgres",
   max: 20,
   idle_timeout: 20,
@@ -32,7 +32,7 @@ CREATE TABLE profile (
   info varchar(50));
 `);
 const Usr = Model.createModel({
-  defaultQuery,
+  sql,
   tableName: "usr",
   fields: {
     name: { label: "姓名", unique: true, maxlength: 4, minlength: 1 },
@@ -40,7 +40,7 @@ const Usr = Model.createModel({
   },
 });
 const Profile = Model.createModel({
-  defaultQuery,
+  sql,
   tableName: "profile",
   fields: {
     usrName: { label: "用户", reference: Usr, referenceColumn: "name" },

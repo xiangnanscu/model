@@ -120,7 +120,6 @@ const NON_MERGE_NAMES = {
   fieldNames: true,
   _extends: true,
   mixins: true,
-  __index: true,
   admin: true,
 };
 const SHARED_NAMES = [
@@ -697,12 +696,13 @@ class Model {
       value: `${ConcreteModel.tableName.toUpperCase()}Model`,
     };
     Object.defineProperty(ConcreteModel, "name", className);
-    // if (opts.dbOptions) {
-    //   let dbQuery = Query(opts.dbOptions);
-    //   ConcreteModel.prototype.query = function (statement) {
-    //     return dbQuery(statement, this._compact);
-    //   };
-    // }
+    if (opts.sql) {
+      // https://www.npmjs.com/package/postgres#connection-details
+      const sql = opts.sql;
+      ConcreteModel.defaultQuery = async function (statement, args, options) {
+        return await sql.unsafe(statement, args, options);
+      };
+    }
     if (!ConcreteModel.tableName) {
       const namesHint =
         (ConcreteModel.fieldNames && ConcreteModel.fieldNames.join(",")) ||
@@ -761,7 +761,12 @@ class Model {
     }
     ConcreteModel.Record = makeRecordClass(ConcreteModel, this);
     for (const name of SHARED_NAMES) {
-      ConcreteModel.prototype[name] = ConcreteModel[name];
+      if (
+        ConcreteModel.prototype[name] === undefined &&
+        ConcreteModel[name] !== undefined
+      ) {
+        ConcreteModel.prototype[name] = ConcreteModel[name];
+      }
     }
     return ConcreteModel;
   }

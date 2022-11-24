@@ -19,7 +19,7 @@ jobs:
           postgresql version: '14'
           postgresql db: 'postgres'
           postgresql user: 'postgres'
-          postgresql password: 'postgres'
+          postgresql password: '111111'
       - run: npm ci
       - run: npm test
 

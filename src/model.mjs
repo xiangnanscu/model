@@ -1231,7 +1231,7 @@ class Model {
     return this.statement();
   }
   _baseSelect(a, b, ...varargs) {
-    const s = Model.prototype._baseGetSelectToken.call(this, a, b, ...varargs);
+    const s = this._baseGetSelectToken(a, b, ...varargs);
     if (!this._select) {
       this._select = s;
     } else if (s !== undefined && s !== "") {
@@ -1242,7 +1242,7 @@ class Model {
   _baseGetSelectToken(a, b, ...varargs) {
     if (b === undefined) {
       if (typeof a === "object") {
-        return Model.prototype._baseGetSelectToken.call(this, ...a);
+        return this._baseGetSelectToken(...a);
       } else {
         return asToken(a);
       }
@@ -1314,7 +1314,7 @@ class Model {
         ._baseReturning(valsColumns);
     }
     this.with(cteName, cteValues).with("U", updatedSubquery);
-    return Model.prototype._baseInsert.call(this, insertSubquery, columns);
+    return this._baseInsert(insertSubquery, columns);
   }
   _baseUpsert(rows, key, columns) {
     assert(key, "you must provide key for upsert(string or table)");
@@ -1341,8 +1341,7 @@ class Model {
         this._as || this.tableName
       );
       this.with(cteName, rows);
-      return Model.prototype._baseUpdate
-        .call(this, this._getUpdateTokenWithPrefix(columns, key, "V"))
+      return this._baseUpdate(this._getUpdateTokenWithPrefix(columns, key, "V"))
         .from("V")
         .where(joinCond);
     } else if (rows.length === 0) {
@@ -1357,8 +1356,7 @@ class Model {
         this._as || this.tableName
       );
       this.with(cteName, cteValues);
-      return Model.prototype._baseUpdate
-        .call(this, this._getUpdateTokenWithPrefix(columns, key, "V"))
+      return this._baseUpdate(this._getUpdateTokenWithPrefix(columns, key, "V"))
         .from("V")
         .where(joinCond);
     }
@@ -1396,16 +1394,9 @@ class Model {
   }
   _baseFrom(a, ...varargs) {
     if (!this._from) {
-      this._from = Model.prototype._baseGetSelectToken.call(
-        this,
-        a,
-        ...varargs
-      );
+      this._from = this._baseGetSelectToken(a, ...varargs);
     } else {
-      this._from =
-        this._from +
-        ", " +
-        Model.prototype._baseGetSelectToken.call(this, a, ...varargs);
+      this._from = this._from + ", " + this._baseGetSelectToken(a, ...varargs);
     }
     return this;
   }
@@ -1437,7 +1428,7 @@ class Model {
     const tokens = [];
     if (Array.isArray(kwargs)) {
       for (const value of kwargs) {
-        const token = Model.prototype._baseGetConditionToken.call(this, value);
+        const token = this._baseGetConditionToken(value);
         if (token !== undefined && token !== "") {
           tokens.push("(" + token + ")");
         }
@@ -1457,7 +1448,7 @@ class Model {
     if (op === undefined) {
       const argtype = typeof cond;
       if (argtype === "object") {
-        return Model.prototype._baseGetConditionTokenFromTable.call(this, cond);
+        return this._baseGetConditionTokenFromTable(cond);
       } else if (argtype === "string") {
         return cond;
       } else if (argtype === "function") {
@@ -2130,9 +2121,9 @@ class Model {
   _getConditionToken(cond, op, dval) {
     if (op === undefined) {
       if (typeof cond === "object") {
-        return Model.prototype._getConditionTokenFromTable.call(this, cond);
+        return this._getConditionTokenFromTable(cond);
       } else {
-        return Model.prototype._baseGetConditionToken.call(this, cond);
+        return this._baseGetConditionToken(cond);
       }
     } else if (dval === undefined) {
       return `${this._getColumn(cond)} = ${asLiteral(op)}`;
@@ -2168,7 +2159,7 @@ class Model {
     return this;
   }
   _statementForSet() {
-    let statement = Model.prototype.statement.call(this);
+    let statement = this.statement();
     if (this._intersect) {
       statement = `(${statement}) INTERSECT (${this._intersect})`;
     } else if (this._intersectAll) {
@@ -2253,26 +2244,24 @@ class Model {
       }
       [rows, columns] = this.prepareDbRows(rows, columns);
     }
-    return Model.prototype._baseInsert.call(this, rows, columns);
+    return this._baseInsert(rows, columns);
   }
   update(row, columns) {
     if (typeof row === "string") {
-      return Model.prototype._baseUpdate.call(this, row);
+      return this._baseUpdate(row);
     } else if (!(row instanceof Model)) {
       if (!this._skipValidate) {
         row = this.validateUpdate(row, columns);
       }
       [row, columns] = this.prepareDbRows(row, columns, true);
     }
-    return Model.prototype._baseUpdate.call(this, row, columns);
+    return this._baseUpdate(row, columns);
   }
   async getMultiple(keys, columns) {
     if (this._commit === undefined || this._commit) {
-      return await Model.prototype._baseGetMultiple
-        .call(this, keys, columns)
-        .exec();
+      return await this._baseGetMultiple(keys, columns).exec();
     } else {
-      return Model.prototype._baseGetMultiple.call(this, keys, columns);
+      return this._baseGetMultiple(keys, columns);
     }
   }
   async merge(rows, key, columns) {
@@ -2283,10 +2272,7 @@ class Model {
       [rows, key, columns] = this.validateCreateRows(rows, key, columns);
     }
     [rows, columns] = this.prepareDbRows(rows, columns, false);
-    Model.prototype._baseMerge
-      .call(this, rows, key, columns)
-      .returning(key)
-      .compact();
+    this._baseMerge(rows, key, columns).returning(key).compact();
     if (this._commit === undefined || this._commit) {
       return await this.exec();
     } else {
@@ -2301,10 +2287,7 @@ class Model {
       [rows, key, columns] = this.validateCreateRows(rows, key, columns);
     }
     [rows, columns] = this.prepareDbRows(rows, columns, false);
-    Model.prototype._baseUpsert
-      .call(this, rows, key, columns)
-      .returning(key)
-      .compact();
+    this._baseUpsert(rows, key, columns).returning(key).compact();
     if (this._commit === undefined || this._commit) {
       return await this.exec();
     } else {
@@ -2319,10 +2302,7 @@ class Model {
       [rows, key, columns] = this.validateUpdateRows(rows, key, columns);
     }
     [rows, columns] = this.prepareDbRows(rows, columns, true);
-    Model.prototype._baseUpdates
-      .call(this, rows, key, columns)
-      .returning(key)
-      .compact();
+    this._baseUpdates(rows, key, columns).returning(key).compact();
     if (this._commit === undefined || this._commit) {
       return await this.exec();
     } else {
@@ -2339,8 +2319,7 @@ class Model {
     );
     const cteName = `V(${columns.join(", ")})`;
     const cteValues = `(VALUES ${asToken(rows)})`;
-    Model.prototype._baseSelect
-      .call(this, "V.*")
+    this._baseSelect("V.*")
       .with(cteName, cteValues)
       ._baseRightJoin("V", joinCond);
     if (this._commit === undefined || this._commit) {
@@ -2468,7 +2447,7 @@ class Model {
     if (typeof joinArgs === "object") {
       this._registerJoinModel(joinArgs, "INNER");
     } else {
-      Model.prototype._baseJoin.call(this, joinArgs, key, op, val);
+      this._baseJoin(joinArgs, key, op, val);
     }
     return this;
   }
@@ -2476,7 +2455,7 @@ class Model {
     if (typeof joinArgs === "object") {
       this._registerJoinModel(joinArgs, "INNER");
     } else {
-      Model.prototype._baseJoin.call(this, joinArgs, key, op, val);
+      this._baseJoin(joinArgs, key, op, val);
     }
     return this;
   }
@@ -2484,7 +2463,7 @@ class Model {
     if (typeof joinArgs === "object") {
       this._registerJoinModel(joinArgs, "LEFT");
     } else {
-      Model.prototype._baseLeftJoin.call(this, joinArgs, key, op, val);
+      this._baseLeftJoin(joinArgs, key, op, val);
     }
     return this;
   }
@@ -2492,7 +2471,7 @@ class Model {
     if (typeof joinArgs === "object") {
       this._registerJoinModel(joinArgs, "RIGHT");
     } else {
-      Model.prototype._baseRightJoin.call(this, joinArgs, key, op, val);
+      this._baseRightJoin(joinArgs, key, op, val);
     }
     return this;
   }
@@ -2500,7 +2479,7 @@ class Model {
     if (typeof joinArgs === "object") {
       this._registerJoinModel(joinArgs, "FULL");
     } else {
-      Model.prototype._baseFullJoin.call(this, joinArgs, key, op, val);
+      this._baseFullJoin(joinArgs, key, op, val);
     }
     return this;
   }
@@ -2554,14 +2533,10 @@ class Model {
   }
   whereIn(cols, range) {
     if (typeof cols === "string") {
-      return Model.prototype._baseWhereIn.call(
-        this,
-        this._getColumn(cols),
-        range
-      );
+      return this._baseWhereIn(this._getColumn(cols), range);
     } else {
       const res = cols.map((e) => this._getColumn(e));
-      return Model.prototype._baseWhereIn.call(this, res, range);
+      return this._baseWhereIn(res, range);
     }
   }
   whereNotIn(cols, range) {
@@ -2572,29 +2547,19 @@ class Model {
         cols[i] = this._getColumn(cols[i]);
       }
     }
-    return Model.prototype._baseWhereNotIn.call(this, cols, range);
+    return this._baseWhereNotIn(cols, range);
   }
   whereNull(col) {
-    return Model.prototype._baseWhereNull.call(this, this._getColumn(col));
+    return this._baseWhereNull(this._getColumn(col));
   }
   whereNotNull(col) {
-    return Model.prototype._baseWhereNotNull.call(this, this._getColumn(col));
+    return this._baseWhereNotNull(this._getColumn(col));
   }
   whereBetween(col, low, high) {
-    return Model.prototype._baseWhereBetween.call(
-      this,
-      this._getColumn(col),
-      low,
-      high
-    );
+    return this._baseWhereBetween(this._getColumn(col), low, high);
   }
   whereNotBetween(col, low, high) {
-    return Model.prototype._baseWhereNotBetween.call(
-      this,
-      this._getColumn(col),
-      low,
-      high
-    );
+    return this._baseWhereNotBetween(this._getColumn(col), low, high);
   }
   orWhereIn(cols, range) {
     if (typeof cols === "string") {
@@ -2604,7 +2569,7 @@ class Model {
         cols[i] = this._getColumn(cols[i]);
       }
     }
-    return Model.prototype._baseOrWhereIn.call(this, cols, range);
+    return this._baseOrWhereIn(cols, range);
   }
   orWhereNotIn(cols, range) {
     if (typeof cols === "string") {
@@ -2614,29 +2579,19 @@ class Model {
         cols[i] = this._getColumn(cols[i]);
       }
     }
-    return Model.prototype._baseOrWhereNotIn.call(this, cols, range);
+    return this._baseOrWhereNotIn(cols, range);
   }
   orWhereNull(col) {
-    return Model.prototype._baseOrWhereNull.call(this, this._getColumn(col));
+    return this._baseOrWhereNull(this._getColumn(col));
   }
   orWhereNotNull(col) {
-    return Model.prototype._baseOrWhereNotNull.call(this, this._getColumn(col));
+    return this._baseOrWhereNotNull(this._getColumn(col));
   }
   orWhereBetween(col, low, high) {
-    return Model.prototype._baseOrWhereBetween.call(
-      this,
-      this._getColumn(col),
-      low,
-      high
-    );
+    return this._baseOrWhereBetween(this._getColumn(col), low, high);
   }
   orWhereNotBetween(col, low, high) {
-    return Model.prototype._baseOrWhereNotBetween.call(
-      this,
-      this._getColumn(col),
-      low,
-      high
-    );
+    return this._baseOrWhereNotBetween(this._getColumn(col), low, high);
   }
   orWhereExists(builder) {
     if (this._where) {
@@ -3000,7 +2955,7 @@ class Model {
         `invalid argument type ${typeof selectNames} for load_fk`
       );
     }
-    return Model.prototype._baseSelect.call(this, fks);
+    return this._baseSelect(fks);
   }
 }
 

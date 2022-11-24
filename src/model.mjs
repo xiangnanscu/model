@@ -118,7 +118,7 @@ const NON_MERGE_NAMES = {
   sql: true,
   fields: true,
   fieldNames: true,
-  _extends: true,
+  extend: true,
   mixins: true,
   admin: true,
 };
@@ -649,7 +649,7 @@ class Model {
       static primaryKey = opts.primaryKey;
       static defaultPrimaryKey = opts.defaultPrimaryKey;
       static mixins = opts.mixins;
-      static _extends = opts._extends;
+      static extend = opts.extend;
       static abstract = opts.abstract;
       static disableAutoPrimaryKey = opts.disableAutoPrimaryKey;
       newRecord(data) {
@@ -740,7 +740,11 @@ class Model {
         ConcreteModel.names.push(name);
       }
     }
-    if (!pkDefined && !ConcreteModel.disableAutoPrimaryKey) {
+    if (
+      !ConcreteModel.abstract &&
+      !pkDefined &&
+      !ConcreteModel.disableAutoPrimaryKey
+    ) {
       const pkName = ConcreteModel.defaultPrimaryKey || "id";
       ConcreteModel.primaryKey = pkName;
       ConcreteModel.fields[pkName] = Field.integer.new({
@@ -773,16 +777,16 @@ class Model {
     return ConcreteModel;
   }
   static normalize(options) {
-    const _extends = options._extends;
+    const extend = options.extend;
     const model = {
-      sql: options.sql
+      sql: options.sql,
     };
     const optsFields = normalizeArrayAndHashFields(options.fields || []);
     let optsNames = options.fieldNames;
     if (!optsNames) {
       const selfNames = Object.keys(optsFields);
-      if (_extends) {
-        optsNames = unique([..._extends.fieldNames, ...selfNames]);
+      if (extend) {
+        optsNames = unique([...extend.fieldNames, ...selfNames]);
       } else {
         optsNames = selfNames;
       }
@@ -799,8 +803,8 @@ class Model {
       let field = optsFields[name];
       if (!field) {
         const tname = options.tableName || "[abstract model]";
-        if (_extends) {
-          field = _extends.fields[name];
+        if (extend) {
+          field = extend.fields[name];
           if (!field) {
             throw new Error(
               `'${tname}' field name '${name}' is not in fields and parent fields`
@@ -810,14 +814,14 @@ class Model {
           throw new Error(`'${tname}' field name '${name}' is not in fields`);
         }
       } else if (!(field instanceof Field.basefield)) {
-        if (_extends) {
-          const pfield = _extends.fields[name];
+        if (extend) {
+          const pfield = extend.fields[name];
           if (pfield) {
             field = { ...pfield.getOptions(), ...field };
             if (pfield.model && field.model) {
               field.model = this.createModel({
                 abstract: true,
-                _extends: pfield.model,
+                extend: pfield.model,
                 fields: field.model.fields,
                 fieldNames: field.model.fieldNames,
               });

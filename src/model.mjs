@@ -135,7 +135,7 @@ const SHARED_NAMES = [
   "labelToName",
   "nameToLabel",
   "Record",
-  "defaultQuery",
+  "sqlQuery",
 ];
 const getLocalTime = Field.basefield.getLocalTime;
 const stringFormat = (s, ...varargs) => {
@@ -163,7 +163,7 @@ const stringFormat = (s, ...varargs) => {
 };
 const baseModel = {
   abstract: true,
-  fieldNames: Array(["id", "ctime", "utime"]),
+  fieldNames: ["id", "ctime", "utime"],
   fields: {
     id: { type: "integer", primaryKey: true, serial: true },
     ctime: { label: "创建时间", type: "datetime", autoNowAdd: true },
@@ -219,7 +219,7 @@ function normalizeFieldNames(fieldNames) {
   for (const name of fieldNames) {
     assert(typeof name === "string", "element of field_names must be string");
   }
-  return Array(fieldNames);
+  return fieldNames;
 }
 function getForeignObject(attrs, prefix) {
   const fk = {};
@@ -642,7 +642,7 @@ class Model {
   }
   static makeModelClass(opts) {
     class ConcreteModel extends this {
-      static defaultQuery = opts.defaultQuery;
+      static sqlQuery = opts.sqlQuery;
       static tableName = opts.tableName;
       static fields = opts.fields;
       static fieldNames = opts.fieldNames;
@@ -699,7 +699,7 @@ class Model {
     if (opts.sql) {
       // https://www.npmjs.com/package/postgres#connection-details
       const sql = opts.sql;
-      ConcreteModel.defaultQuery = async function (statement, args, options) {
+      ConcreteModel.sqlQuery = async function (statement, args, options) {
         return await sql.unsafe(statement, args, options);
       };
     }
@@ -740,14 +740,16 @@ class Model {
         ConcreteModel.names.push(name);
       }
     }
-    const pkName = ConcreteModel.defaultPrimaryKey || "id";
-    ConcreteModel.primaryKey = pkName;
-    ConcreteModel.fields[pkName] = Field.integer.new({
-      name: pkName,
-      primaryKey: true,
-      serial: true,
-    });
-    ConcreteModel.fieldNames.unshift(pkName);
+    if (!pkDefined && !ConcreteModel.disableAutoPrimaryKey) {
+      const pkName = ConcreteModel.defaultPrimaryKey || "id";
+      ConcreteModel.primaryKey = pkName;
+      ConcreteModel.fields[pkName] = Field.integer.new({
+        name: pkName,
+        primaryKey: true,
+        serial: true,
+      });
+      ConcreteModel.fieldNames.unshift(pkName);
+    }
     ConcreteModel.nameCache = {};
     ConcreteModel.labelToName = {};
     ConcreteModel.nameToLabel = {};
@@ -759,7 +761,7 @@ class Model {
         field.dbType = ConcreteModel.fields[field.referenceColumn].dbType;
       }
     }
-    ConcreteModel.Record = makeRecordClass(ConcreteModel, this);
+    ConcreteModel.Record = makeRecordClass(ConcreteModel);
     for (const name of SHARED_NAMES) {
       if (
         ConcreteModel.prototype[name] === undefined &&
@@ -772,7 +774,9 @@ class Model {
   }
   static normalize(options) {
     const _extends = options._extends;
-    const model = {};
+    const model = {
+      sql: options.sql
+    };
     const optsFields = normalizeArrayAndHashFields(options.fields || []);
     let optsNames = options.fieldNames;
     if (!optsNames) {
@@ -920,7 +924,7 @@ class Model {
     return res[0][0];
   }
   static async all() {
-    const records = await this.defaultQuery("SELECT * FROM " + this.tableName);
+    const records = await this.sqlQuery("SELECT * FROM " + this.tableName);
     for (let i = 0; i < records.length; i = i + 1) {
       records[i] = this.load(records[i]);
     }
@@ -2796,7 +2800,7 @@ class Model {
   }
   async exists() {
     const statement = `SELECT EXISTS (${this.select("").limit(1).statement()})`;
-    const res = await this.defaultQuery(statement);
+    const res = await this.sqlQuery(statement);
     return res;
   }
   compact() {
@@ -2859,14 +2863,14 @@ class Model {
   }
   // async query(statement) {
   //   console.log(statement);
-  //   return await this.defaultQuery(statement);
+  //   return await this.sqlQuery(statement);
   // }
   async execr() {
     return await this.raw().exec();
   }
   async exec() {
     const statement = this.statement();
-    const records = await this.defaultQuery(statement);
+    const records = await this.sqlQuery(statement);
     if (this._raw) {
       return records;
     } else if (

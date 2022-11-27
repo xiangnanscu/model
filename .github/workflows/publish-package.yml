@@ -4,7 +4,7 @@ on:
   push:
     branches:
       - master
-    paths: 'package.json'
+    paths: "package.json"
 
 jobs:
   build:
@@ -16,10 +16,10 @@ jobs:
           node-version: 16
       - uses: harmon758/postgresql-action@v1
         with:
-          postgresql version: '14'
-          postgresql db: 'postgres'
-          postgresql user: 'postgres'
-          postgresql password: '111111'
+          postgresql version: "14"
+          postgresql db: "postgres"
+          postgresql user: "postgres"
+          postgresql password: "postgres"
       - run: npm ci
       - run: npm test
 

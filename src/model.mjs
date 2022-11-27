@@ -136,6 +136,7 @@ const SHARED_NAMES = [
   "nameToLabel",
   "Record",
   "sqlQuery",
+  "__is_model_class__",
 ];
 const getLocalTime = Field.basefield.getLocalTime;
 const stringFormat = (s, ...varargs) => {
@@ -768,6 +769,10 @@ class Model {
         field.dbType = ConcreteModel.fields[field.referenceColumn].dbType;
       }
     }
+    ConcreteModel.__is_model_class__ = true;
+    if (!notAbstract) {
+      ConcreteModel.Record = makeRecordClass(ConcreteModel);
+    }
     for (const name of SHARED_NAMES) {
       if (
         ConcreteModel.prototype[name] === undefined &&
@@ -776,11 +781,6 @@ class Model {
         ConcreteModel.prototype[name] = ConcreteModel[name];
       }
     }
-    ConcreteModel.__is_model_class__ = true;
-    if (notAbstract) {
-      return ConcreteModel;
-    }
-    ConcreteModel.Record = makeRecordClass(ConcreteModel);
     return ConcreteModel;
   }
   static normalize(options) {

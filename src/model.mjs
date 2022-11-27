@@ -703,15 +703,18 @@ class Model {
         return await sql.unsafe(statement, args, options);
       };
     }
-    if (!ConcreteModel.tableName) {
-      const namesHint =
-        (ConcreteModel.fieldNames && ConcreteModel.fieldNames.join(",")) ||
-        "no field_names";
-      throw new Error(
-        `you must define table_name for a non-abstract model (${namesHint})`
-      );
+    const notAbstract = !ConcreteModel.abstract;
+    if (notAbstract) {
+      if (!ConcreteModel.tableName) {
+        const namesHint =
+          (ConcreteModel.fieldNames && ConcreteModel.fieldNames.join(",")) ||
+          "no field_names";
+        throw new Error(
+          `you must define table_name for a non-abstract model (${namesHint})`
+        );
+      }
+      checkReserved(ConcreteModel.tableName);
     }
-    checkReserved(ConcreteModel.tableName);
     let pkDefined = false;
     ConcreteModel.foreignKeys = {};
     ConcreteModel.names = [];
@@ -740,11 +743,7 @@ class Model {
         ConcreteModel.names.push(name);
       }
     }
-    if (
-      !ConcreteModel.abstract &&
-      !pkDefined &&
-      !ConcreteModel.disableAutoPrimaryKey
-    ) {
+    if (notAbstract && !pkDefined && !ConcreteModel.disableAutoPrimaryKey) {
       const pkName = ConcreteModel.defaultPrimaryKey || "id";
       ConcreteModel.primaryKey = pkName;
       ConcreteModel.fields[pkName] = Field.integer.new({
@@ -754,18 +753,21 @@ class Model {
       });
       ConcreteModel.fieldNames.unshift(pkName);
     }
-    ConcreteModel.nameCache = {};
+    if (notAbstract) {
+      ConcreteModel.nameCache = {};
+    }
     ConcreteModel.labelToName = {};
     ConcreteModel.nameToLabel = {};
     for (const [name, field] of Object.entries(ConcreteModel.fields)) {
       ConcreteModel.labelToName[field.label] = name;
       ConcreteModel.nameToLabel[name] = field.label;
-      ConcreteModel.nameCache[name] = ConcreteModel.tableName + "." + name;
+      if (notAbstract) {
+        ConcreteModel.nameCache[name] = ConcreteModel.tableName + "." + name;
+      }
       if (field.dbType === Field.basefield.NOT_DEFIEND) {
         field.dbType = ConcreteModel.fields[field.referenceColumn].dbType;
       }
     }
-    ConcreteModel.Record = makeRecordClass(ConcreteModel);
     for (const name of SHARED_NAMES) {
       if (
         ConcreteModel.prototype[name] === undefined &&
@@ -774,6 +776,11 @@ class Model {
         ConcreteModel.prototype[name] = ConcreteModel[name];
       }
     }
+    ConcreteModel.__is_model_class__ = true;
+    if (notAbstract) {
+      return ConcreteModel;
+    }
+    ConcreteModel.Record = makeRecordClass(ConcreteModel);
     return ConcreteModel;
   }
   static normalize(options) {

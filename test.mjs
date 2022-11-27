@@ -15,7 +15,7 @@ const sql = postgres({
   connect_timeout: 2,
 });
 const defaultQuery = async (statement) => {
-  p(statement)
+  p(statement);
   return await sql.unsafe(statement);
 };
 await defaultQuery(`

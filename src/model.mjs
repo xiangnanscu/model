@@ -162,6 +162,7 @@ const stringFormat = (s, ...varargs) => {
   }
   return res.join("");
 };
+const capitalize = (s) => s.charAt(0).toUpperCase() + s.slice(1);
 const baseModel = {
   abstract: true,
   fieldNames: ["id", "ctime", "utime"],
@@ -694,7 +695,7 @@ class Model {
       }
     }
     const className = {
-      value: `${ConcreteModel.tableName.toUpperCase()}Model`,
+      value: `${capitalize(ConcreteModel.tableName)}Model`,
     };
     Object.defineProperty(ConcreteModel, "name", className);
     if (opts.sql) {
@@ -770,7 +771,7 @@ class Model {
       }
     }
     ConcreteModel.__is_model_class__ = true;
-    if (!notAbstract) {
+    if (notAbstract) {
       ConcreteModel.Record = makeRecordClass(ConcreteModel);
     }
     for (const name of SHARED_NAMES) {

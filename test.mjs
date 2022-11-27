@@ -8,7 +8,7 @@ function p() {
 const sql = postgres({
   host: "localhost",
   user: "postgres",
-  password: "111111",
+  password: "postgres",
   database: "postgres",
   max: 20,
   idle_timeout: 20,

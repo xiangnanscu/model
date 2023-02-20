@@ -1,5 +1,5 @@
 /* eslint-disable no-undef */
-import Model from "./src/model.mjs";
+import Model from "./src/model2.mjs";
 import postgres from "postgres";
 
 function p() {
@@ -9,7 +9,7 @@ const sql = postgres({
   host: "localhost",
   user: "postgres",
   password: "postgres",
-  database: "postgres",
+  database: "test",
   max: 20,
   idle_timeout: 20,
   connect_timeout: 2,
@@ -19,6 +19,7 @@ const defaultQuery = async (statement) => {
   return await sql.unsafe(statement);
 };
 await defaultQuery(`
+DROP TABLE IF EXISTS post;
 DROP TABLE IF EXISTS profile;
 DROP TABLE IF EXISTS usr;
 

@@ -4,13 +4,22 @@ require("@rushstack/eslint-patch/modern-module-resolution");
 module.exports = {
   root: true,
   rules: {
-    semi: [0, "never"],
     "prefer-const": [
       "error",
       {
         destructuring: "all",
         ignoreReadBeforeAssign: false,
       },
+    ],
+    "vue/no-unused-vars": [
+      "warn",
+      {
+        ignorePattern: "^_",
+      },
+    ],
+    "no-unused-vars": [
+      "warn",
+      { vars: "all", args: "after-used", argsIgnorePattern: "^_" },
     ],
   },
   extends: [

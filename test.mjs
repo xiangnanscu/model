@@ -1,5 +1,5 @@
 /* eslint-disable no-undef */
-import Model from "./src/model2.mjs";
+import Model from "./src/model.mjs";
 import postgres from "postgres";
 
 function p() {
@@ -14,11 +14,12 @@ const sql = postgres({
   idle_timeout: 20,
   connect_timeout: 2,
 });
-const defaultQuery = async (statement) => {
+// https://www.npmjs.com/package/postgres#connection-details
+const sqlQuery = async (statement) => {
   p(statement);
   return await sql.unsafe(statement);
 };
-await defaultQuery(`
+await sqlQuery(`
 DROP TABLE IF EXISTS post;
 DROP TABLE IF EXISTS profile;
 DROP TABLE IF EXISTS usr;
@@ -33,7 +34,7 @@ CREATE TABLE profile (
   info varchar(50));
 `);
 const Usr = Model.createModel({
-  sql,
+  sqlQuery,
   tableName: "usr",
   fields: {
     name: { label: "姓名", unique: true, maxlength: 4, minlength: 1 },
@@ -41,7 +42,7 @@ const Usr = Model.createModel({
   },
 });
 const Profile = Model.createModel({
-  sql,
+  sqlQuery,
   tableName: "profile",
   fields: {
     usrName: { label: "用户", reference: Usr, referenceColumn: "name" },

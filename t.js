@@ -1,6 +1,13 @@
-class C {
+class B {
   hello() {
-    console.log(Object.get(this) === C.prototype);
+    console.log(this.cls === C);
+  }
+}
+
+class C extends B {
+  constructor() {
+    super();
+    this.cls = C;
   }
 }
 

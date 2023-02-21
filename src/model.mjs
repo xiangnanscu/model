@@ -128,7 +128,7 @@ const isEmptyObject = (obj) => {
   }
   return true;
 };
-const getLocalTime = Field.basefield.getLocalTime;
+const getLocalTime = Field.BaseField.getLocalTime;
 const stringFormat = (s, ...varargs) => {
   let status = 0;
   const res = [];
@@ -349,7 +349,7 @@ function makeFieldFromJson(json, kwargs) {
   ) {
     options.maxlength = DEFAULT_STRING_MAXLENGTH;
   }
-  const fcls = Field[options.type];
+  const fcls = Field[`${capitalize(options.type)}Field`];
   if (!fcls) {
     throw new Error("invalid field type:" + String(options.type));
   }
@@ -474,6 +474,7 @@ class ModelProxy {
   }
   static createProxy(modelclass) {
     return new this({
+      __isModelClass__: true, // 用于ForeignkeyField判断reference是否传入model
       modelclass: modelclass,
       tableName: modelclass.tableName,
       fieldNames: modelclass.fieldNames,
@@ -713,7 +714,7 @@ class Model {
       }
     }
     for (const [_, field] of Object.entries(ConcreteModel.fields)) {
-      if (field.dbType === Field.basefield.NOT_DEFIEND) {
+      if (field.dbType === Field.BaseField.NOT_DEFIEND) {
         field.dbType = ConcreteModel.fields[field.referenceColumn].dbType;
       }
     }
@@ -742,7 +743,7 @@ class Model {
     if (!ConcreteModel.primaryKey && !ConcreteModel.disableAutoPrimaryKey) {
       const pkName = ConcreteModel.defaultPrimaryKey || "id";
       ConcreteModel.primaryKey = pkName;
-      ConcreteModel.fields[pkName] = Field.integer.new({
+      ConcreteModel.fields[pkName] = Field.IntegerField.new({
         name: pkName,
         primaryKey: true,
         serial: true,
@@ -798,7 +799,7 @@ class Model {
         } else {
           throw new Error(`'${tname}' field name '${name}' is not in fields`);
         }
-      } else if (!(field instanceof Field.basefield)) {
+      } else if (!(field instanceof Field.BaseField)) {
         if (extend) {
           const pfield = extend.fields[name];
           if (pfield) {
@@ -814,7 +815,7 @@ class Model {
           }
         }
       }
-      if (!(field instanceof Field.basefield)) {
+      if (!(field instanceof Field.BaseField)) {
         model.fields[name] = makeFieldFromJson(field, { name: name });
       } else {
         model.fields[name] = makeFieldFromJson(field.getOptions(), {

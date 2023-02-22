@@ -1,6 +1,6 @@
 {
   "name": "@xiangnanscu/model",
-  "version": "0.14.0",
+  "version": "0.15.0",
   "description": "model",
   "main": "src/model.mjs",
   "keywords": [
@@ -62,6 +62,6 @@
     "vue-tsc": "^1.0.8"
   },
   "dependencies": {
-    "@xiangnanscu/field": "latest"
+    "@xiangnanscu/field": "^0.12.0"
   }
 }

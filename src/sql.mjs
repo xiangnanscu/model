@@ -1,20 +1,55 @@
-const nkeys = require("table.nkeys");
-const clone = require("table.clone");
-const utils = require("xodel.utils");
-const setmetatable = setmetatable;
-const ipairs = ipairs;
-const tostring = tostring;
-const type = type;
-const next = next;
-const pairs = pairs;
-const assert = assert;
-const error = error;
-const string_format = string.format;
-const table_concat = table.concat;
-const table_insert = table.insert;
-const table_new = table.new;
-const NULL = ngx.null;
-const match = ngx.re.match;
+// ([a-z])([A-Z]) => $1_\L$2
+// rows[0] 替换为Array.isArray(rows)
+// is_sql_instance\((\w+)\) => $1 instanceof Sql
+// lua混合array和object, js只能分别处理:
+//  _base_get_condition_token_from_table
+//  _get_condition_token_from_table
+// foo.bar = undefined => delete foo.bar
+// table_new(n, 0); =>  new Array(n);
+// key:find("__", 1, true) => key.indexOf("__")
+// key:sub => key.slice
+// key:gsub => key.replaceAll
+// _get_expr_token接收_parse_column返回值时要用...
+// foo = [] 要注意是否应该为 foo = {}
+// match(key, ...) => key.match
+// lua循环起始值为2时js的处理, 例如:parse_where_exp
+// parse_where_exp的self处理
+const clone = (o) => JSON.parse(JSON.stringify(o));
+const string_format = (s, ...varargs) => {
+  let status = 0;
+  const res = [];
+  let j = -1;
+  for (let i = 0; i < s.length; i++) {
+    const c = s[i];
+    if (c === "%") {
+      if (status === 0) {
+        status = 1;
+      } else if (status === 1) {
+        status = 0;
+        res.push("%");
+      }
+    } else if (c === "s" && status === 1) {
+      j = j + 1;
+      res.push(varargs[j]);
+      status = 0;
+    } else {
+      res.push(c);
+    }
+  }
+  return res.join("");
+};
+function assert(bool, err_msg) {
+  if (!bool) {
+    throw new Error(err_msg);
+  } else {
+    return bool;
+  }
+}
+function next(obj) {
+  for (const key in obj) {
+    return key;
+  }
+}
 const PG_SET_MAP = {
   _union: "UNION",
   _union_all: "UNION ALL",
@@ -37,71 +72,38 @@ function make_token(s) {
   }
   return raw_token;
 }
+const NULL = make_token("NULL");
 const DEFAULT = make_token("DEFAULT");
-function map(tbl, func) {
-  const res = [];
-  for (let i = 0; i < tbl.length; i = i + 1) {
-    res[i] = func(tbl[i]);
-  }
-  return res;
-}
-function flat(tbl) {
-  const res = [];
-  for (let i = 0; i < tbl.length; i = i + 1) {
-    const t = tbl[i];
-    if (typeof t !== "object") {
-      res.push(t);
-    } else {
-      for (const [_, e] of flat(t).entries()) {
-        res.push(e);
-      }
-    }
-  }
-  return res;
-}
-function list(t1, t2) {
-  const res = clone(t1);
-  if (t2) {
-    for (let i = 0; i < t2.length; i = i + 1) {
-      res.push(t2[i]);
-    }
-  }
-  return res;
-}
+
 function _prefix_with_V(column) {
   return "V." + column;
-}
-function is_sql_instance(row) {
-  const meta = getmetatable(row);
-  return meta && meta.__SQL_BUILDER__;
 }
 function _escape_factory(is_literal, is_bracket) {
   function as_sql_token(value) {
     const value_type = typeof value;
     if ("string" === value_type) {
       if (is_literal) {
-        return "'" + (value.gsub("'", "''") + "'");
+        return "'" + value.replaceAll("'", "''") + "'";
       } else {
         return value;
       }
     } else if ("number" === value_type) {
-      return tostring(value);
+      return String(value);
     } else if ("boolean" === value_type) {
       return (value && "TRUE") || "FALSE";
     } else if ("function" === value_type) {
       return value();
-    } else if ("object" === value_type) {
-      if (is_sql_instance(value)) {
-        return "(" + (value.statement() + ")");
-      } else if (value[0] !== undefined) {
-        const token = map(value, as_sql_token).join(", ");
-        if (is_bracket) {
-          return "(" + (token + ")");
-        } else {
-          return token;
-        }
+    } else if (value instanceof Sql) {
+      return "(" + value.statement() + ")";
+    } else if (Array.isArray(value)) {
+      if (value.length === 0) {
+        throw new Error("empty array as Sql value is not allowed");
+      }
+      const token = value.map(as_sql_token).join(", ");
+      if (is_bracket) {
+        return "(" + token + ")";
       } else {
-        throw new Error("empty table as a Xodel value is not allowed");
+        return token;
       }
     } else if (NULL === value) {
       return "NULL";
@@ -148,32 +150,51 @@ function assemble_sql(opts) {
   }
   return (opts.with && `WITH ${opts.with} ${statement}`) || statement;
 }
-const Sql = utils._class(
-  {
-    __SQL_BUILDER__: true,
-    NULL: NULL,
-    DEFAULT: DEFAULT,
-    token: make_token,
-    as_token: as_token,
-    as_literal: as_literal,
-    as_literal_without_brackets: as_literal_without_brackets,
-  },
-  {
-    __call: function (t, args) {
-      if (typeof args === "string") {
-        return t.new({ table_name: args });
-      } else {
-        return t.new(args);
-      }
-    },
-    __tostring: function (self) {
-      return self.statement();
-    },
+class Sql {
+  // static Validate_error = Validate_error;
+  // static Validate_batch_error = Validate_batch_error;
+  // static base_model = base_model;
+  // static make_field_from_json = make_field_from_json;
+  static token = make_token;
+  static NULL = NULL;
+  static DEFAULT = DEFAULT;
+  static as_token = as_token;
+  static as_literal = as_literal;
+  static as_literal_without_brackets = as_literal_without_brackets;
+
+  static new(args) {
+    if (typeof args === "string") {
+      return new this({ table_name: args });
+    } else {
+      return new this(args);
+    }
   }
-);
-Sql.new = function (self) {
-  return setmetatable(self || [], this);
-};
+  static get_keys(rows) {
+    const columns = [];
+    if (rows instanceof Array) {
+      const d = [];
+      for (const row of rows) {
+        for (const k of Object.keys(row)) {
+          if (!d[k]) {
+            d[k] = true;
+            columns.push(k);
+          }
+        }
+      }
+    } else {
+      for (const k of Object.keys(rows)) {
+        columns.push(k);
+      }
+    }
+    return columns;
+  }
+  constructor(attrs) {
+    Object.assign(this, attrs);
+  }
+  toString() {
+    return this.statement();
+  }
+}
 Sql.prototype._base_select = function (a, b, ...varargs) {
   const s = this._base_get_select_token(a, b, ...varargs);
   if (!this._select) {
@@ -186,7 +207,7 @@ Sql.prototype._base_select = function (a, b, ...varargs) {
 Sql.prototype._base_get_select_token = function (a, b, ...varargs) {
   if (b === undefined) {
     if (typeof a === "object") {
-      return Sql.prototype._base_get_select_token.call(this, unpack(a));
+      return Sql.prototype._base_get_select_token.call(this, ...a);
     } else {
       return as_token(a);
     }
@@ -200,7 +221,7 @@ Sql.prototype._base_get_select_token = function (a, b, ...varargs) {
 };
 Sql.prototype._base_insert = function (rows, columns) {
   if (typeof rows === "object") {
-    if (is_sql_instance(rows)) {
+    if (rows instanceof Sql) {
       if (rows._select) {
         this._set_select_subquery_insert_token(rows, columns);
       } else if (rows._returning_args) {
@@ -210,7 +231,7 @@ Sql.prototype._base_insert = function (rows, columns) {
           "select or returning args should be provided when inserting from a sub query"
         );
       }
-    } else if (rows[0]) {
+    } else if (rows instanceof Array) {
       this._insert = this._get_bulk_insert_token(rows, columns);
     } else if (next(rows) !== undefined) {
       this._insert = this._get_insert_token(rows, columns);
@@ -225,7 +246,7 @@ Sql.prototype._base_insert = function (rows, columns) {
   return this;
 };
 Sql.prototype._base_update = function (row, columns) {
-  if (is_sql_instance(row)) {
+  if (row instanceof Sql) {
     this._update = this._base_get_update_query_token(row, columns);
   } else if (typeof row === "object") {
     this._update = this._get_update_token(row, columns);
@@ -239,11 +260,11 @@ Sql.prototype._base_merge = function (rows, key, columns) {
   const cte_name = `V(${columns.join(", ")})`;
   const cte_values = `(VALUES ${as_token(rows)})`;
   const join_cond = this._get_join_conditions(key, "V", "T");
-  const vals_columns = map(columns, _prefix_with_V);
+  const vals_columns = columns.map(_prefix_with_V);
   const insert_subquery = Sql.new({ table_name: "V" })
     ._base_select(vals_columns)
     ._base_left_join("U AS T", join_cond)
-    ._base_where_null("T." + (key[0] || key));
+    ._base_where_null("T." + (Array.is_array(key) ? key[0] : key));
   let updated_subquery;
   if (
     (typeof key === "object" && key.length === columns.length) ||
@@ -264,13 +285,13 @@ Sql.prototype._base_merge = function (rows, key, columns) {
 };
 Sql.prototype._base_upsert = function (rows, key, columns) {
   assert(key, "you must provide key for upsert(string or table)");
-  if (is_sql_instance(rows)) {
+  if (rows instanceof Sql) {
     assert(
       columns !== undefined,
       "you must specify columns when use subquery as values of upsert"
     );
     this._insert = this._get_upsert_query_token(rows, key, columns);
-  } else if (rows[0]) {
+  } else if (Array.is_array(rows)) {
     this._insert = this._get_bulk_upsert_token(rows, key, columns);
   } else {
     this._insert = this._get_upsert_token(rows, key, columns);
@@ -278,8 +299,8 @@ Sql.prototype._base_upsert = function (rows, key, columns) {
   return this;
 };
 Sql.prototype._base_updates = function (rows, key, columns) {
-  if (is_sql_instance(rows)) {
-    columns = columns || flat(rows._returning_args);
+  if (rows instanceof Sql) {
+    columns = columns || rows._returning_args.flat();
     const cte_name = `V(${columns.join(", ")})`;
     const join_cond = this._get_join_conditions(
       key,
@@ -360,14 +381,16 @@ Sql.prototype._base_where = function (cond, op, dval) {
 };
 Sql.prototype._base_get_condition_token_from_table = function (kwargs, logic) {
   const tokens = [];
-  for (const [k, value] of Object.entries(kwargs)) {
-    if (typeof k === "string") {
-      tokens.push(`${k} = ${as_literal(value)}`);
-    } else {
+  if (Array.isArray(kwargs)) {
+    for (const value of kwargs) {
       const token = this._base_get_condition_token(value);
       if (token !== undefined && token !== "") {
-        tokens.push("(" + (token + ")"));
+        tokens.push("(" + token + ")");
       }
+    }
+  } else {
+    for (const [k, value] of Object.entries(kwargs)) {
+      tokens.push(`${k} = ${as_literal(value)}`);
     }
   }
   if (logic === undefined) {
@@ -388,25 +411,21 @@ Sql.prototype._base_get_condition_token = function (cond, op, dval) {
       return cond;
     } else if (argtype === "function") {
       const old_where = this._where;
-      this._where = undefined;
-      const [res, err] = cond.call(this);
-      if (res !== undefined) {
-        if (res === this) {
-          const group_where = this._where;
-          if (group_where === undefined) {
-            throw new Error(
-              "no where token generate after calling condition function"
-            );
-          } else {
-            this._where = old_where;
-            return group_where;
-          }
+      delete this._where;
+      const res = cond.call(this);
+      if (res === this) {
+        const group_where = this._where;
+        if (group_where === undefined) {
+          throw new Error(
+            "no where token generate after calling condition function"
+          );
         } else {
           this._where = old_where;
-          return res;
+          return group_where;
         }
       } else {
-        throw new Error(err || "nil returned in condition function");
+        this._where = old_where;
+        return res;
       }
     } else {
       throw new Error("invalid condition type: " + argtype);
@@ -517,23 +536,23 @@ Sql.prototype._base_or_where_not_between = function (col, low, high) {
   }
   return this;
 };
-Sql.prototype.pcall = function () {
-  this._pcall = true;
-  return this;
-};
-Sql.prototype.error = function (err, level) {
-  if (this._pcall) {
-    throw new Error(err);
-  } else {
-    throw new Error(err);
-  }
-};
+// Sql.prototype.pcall = function () {
+//   this._pcall = true;
+//   return this;
+// };
+// Sql.prototype.error = function (err, level) {
+//   if (this._pcall) {
+//     throw new Error(err);
+//   } else {
+//     throw new Error(err);
+//   }
+// };
 Sql.prototype._rows_to_array = function (rows, columns) {
   const c = columns.length;
   const n = rows.length;
-  const res = table_new(n, 0);
+  const res = new Array(n);
   for (let i = 0; i < n; i = i + 1) {
-    res[i] = table_new(c, 0);
+    res[i] = new Array(c);
   }
   for (const [i, col] of columns.entries()) {
     for (let j = 0; j < n; j = j + 1) {
@@ -568,9 +587,9 @@ Sql.prototype._get_insert_values_token = function (row, columns) {
   return [value_list, columns];
 };
 Sql.prototype._get_bulk_insert_values_token = function (rows, columns) {
-  columns = columns || utils.get_keys(rows);
+  columns = columns || Sql.get_keys(rows);
   rows = this._rows_to_array(rows, columns);
-  return [map(rows, as_literal), columns];
+  return [rows.map(as_literal), columns];
 };
 Sql.prototype._get_update_token_with_prefix = function (
   columns,
@@ -599,7 +618,7 @@ Sql.prototype._get_update_token_with_prefix = function (
 };
 Sql.prototype._get_select_token = function (a, b, ...varargs) {
   if (b === undefined) {
-    if (typeof a === "object") {
+    if (Array.isArray(a)) {
       const tokens = [];
       for (let i = 0; i < a.length; i = i + 1) {
         tokens[i] = this._get_select_column(a[i]);
@@ -623,7 +642,7 @@ Sql.prototype._get_select_token = function (a, b, ...varargs) {
 };
 Sql.prototype._get_select_token_literal = function (a, b, ...varargs) {
   if (b === undefined) {
-    if (typeof a === "object") {
+    if (Array.isArray(a)) {
       const tokens = [];
       for (let i = 0; i < a.length; i = i + 1) {
         tokens[i] = as_literal(a[i]);
@@ -658,7 +677,7 @@ Sql.prototype._get_update_token = function (row, columns) {
 Sql.prototype._get_with_token = function (name, token) {
   if (token === undefined) {
     return name;
-  } else if (is_sql_instance(token)) {
+  } else if (token instanceof Sql) {
     return `${name} AS (${token.statement()})`;
   } else {
     return `${name} AS ${token}`;
@@ -687,7 +706,7 @@ Sql.prototype._set_select_subquery_insert_token = function (
   }
 };
 Sql.prototype._set_cud_subquery_insert_token = function (sub_query, columns) {
-  const insert_columns = columns || flat(sub_query._returning_args);
+  const insert_columns = columns || sub_query._returning_args.flat();
   const cud_select_query = Sql.new({ table_name: "d" })._base_select(
     insert_columns
   );
@@ -705,7 +724,7 @@ Sql.prototype._get_upsert_token = function (row, key, columns) {
     values_list
   )} ON CONFLICT (${this._get_select_token(key)})`;
   if (
-    (typeof key === "object" && key.length === insert_columns.length) ||
+    (Array.isArray(key) && key.length === insert_columns.length) ||
     insert_columns.length === 1
   ) {
     return `${insert_token} DO NOTHING`;
@@ -723,7 +742,7 @@ Sql.prototype._get_bulk_upsert_token = function (rows, key, columns) {
     rows
   )} ON CONFLICT (${this._base_get_select_token(key)})`;
   if (
-    (typeof key === "object" && key.length === columns.length) ||
+    (Array.isArray(key) && key.length === columns.length) ||
     columns.length === 1
   ) {
     return `${insert_token} DO NOTHING`;
@@ -741,7 +760,7 @@ Sql.prototype._get_upsert_query_token = function (rows, key, columns) {
     key
   )})`;
   if (
-    (typeof key === "object" && key.length === columns.length) ||
+    (Array.isArray(key) && key.length === columns.length) ||
     columns.length === 1
   ) {
     return `${insert_token} DO NOTHING`;
@@ -783,7 +802,7 @@ Sql.prototype._get_in_token = function (cols, range, op) {
   cols = as_token(cols);
   op = op || "IN";
   if (typeof range === "object") {
-    if (is_sql_instance(range)) {
+    if (range instanceof Sql) {
       return `(${cols}) ${op} (${range.statement()})`;
     } else {
       return `(${cols}) ${op} ${as_literal(range)}`;
@@ -813,9 +832,9 @@ Sql.prototype._get_join_conditions = function (key, left_table, right_table) {
   return res.join(" AND ");
 };
 Sql.prototype._get_cte_values_literal = function (rows, columns, no_check) {
-  columns = columns || utils.get_keys(rows);
+  columns = columns || Sql.get_keys(rows);
   rows = this._rows_to_array(rows, columns);
-  const res = table_new(rows.length);
+  const res = new Array(rows.length);
   for (let i = 0; i < rows.length; i = i + 1) {
     res[i] = as_literal(rows[i]);
   }
@@ -839,12 +858,12 @@ Sql.prototype._handle_join = function (join_type, join_table, join_cond) {
   }
 };
 Sql.prototype._parse_column = function (key, as_select, strict, disable_alias) {
-  const [a, b] = key.find("__", 1, true);
-  if (!a) {
+  const a = key.indexOf("__");
+  if (a === -1) {
     return [key, "eq"];
   }
-  const e = key.sub(1, a - 1);
-  const op = key.sub(b + 1);
+  const e = key.slice(0, a);
+  const op = key.slice(a + 2);
   return [e, op];
 };
 Sql.prototype._get_column = function (key) {
@@ -854,7 +873,7 @@ Sql.prototype._get_select_column = function (key) {
   if (typeof key !== "string") {
     return key;
   } else {
-    return this._parse_column(key, true, true);
+    return this._parse_column(key, true, true)[0];
   }
 };
 Sql.prototype._get_expr_token = function (value, key, op) {
@@ -867,11 +886,11 @@ Sql.prototype._get_expr_token = function (value, key, op) {
   } else if (COMPARE_OPERATORS[op]) {
     return `${key} ${COMPARE_OPERATORS[op]} ${as_literal(value)}`;
   } else if (op === "contains") {
-    return `${key} LIKE '%${value.gsub("'", "''")}%'`;
+    return `${key} LIKE '%${value.replaceAll("'", "''")}%'`;
   } else if (op === "startswith") {
-    return `${key} LIKE '${value.gsub("'", "''")}%'`;
+    return `${key} LIKE '${value.replaceAll("'", "''")}%'`;
   } else if (op === "endswith") {
-    return `${key} LIKE '%${value.gsub("'", "''")}'`;
+    return `${key} LIKE '%${value.replaceAll("'", "''")}'`;
   } else if (op === "null") {
     if (value) {
       return `${key} IS NULL`;
@@ -879,12 +898,12 @@ Sql.prototype._get_expr_token = function (value, key, op) {
       return `${key} IS NOT NULL`;
     }
   } else {
-    throw new Error("invalid sql op: " + tostring(op));
+    throw new Error("invalid sql op: " + String(op));
   }
 };
 Sql.prototype._get_join_number = function () {
   if (this._join_keys) {
-    return nkeys(this._join_keys) + 1;
+    return Object.keys(this._join_keys).length + 1;
   } else {
     return 1;
   }
@@ -901,22 +920,24 @@ Sql.prototype._handle_where_token = function (where_token, tpl) {
 };
 Sql.prototype._get_condition_token_from_table = function (kwargs, logic) {
   const tokens = [];
-  for (const [k, value] of Object.entries(kwargs)) {
-    if (typeof k === "string") {
-      tokens.push(
-        this._get_expr_token(value, this._parse_column(k, false, true))
-      );
-    } else {
+  if (Array.isArray(kwargs)) {
+    for (const value of kwargs) {
       const token = this._get_condition_token(value);
       if (token !== undefined && token !== "") {
-        tokens.push("(" + (token + ")"));
+        tokens.push("(" + token + ")");
       }
+    }
+  } else {
+    for (const [k, value] of Object.entries(kwargs)) {
+      tokens.push(
+        this._get_expr_token(value, ...this._parse_column(k, false, true))
+      );
     }
   }
   if (logic === undefined) {
     return tokens.join(" AND ");
   } else {
-    return tokens.join(" " + (logic + " "));
+    return tokens.join(" " + logic + " ");
   }
 };
 Sql.prototype._get_condition_token = function (cond, op, dval) {
@@ -956,11 +977,12 @@ Sql.prototype._handle_set_option = function (other_sql, set_operation_attr) {
       PG_SET_MAP[set_operation_attr]
     } (${other_sql.statement()})`;
   }
-  if (this !== Sql) {
-    this.statement = this._statement_for_set;
-  } else {
-    throw new Error("don't call _handle_set_option directly on Sql class");
-  }
+  // if (this !== Sql) {
+  //   this.statement = this._statement_for_set;
+  // } else {
+  //   throw new Error("don't call _handle_set_option directly on Sql class");
+  // }
+  this.statement = this._statement_for_set;
   return this;
 };
 Sql.prototype._statement_for_set = function () {
@@ -1036,7 +1058,7 @@ Sql.prototype.as = function (table_alias) {
   return this;
 };
 Sql.prototype.with_values = function (name, rows) {
-  let columns = utils.get_keys(rows[0]);
+  let columns = Sql.get_keys(rows[0]);
   [rows, columns] = this._get_cte_values_literal(rows, columns, true);
   const cte_name = `${name}(${columns.join(", ")})`;
   const cte_values = `(VALUES ${as_token(rows)})`;
@@ -1074,7 +1096,7 @@ Sql.prototype.updates = function (rows, key, columns) {
   return this;
 };
 Sql.prototype.get_merge = function (rows, key) {
-  let columns = utils.get_keys(rows[0]);
+  let columns = Sql.get_keys(rows[0]);
   [rows, columns] = this._get_cte_values_literal(rows, columns, true);
   const join_cond = this._get_join_conditions(
     key,
@@ -1089,7 +1111,7 @@ Sql.prototype.get_merge = function (rows, key) {
   return this;
 };
 Sql.prototype.copy = function () {
-  const copy_sql = [];
+  const copy_sql = {};
   for (const [key, value] of Object.entries(this)) {
     if (typeof value === "object") {
       copy_sql[key] = clone(value);
@@ -1097,7 +1119,7 @@ Sql.prototype.copy = function () {
       copy_sql[key] = value;
     }
   }
-  return setmetatable(copy_sql, getmetatable.call(this));
+  return Sql.new(copy_sql)
 };
 Sql.prototype.delete = function (cond, op, dval) {
   this._delete = true;
@@ -1120,7 +1142,7 @@ Sql.prototype.select = function (a, b, ...varargs) {
   return this;
 };
 Sql.prototype.select_as = function (key, alias) {
-  const col = this._parse_column(key, true, true, true) + (" AS " + alias);
+  const col = this._parse_column(key, true, true, true)[0] + (" AS " + alias);
   if (!this._select) {
     this._select = col;
   } else {
@@ -1182,10 +1204,10 @@ Sql.prototype._get_order_column = function (key) {
   if (typeof key !== "string") {
     return this._get_select_column(key);
   } else {
-    const matched = match(key, "^([-+])?([\\w_.]+)$", "josui");
+    const matched = key.match(/^([-+])?([\w_.]+)$/);
     if (matched) {
-      return `${this._get_select_column(matched[1])} ${
-        (matched[0] === "-" && "DESC") || "ASC"
+      return `${this._get_select_column(matched[2])} ${
+        (matched[1] === "-" && "DESC") || "ASC"
       }`;
     } else {
       throw new Error(`invalid order arg format: ${key}`);
@@ -1194,7 +1216,7 @@ Sql.prototype._get_order_column = function (key) {
 };
 Sql.prototype._get_order_token = function (a, b, ...varargs) {
   if (b === undefined) {
-    if (typeof a === "object") {
+    if (Array.isArray(a)) {
       const tokens = [];
       for (let i = 0; i < a.length; i = i + 1) {
         tokens[i] = this._get_order_column(a[i]);
@@ -1290,14 +1312,14 @@ const logic_priority = {
 function parse_where_exp(self, cond, father_op) {
   const logic_op = cond[0];
   const tokens = [];
-  for (let i = 2; i <= cond.length; i = i + 1) {
+  for (let i = 1; i <= cond.length; i = i + 1) {
     const value = cond[i];
-    if (value[0]) {
+    if (Array.isArray(value)) {
       tokens.push(parse_where_exp(self, value, logic_op));
     } else {
       for (const [k, v] of Object.entries(value)) {
         tokens.push(
-          self._get_expr_token(v, self._parse_column(k, false, true))
+          self._get_expr_token(v, ...self._parse_column(k, false, true))
         );
       }
     }
@@ -1315,7 +1337,7 @@ function parse_where_exp(self, cond, father_op) {
   }
 }
 Sql.prototype.where_exp = function (cond) {
-  const where_token = parse_where_exp.call(this, cond, "init");
+  const where_token = parse_where_exp(this, cond, "init");
   return this._handle_where_token(where_token, "(%s) AND (%s)");
 };
 Sql.prototype.where_or = function (cond, op, dval) {

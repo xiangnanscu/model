@@ -441,31 +441,31 @@ function getReturningToken(opts) {
 function assembleSql(opts) {
   let statement;
   if (opts.update) {
-    const from = (opts.from && " FROM " + opts.from) || "";
-    const where = (opts.where && " WHERE " + opts.where) || "";
+    const from = opts.from && " FROM " + opts.from || "";
+    const where = opts.where && " WHERE " + opts.where || "";
     const returning = getReturningToken(opts);
     statement = `UPDATE ${opts.tableName} SET ${opts.update}${from}${where}${returning}`;
   } else if (opts.insert) {
     const returning = getReturningToken(opts);
     statement = `INSERT INTO ${opts.tableName} ${opts.insert}${returning}`;
   } else if (opts.delete) {
-    const using = (opts.using && " USING " + opts.using) || "";
-    const where = (opts.where && " WHERE " + opts.where) || "";
+    const using = opts.using && " USING " + opts.using || "";
+    const where = opts.where && " WHERE " + opts.where || "";
     const returning = getReturningToken(opts);
     statement = `DELETE FROM ${opts.tableName}${using}${where}${returning}`;
   } else {
     const from = opts.from || opts.tableName;
-    const where = (opts.where && " WHERE " + opts.where) || "";
-    const group = (opts.group && " GROUP BY " + opts.group) || "";
-    const having = (opts.having && " HAVING " + opts.having) || "";
-    const order = (opts.order && " ORDER BY " + opts.order) || "";
-    const limit = (opts.limit && " LIMIT " + opts.limit) || "";
-    const offset = (opts.offset && " OFFSET " + opts.offset) || "";
-    const distinct = (opts.distinct && "DISTINCT ") || "";
+    const where = opts.where && " WHERE " + opts.where || "";
+    const group = opts.group && " GROUP BY " + opts.group || "";
+    const having = opts.having && " HAVING " + opts.having || "";
+    const order = opts.order && " ORDER BY " + opts.order || "";
+    const limit = opts.limit && " LIMIT " + opts.limit || "";
+    const offset = opts.offset && " OFFSET " + opts.offset || "";
+    const distinct = opts.distinct && "DISTINCT " || "";
     const select = opts.select || "*";
     statement = `SELECT ${distinct}${select} FROM ${from}${where}${group}${having}${order}${limit}${offset}`;
   }
-  return (opts.with && `WITH ${opts.with} ${statement}`) || statement;
+  return opts.with && `WITH ${opts.with} ${statement}` || statement;
 }
 
 class ModelProxy {
@@ -731,7 +731,7 @@ class Model {
   static materializeWithTableName(ConcreteModel, tableName) {
     if (!tableName) {
       const namesHint =
-        (ConcreteModel.fieldNames && ConcreteModel.fieldNames.join(",")) ||
+        ConcreteModel.fieldNames && ConcreteModel.fieldNames.join(",") ||
         "no field_names";
       throw new Error(
         `you must define table_name for a non-abstract model (${namesHint})`
@@ -865,8 +865,8 @@ class Model {
     }
   }
   static mergeModel(a, b) {
-    const A = (a.__normalized__ && a) || this.normalize(a);
-    const B = (b.__normalized__ && b) || this.normalize(b);
+    const A = a.__normalized__ && a || this.normalize(a);
+    const B = b.__normalized__ && b || this.normalize(b);
     const C = {};
     const fieldNames = unique([...A.fieldNames, ...B.fieldNames]);
     const fields = {};
@@ -1300,7 +1300,7 @@ class Model {
       ._baseWhereNull("T." + (Array.isArray(key) ? key[0] : key));
     let updatedSubquery;
     if (
-      (typeof key === "object" && key.length === columns.length) ||
+      typeof key === "object" && key.length === columns.length ||
       columns.length === 1
     ) {
       updatedSubquery = Model.new({ tableName: "V" })
@@ -1696,7 +1696,7 @@ class Model {
     } else {
       for (const k of columns) {
         const v = row[k];
-        kv.push(`${k} = ${(v !== undefined && asLiteral(v)) || "DEFAULT"}`);
+        kv.push(`${k} = ${v !== undefined && asLiteral(v) || "DEFAULT"}`);
       }
     }
     return kv.join(", ");
@@ -1761,7 +1761,7 @@ class Model {
       insertColumns
     )}) VALUES ${valuesToken} ON CONFLICT (${this._getSelectToken(key)})`;
     if (
-      (Array.isArray(key) && key.length === insertColumns.length) ||
+      Array.isArray(key) && key.length === insertColumns.length ||
       insertColumns.length === 1
     ) {
       return `${insertToken} DO NOTHING`;
@@ -1779,7 +1779,7 @@ class Model {
       rows
     )} ON CONFLICT (${this._baseGetSelectToken(key)})`;
     if (
-      (Array.isArray(key) && key.length === columns.length) ||
+      Array.isArray(key) && key.length === columns.length ||
       columns.length === 1
     ) {
       return `${insertToken} DO NOTHING`;
@@ -1797,7 +1797,7 @@ class Model {
       key
     )})`;
     if (
-      (Array.isArray(key) && key.length === columns.length) ||
+      Array.isArray(key) && key.length === columns.length ||
       columns.length === 1
     ) {
       return `${insertToken} DO NOTHING`;
@@ -1844,12 +1844,12 @@ class Model {
   }
   _getUpdateQueryToken(subSelect, columns) {
     const columnsToken =
-      (columns && this._getSelectToken(columns)) || subSelect._select;
+      columns && this._getSelectToken(columns) || subSelect._select;
     return `(${columnsToken}) = (${subSelect.statement()})`;
   }
   _baseGetUpdateQueryToken(subSelect, columns) {
     const columnsToken =
-      (columns && this._baseGetSelectToken(columns)) || subSelect._select;
+      columns && this._baseGetSelectToken(columns) || subSelect._select;
     return `(${columnsToken}) = (${subSelect.statement()})`;
   }
   _getJoinConditions(key, leftTable, rightTable) {
@@ -2034,7 +2034,7 @@ class Model {
   }
   _getColumn(key) {
     if (this.cls.fields[key]) {
-      return (this._as && this._as + "." + key) || this.cls.nameCache[key];
+      return this._as && this._as + "." + key || this.cls.nameCache[key];
     }
     if (!this._joinKeys) {
       return key;
@@ -2145,7 +2145,7 @@ class Model {
     } else {
       token = this._getConditionToken(cond, op, dval);
     }
-    return (token !== "" && `NOT (${token})`) || "";
+    return token !== "" && `NOT (${token})` || "";
   }
   _handleSetOption(otherSql, innerAttr) {
     if (!this[innerAttr]) {
@@ -2448,7 +2448,7 @@ class Model {
   }
   getTable() {
     return (
-      (this._as === undefined && this.tableName) ||
+      this._as === undefined && this.tableName ||
       this.tableName + " AS " + this._as
     );
   }

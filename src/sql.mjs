@@ -13,7 +13,7 @@
 // foo = [] 要注意是否应该为 foo = {}, 如get_keys
 // match(key, ...) => key.match
 // lua循环起始值为2时js的处理, 例如:parse_where_exp
-import { clone, string_format, assert, next } from "./utils";
+import { clone, string_format, assert, next, make_token, NULL, DEFAULT } from "./utils";
 
 const PG_SET_MAP = {
   _union: "UNION",
@@ -31,14 +31,6 @@ const COMPARE_OPERATORS = {
   ne: "<>",
   eq: "=",
 };
-function make_token(s) {
-  function raw_token() {
-    return s;
-  }
-  return raw_token;
-}
-const NULL = make_token("NULL");
-const DEFAULT = make_token("DEFAULT");
 
 function _prefix_with_V(column) {
   return "V." + column;
@@ -56,6 +48,8 @@ function _escape_factory(is_literal, is_bracket) {
       return String(value);
     } else if ("boolean" === value_type) {
       return (value && "TRUE") || "FALSE";
+    } else if ("symbol" === value_type) {
+      return value.description || String(value).slice(7, -1);
     } else if ("function" === value_type) {
       return value();
     } else if (value instanceof Sql) {

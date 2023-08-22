@@ -1,14 +1,12 @@
-import { clone, string_format, assert, next } from "./utils";
+import { clone, assert, NULL, FK_TYPE_NOT_DEFIEND } from "./utils";
 import * as Validator from "./validator";
 import { Http } from "@/globals/Http";
 import { parse_size } from "@/lib/utils.mjs";
 
-
 const TABLE_MAX_ROWS = 1;
 const CHOICES_ERROR_DISPLAY_COUNT = 30;
 const DEFAULT_ERROR_MESSAGES = { required: "此项必填", choices: "无效选项" };
-const NULL = {}
-const FK_TYPE_NOT_DEFIEND = [];
+
 function clean_choice(c) {
   let v;
   if (c.value !== undefined) {
@@ -28,9 +26,9 @@ function clean_choice(c) {
   return [v, l, c.hint || c[2]];
 }
 function string_choices_to_array(s) {
-  const choices = lua_array([]);
-  for (let [_, line] of utils.split(s, "\n").entries()) {
-    line = assert(Validator.trim(line));
+  const choices = [];
+  for (let [_, line] of s.split("\n").entries()) {
+    line = line.trim();
     if (line !== "") {
       choices.push(line);
     }

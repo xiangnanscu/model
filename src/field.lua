@@ -19,15 +19,6 @@ local class = utils.class
 local TABLE_MAX_ROWS = 1
 local CHOICES_ERROR_DISPLAY_COUNT = 30
 local DEFAULT_ERROR_MESSAGES = { required = "此项必填", choices = "无效选项" }
-
--- local PRIMITIVES = {
---   string = true,
---   number = true,
---   boolean = true,
---   table = true,
--- }
-local NULL = ngx.null
-
 local FK_TYPE_NOT_DEFIEND = {}
 
 local function clean_choice(c)

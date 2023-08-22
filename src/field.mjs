@@ -1,4 +1,5 @@
-import { clone, assert, NULL, FK_TYPE_NOT_DEFIEND } from "./utils";
+// get_options 和后端不同, attrs必存在
+import { clone, assert, NULL, FK_TYPE_NOT_DEFIEND, get_localtime } from "./utils";
 import * as Validator from "./validator";
 import { Http } from "@/globals/Http";
 import { parse_size } from "@/lib/utils.mjs";
@@ -6,6 +7,12 @@ import { parse_size } from "@/lib/utils.mjs";
 const TABLE_MAX_ROWS = 1;
 const CHOICES_ERROR_DISPLAY_COUNT = 30;
 const DEFAULT_ERROR_MESSAGES = { required: "此项必填", choices: "无效选项" };
+const PRIMITIVE_TYPES = {
+  string: true,
+  number: true,
+  boolean: true,
+  bigint: true,
+};
 
 function clean_choice(c) {
   let v;
@@ -39,13 +46,15 @@ function get_choices(raw_choices) {
   if (typeof raw_choices === "string") {
     raw_choices = string_choices_to_array(raw_choices);
   }
-  if (typeof raw_choices !== "object") {
+  if (!Array.isArray(raw_choices)) {
     throw new Error(`choices type must be table ,not ${typeof raw_choices}`);
   }
-  const choices = lua_array([]);
+  const choices = [];
   for (let [i, c] of raw_choices.entries()) {
-    if (typeof c === "string" || typeof c === "number") {
+    if (typeof c === "string") {
       c = { value: c, label: c };
+    } else if (PRIMITIVE_TYPES[typeof c]) {
+      c = { value: c, label: String(c) };
     } else if (typeof c === "object") {
       const [value, label, hint] = clean_choice(c);
       c = { value: value, label: label, hint: hint };
@@ -60,14 +69,14 @@ function serialize_choice(choice) {
   return String(choice.value);
 }
 function get_choices_error_message(choices) {
-  const valid_choices = utils.map(choices, serialize_choice).join("，");
+  const valid_choices = choices.map(serialize_choice).join("，");
   return `限下列选项：${valid_choices}`;
 }
 function get_choices_validator(choices, message) {
   if (choices.length <= CHOICES_ERROR_DISPLAY_COUNT) {
     message = `${message}，${get_choices_error_message(choices)}`;
   }
-  const is_choice = [];
+  const is_choice = {};
   for (const [_, c] of choices.entries()) {
     is_choice[c.value] = true;
   }
@@ -107,19 +116,15 @@ class basefield {
   __is_field_class__ = true;
   required = false;
   option_names = base_option_names;
-  static __call(options) {
+  static new(options) {
     return this.create_field(options);
   }
   static create_field(options) {
-    const self = this.new([]);
-    self.init(options);
+    const self = new this(options);
     self.validators = self.get_validators([]);
     return self;
   }
-  static new(self) {
-    return setmetatable(self || [], this);
-  }
-  init(options) {
+  constructor(options) {
     this.name = assert(options.name, "you must define a name for a field");
     this.type = options.type;
     for (const [_, name] of this.option_names.entries()) {
@@ -140,10 +145,7 @@ class basefield {
         this.null = true;
       }
     }
-    if (this.choices) {
-      if (this.strict === undefined) {
-        this.strict = true;
-      }
+    if (Array.isArray(this.choices) || typeof this.choices === "string") {
       this.choices = get_choices(this.choices);
     }
     return this;
@@ -160,7 +162,24 @@ class basefield {
     } else {
       validators.unshift(Validator.not_required);
     }
-    if (this.choices && this.strict) {
+    if (typeof this.choices_url === "string" && this.strict) {
+      const dynamic_choices_validator = async (val) => {
+        let message = this.get_error_message("choices");
+        const data = await Http[this.choices_url_method || "get"](this.choices_url).data;
+        const choices = get_choices(data);
+        for (const [_, c] of choices.entries()) {
+          if (val === c.value) {
+            return val;
+          }
+        }
+        if (choices.length <= CHOICES_ERROR_DISPLAY_COUNT) {
+          message = `${message}，${get_choices_error_message(choices)}`;
+        }
+        throw new Error(message);
+      };
+      validators.push(dynamic_choices_validator);
+    }
+    if (Array.isArray(this.choices) && this.choices.length && (this.strict === undefined || this.strict)) {
       validators.push(get_choices_validator(this.choices, this.get_error_message("choices")));
     }
     return validators;
@@ -177,16 +196,22 @@ class basefield {
     }
     if (ret.attrs) {
       ret.attrs = clone(ret.attrs);
+    } else {
+      ret.attrs = {};
     }
     return ret;
   }
   json() {
     const json = this.get_options();
-    if (typeof json._js_default === "function") {
-      json._js_default = undefined;
+    delete json.error_messages;
+    if (typeof json.default === "function") {
+      delete json.default;
+    }
+    if (typeof json.choices === "function") {
+      delete json.choices;
     }
     if (!json.tag) {
-      if (typeof json.choices === "object" && json.choices.length > 0 && !json.autocomplete) {
+      if (Array.isArray(json.choices) && json.choices.length > 0 && !json.autocomplete) {
         json.tag = "select";
       } else {
         json.tag = "input";
@@ -201,35 +226,60 @@ class basefield {
     return json;
   }
   widget_attrs(extra_attrs) {
-    return utils.dict({ required: this.required, readonly: this.disabled }, extra_attrs);
+    return { required: this.required, readonly: this.disabled, ...extra_attrs };
   }
   validate(value, ctx) {
     if (typeof value === "function") {
       return value;
     }
-    let err;
-    for (const [_, validator] of this.validators.entries()) {
-      [value, err] = validator(value, ctx);
-      if (value !== undefined) {
-        if (err === undefined) {
-        } else if (value === err) {
+    for (const validator of this.validators) {
+      try {
+        value = validator(value, ctx);
+      } catch (error) {
+        if (error instanceof Validator.Skip_validate_error) {
           return value;
         } else {
-          throw new Error(err);
+          throw error;
         }
-      } else if (err !== undefined) {
-        throw new Error(err);
-      } else {
-        return undefined;
       }
     }
     return value;
   }
   get_default(ctx) {
-    if (typeof this._js_default !== "function") {
-      return this._js_default;
+    if (typeof this.default !== "function") {
+      return this.default;
     } else {
-      return this._js_default(ctx);
+      return this.default(ctx);
+    }
+  }
+  to_form_value(value) {
+    // Fields like alioss* need this
+    // console.log("base to_form_value");
+    return value;
+  }
+  to_post_value(value) {
+    return value;
+  }
+  get_antd_rule() {
+    const rule = {
+      whitespace: true,
+    };
+    rule.validator = async (_rule, value) => {
+      try {
+        return Promise.resolve(this.validate(value));
+      } catch (error) {
+        return Promise.reject(error);
+      }
+    };
+    return rule;
+  }
+  choices_callback(choice) {
+    if (PRIMITIVE_TYPES[typeof choice]) {
+      return { value: choice, label: String(choice) };
+    } else if (typeof choice == "object") {
+      return { value: choice.value, label: choice.label, hint: choice.hint };
+    } else {
+      return { value: String(choice), label: String(choice) };
     }
   }
 }

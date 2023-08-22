@@ -13,7 +13,7 @@ function required(message) {
 }
 function not_required(v) {
   if (v === undefined || v === "") {
-    return;
+    throw new Skip_validate_error();
   } else {
     return v;
   }

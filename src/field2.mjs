@@ -22,10 +22,8 @@ function assert(bool, err_msg) {
     return bool;
   }
 }
-function get_local_time(d = new Date()) {
-  return `${d.get_full_year()}-${
-    d.get_month() + 1
-  }-${d.get_date()} ${d.get_hours()}:${d.get_minutes()}:${d.get_seconds()}`;
+function get_localtime(d = new Date()) {
+  return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()} ${d.getHours()}:${d.getMinutes()}:${d.getSeconds()}`;
 }
 function clean_choice(c) {
   let v;
@@ -109,7 +107,7 @@ const base_option_names = [
 ];
 
 class Base_field {
-  static get_local_time = get_local_time;
+  static get_localtime = get_localtime;
   static FK_TYPE_NOT_DEFIEND = FK_TYPE_NOT_DEFIEND;
   __is_field_class__ = true;
   required = false;
@@ -732,7 +730,7 @@ class Datetime_field extends Base_field {
   constructor(options) {
     super(options);
     if (this.auto_now_add) {
-      this.default = get_local_time;
+      this.default = get_localtime;
     }
     return this;
   }
@@ -750,7 +748,7 @@ class Datetime_field extends Base_field {
   }
   prepare_for_db(value) {
     if (this.auto_now) {
-      return get_local_time();
+      return get_localtime();
     } else if (value === "" || value === undefined) {
       return NULL;
     } else {

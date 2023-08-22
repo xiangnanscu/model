@@ -13,6 +13,7 @@
 // foo = [] 要注意是否应该为 foo = {}, 如get_keys
 // match(key, ...) => key.match
 // lua循环起始值为2时js的处理, 例如:parse_where_exp
+// lua: type(obj)=='table', js要考虑是不是Array.isArray(obj)
 import { clone, string_format, assert, next, make_token, NULL, DEFAULT } from "./utils";
 
 const PG_SET_MAP = {

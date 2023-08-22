@@ -1,17 +1,17 @@
-class SkipValidateError extends Error {}
+class Skip_validate_error extends Error {}
 
 function required(message) {
   message = message || "此项必填";
-  function requiredValidator(v) {
+  function required_validator(v) {
     if (v === undefined || v === "") {
       throw new Error(message);
     } else {
       return v;
     }
   }
-  return requiredValidator;
+  return required_validator;
 }
-function notRequired(v) {
+function not_required(v) {
   if (v === undefined || v === "") {
     return;
   } else {
@@ -25,9 +25,14 @@ function encode(v) {
   return JSON.stringify(v);
 }
 function number(v) {
-  return Number(v);
+  const n = Number(v);
+  if (isNaN(n)) {
+    throw new Error(`${v}不是数字`);
+  } else {
+    return n;
+  }
 }
-const boolMap = {
+const bool_map = {
   [true]: true,
   [false]: false,
   t: true,
@@ -42,15 +47,15 @@ const boolMap = {
   ["否"]: false,
 };
 function boolean(v) {
-  const bv = boolMap[v];
+  const bv = bool_map[v];
   if (bv === undefined) {
-    throw new Error(`invalid boolean value:${v}(${typeof v})`);
+    throw new Error(`invalid boolean value: ${v}(${typeof v})`);
   } else {
     return bv;
   }
 }
-function booleanCn(v) {
-  const bv = boolMap[v];
+function boolean_cn(v) {
+  const bv = bool_map[v];
   if (bv === undefined) {
     throw new Error("请填“是”或“否”");
   } else if (bv === true) {
@@ -59,7 +64,7 @@ function booleanCn(v) {
     return "否";
   }
 }
-function asIs(v) {
+function as_is(v) {
   return v;
 }
 function string(v) {
@@ -71,8 +76,11 @@ function string(v) {
     throw new Error("string type required, not " + typeof v);
   }
 }
-function yearMonth(v) {
-  if (/^\d{4}[.-][01]\d$/.test(v)) {
+function trim(v) {
+  return v.trim();
+}
+function year_month(v) {
+  if (/^\d{4}[.][01]\d$/.test(v)) {
     return v;
   } else {
     throw new Error("格式不正确，正确举例：2010.01");
@@ -85,85 +93,83 @@ function year(v) {
     throw new Error("只能填写4位表示年份的数字");
   }
 }
-function trim(v) {
-  return v.trim();
-}
-function deleteSpaces(v) {
+
+function delete_spaces(v) {
   return v.replace(/\s/g, "");
 }
 function maxlength(len, message) {
   message = message || "字数不能多于%s个";
-  message = message.replace("%s", String(len));
-  function maxlengthValidator(v) {
+  message = message.replaceAll("%s", String(len));
+  function maxlength_validator(v) {
     if (v.length > len) {
       throw new Error(message);
     } else {
       return v;
     }
   }
-  return maxlengthValidator;
+  return maxlength_validator;
 }
 function length(len, message) {
   message = message || "字数需等于%s个";
-  message = message.replace("%s", String(len));
-  function lengthValidator(v) {
+  message = message.replaceAll("%s", String(len));
+  function length_validator(v) {
     if (v.length !== len) {
       throw new Error(message);
     } else {
       return v;
     }
   }
-  return lengthValidator;
+  return length_validator;
 }
 function minlength(len, message) {
   message = message || "字数不能少于%s个";
-  message = message.replace("%s", String(len));
-  function minlengthValidator(v) {
+  message = message.replaceAll("%s", String(len));
+  function minlength_validator(v) {
     if (v.length < len) {
       throw new Error(message);
     } else {
       return v;
     }
   }
-  return minlengthValidator;
+  return minlength_validator;
 }
 function pattern(regex, message) {
   message = message || "格式错误";
   const re = new RegExp(regex);
-  function patternValidator(v) {
+  function pattern_validator(v) {
     if (!re.test(v)) {
       throw new Error(message);
     } else {
       return v;
     }
   }
-  return patternValidator;
+  return pattern_validator;
 }
 function max(n, message) {
   message = message || "值不能大于%s";
-  message = message.replace("%s", n);
-  function maxValidator(v) {
+  message = message.replaceAll("%s", String(n));
+  function max_validator(v) {
     if (v > n) {
       throw new Error(message);
     } else {
       return v;
     }
   }
-  return maxValidator;
+  return max_validator;
 }
 function min(n, message) {
   message = message || "值不能小于%s";
-  message = message.replace("%s", n);
-  function minValidator(v) {
+  message = message.replaceAll("%s", String(n));
+  function min_validator(v) {
     if (v < n) {
       throw new Error(message);
     } else {
       return v;
     }
   }
-  return minValidator;
+  return min_validator;
 }
-function validDate(year, month, day) {
+function valid_date(year, month, day) {
   if (month > 12 || month < 1) {
     throw new Error("月份数字" + (month + "错误"));
   }
@@ -188,7 +194,7 @@ function validDate(year, month, day) {
 function date(v) {
   v = /^(\d{4})([^\d])(\d\d?)([^\d])(\d\d?)([^\d])?$/.exec(v);
   if (v) {
-    validDate(Number(v[1]), Number(v[3]), Number(v[5]));
+    valid_date(Number(v[1]), Number(v[3]), Number(v[5]));
     return `${v[1]}-${v[3]}-${v[5]}`;
   } else {
     throw new Error("日期格式错误, 正确格式举例: 2010-01-01");
@@ -217,7 +223,7 @@ function time(v) {
 function datetime(v) {
   v = /^(\d{4})([^\d])(\d\d?)(\2)(\d\d?) (\d\d?):(\d\d?):(\d\d?)(\+\d\d?)?$/.exec(v);
   if (v) {
-    validDate(Number(v[1]), Number(v[3]), Number(v[5]));
+    valid_date(Number(v[1]), Number(v[3]), Number(v[5]));
     const hour = Number(v[6]);
     if (hour > 24 || hour < 0) {
       throw new Error("小时数字" + (v[6] + "错误"));
@@ -235,16 +241,16 @@ function datetime(v) {
     throw new Error("日期格式错误, 正确格式举例: 2010-01-01 01:30:00");
   }
 }
-function nonEmptyArrayRequired(message) {
+function non_empty_array_required(message) {
   message = message || "此项必填";
-  function arrayValidator(v) {
+  function array_validator(v) {
     if (v.length === 0) {
       throw new Error(message);
     } else {
       return v;
     }
   }
-  return arrayValidator;
+  return array_validator;
 }
 function integer(v) {
   const n = Number(v);
@@ -264,7 +270,7 @@ function url(v) {
 }
 const a = [7, 9, 10, 5, 8, 4, 2, 1, 6, 3, 7, 9, 10, 5, 8, 4, 2];
 const b = ["1", "0", "X", "9", "8", "7", "6", "5", "4", "3", "2"];
-function validateSfzh(s) {
+function validate_sfzh(s) {
   let n = 0;
   for (let i = 0; i < 17; i = i + 1) {
     n = n + Number(s[i]) * a[i];
@@ -277,26 +283,26 @@ function validateSfzh(s) {
 }
 function sfzh(v) {
   if (v.length !== 18) {
-    throw new Error(`身份证号必须为18位，现在输入的是${v.length}位`);
+    throw new Error(`身份证号必须为18位，当前${v.length}位`);
   }
   v = v.toUpperCase();
   if (!/^\d{17}[\dX]$/.test(v)) {
     throw new Error("身份证号前17位必须为数字, 第18位必须为数字或大写字母X");
   }
   try {
-    validDate(Number(v.slice(6, 10)), Number(v.slice(10, 12)), Number(v.slice(12, 14)));
+    valid_date(Number(v.slice(6, 10)), Number(v.slice(10, 12)), Number(v.slice(12, 14)));
   } catch (error) {
     throw new Error("身份证号日期部分错误:" + error.message);
   }
-  return validateSfzh(v);
+  return validate_sfzh(v);
 }
 
 export {
-  SkipValidateError,
+  Skip_validate_error,
   required,
-  notRequired,
+  not_required,
   string,
-  yearMonth,
+  year_month,
   year,
   maxlength,
   minlength,
@@ -304,21 +310,21 @@ export {
   max,
   min,
   pattern,
-  nonEmptyArrayRequired,
+  non_empty_array_required,
   integer,
   url,
   encode,
   decode,
   number,
-  asIs,
+  as_is,
   date,
   datetime,
   time,
   trim,
-  deleteSpaces,
+  delete_spaces,
   boolean,
-  booleanCn,
+  boolean_cn,
   sfzh,
-  validateSfzh,
-  boolMap,
+  validate_sfzh,
+  bool_map,
 };

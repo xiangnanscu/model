@@ -4,6 +4,13 @@ require("@rushstack/eslint-patch/modern-module-resolution");
 module.exports = {
   root: true,
   rules: {
+    "prettier/prettier": [
+      "warn",
+      {
+        printWidth: 150,
+      },
+    ],
+    "max-len": ["warn", { code: 150, ignoreComments: true, ignoreStrings: true }],
     // "no-extra-parens": 2,
     "prefer-const": [
       "error",
@@ -18,17 +25,9 @@ module.exports = {
         ignorePattern: "^_",
       },
     ],
-    "no-unused-vars": [
-      "warn",
-      { vars: "all", args: "after-used", argsIgnorePattern: "^_" },
-    ],
+    "no-unused-vars": ["warn", { vars: "all", args: "after-used", argsIgnorePattern: "^_" }],
   },
-  extends: [
-    "plugin:vue/vue3-essential",
-    "eslint:recommended",
-    "@vue/eslint-config-typescript",
-    "@vue/eslint-config-prettier",
-  ],
+  extends: ["plugin:vue/vue3-essential", "eslint:recommended", "@vue/eslint-config-typescript", "@vue/eslint-config-prettier"],
   parserOptions: {
     ecmaVersion: "latest",
   },

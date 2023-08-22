@@ -1,202 +1,232 @@
-import * as Field from "./field";
-import * as utils from "./utils";
-import { Http } from "@/globals/Http";
-
+const Field = require("xodel.field");
+const Sql = require("xodel.sql");
+const Query = require("xodel.query");
+const array = require("xodel.array");
+const object = require("xodel.object");
+const getenv = require("xodel.utils").getenv;
+const clone = require("table.clone");
+const utils = require("xodel.utils");
+const setmetatable = setmetatable;
+const ipairs = ipairs;
+const tostring = tostring;
+const type = type;
+const next = next;
+const pairs = pairs;
+const assert = assert;
+const error = error;
+const string_format = string.format;
+const table_concat = table.concat;
+const table_insert = table.insert;
+const ngx_localtime = ngx.localtime;
+const match = ngx.re.match;
+const table_new = table.new;
+const NULL = Sql.NULL;
+const default_query = Query({
+  getenv: getenv,
+  HOST: getenv("PGHOST") || "127.0.0.1",
+  PORT: getenv("PGPORT") || 5432,
+  DATABASE: getenv("PGDATABASE") || "postgres",
+  USER: getenv("PGUSER") || "postgres",
+  PASSWORD: getenv("PGPASSWORD") || "postgres",
+});
+const DEFAULT_PRIMARY_KEY = "id";
 const DEFAULT_STRING_MAXLENGTH = 256;
-const FOREIGN_KEY = 2;
-const NON_FOREIGN_KEY = 3;
-const END = 4;
-const COMPARE_OPERATORS = {
-  lt: "<",
-  lte: "<=",
-  gt: ">",
-  gte: ">=",
-  ne: "<>",
-  eq: "=",
+const IS_PG_KEYWORDS = {
+  EQ: true,
+  NOTIN: true,
+  CONTAINS: true,
+  STARTSWITH: true,
+  ENDSWITH: true,
+  LT: true,
+  LTE: true,
+  GT: true,
+  GTE: true,
+  NE: true,
+  ALL: true,
+  ANALYSE: true,
+  ANALYZE: true,
+  AND: true,
+  ANY: true,
+  ARRAY: true,
+  AS: true,
+  ASC: true,
+  ASYMMETRIC: true,
+  AUTHORIZATION: true,
+  BINARY: true,
+  BOTH: true,
+  CASE: true,
+  CAST: true,
+  CHECK: true,
+  COLLATE: true,
+  COLLATION: true,
+  COLUMN: true,
+  CONCURRENTLY: true,
+  CONSTRAINT: true,
+  CREATE: true,
+  CROSS: true,
+  CURRENT_CATALOG: true,
+  CURRENT_DATE: true,
+  CURRENT_ROLE: true,
+  CURRENT_SCHEMA: true,
+  CURRENT_TIME: true,
+  CURRENT_TIMESTAMP: true,
+  CURRENT_USER: true,
+  DEFAULT: true,
+  DEFERRABLE: true,
+  DESC: true,
+  DISTINCT: true,
+  DO: true,
+  ELSE: true,
+  END: true,
+  EXCEPT: true,
+  FALSE: true,
+  FETCH: true,
+  FOR: true,
+  FOREIGN: true,
+  FREEZE: true,
+  FROM: true,
+  FULL: true,
+  GRANT: true,
+  GROUP: true,
+  HAVING: true,
+  ILIKE: true,
+  IN: true,
+  INITIALLY: true,
+  INNER: true,
+  INTERSECT: true,
+  INTO: true,
+  IS: true,
+  ISNULL: true,
+  JOIN: true,
+  LATERAL: true,
+  LEADING: true,
+  LEFT: true,
+  LIKE: true,
+  LIMIT: true,
+  LOCALTIME: true,
+  LOCALTIMESTAMP: true,
+  NATURAL: true,
+  NOT: true,
+  NOTNULL: true,
+  NULL: true,
+  OFFSET: true,
+  ON: true,
+  ONLY: true,
+  OR: true,
+  ORDER: true,
+  OUTER: true,
+  OVERLAPS: true,
+  PLACING: true,
+  PRIMARY: true,
+  REFERENCES: true,
+  RETURNING: true,
+  RIGHT: true,
+  SELECT: true,
+  SESSION_USER: true,
+  SIMILAR: true,
+  SOME: true,
+  SYMMETRIC: true,
+  TABLE: true,
+  TABLESAMPLE: true,
+  THEN: true,
+  TO: true,
+  TRAILING: true,
+  TRUE: true,
+  UNION: true,
+  UNIQUE: true,
+  USER: true,
+  USING: true,
+  VARIADIC: true,
+  VERBOSE: true,
+  WHEN: true,
+  WHERE: true,
+  WINDOW: true,
+  WITH: true,
 };
-const IS_PG_KEYWORDS = {};
-const NON_MERGE_NAMES = {
-  sql: true,
-  fields: true,
-  field_names: true,
-  extend: true,
-  mixins: true,
+const MODEL_MERGE_NAMES = {
   admin: true,
+  table_name: true,
+  label: true,
+  db_options: true,
+  abstract: true,
+  disable_auto_primary_key: true,
+  primary_key: true,
+  unique_together: true,
 };
-const is_empty_object = (obj) => {
-  for (var i in obj) {
-    return false;
-  }
-  return true;
-};
-const get_local_time = Field.Base_field.get_local_time;
-const string_format = (s, ...varargs) => {
-  let status = 0;
-  const res = [];
-  let j = -1;
-  for (let i = 0; i < s.length; i++) {
-    const c = s[i];
-    if (c === "%") {
-      if (status === 0) {
-        status = 1;
-      } else if (status === 1) {
-        status = 0;
-        res.push("%");
-      }
-    } else if (c === "s" && status === 1) {
-      j = j + 1;
-      res.push(varargs[j]);
-      status = 0;
-    } else {
-      res.push(c);
-    }
-  }
-  return res.join("");
-};
-const capitalize = (s) => s.char_at(0).to_upper_case() + s.slice(1);
 const base_model = {
   abstract: true,
-  field_names: ["id", "ctime", "utime"],
+  field_names: array([DEFAULT_PRIMARY_KEY, "ctime", "utime"]),
   fields: {
-    id: { type: "integer", primary_key: true, serial: true },
+    [DEFAULT_PRIMARY_KEY]: { type: "integer", primary_key: true, serial: true },
     ctime: { label: "创建时间", type: "datetime", auto_now_add: true },
     utime: { label: "更新时间", type: "datetime", auto_now: true },
   },
 };
-const unique = (arr) => {
-  return arr.filter((e, i) => arr.index_of(e) === i);
-};
-const clone = (o) => JSON.parse(JSON.stringify(o));
-function _prefix_with_V(column) {
-  return "V." + column;
+function disable_setting_model_attrs(cls, key, value) {
+  throw new Error(`modify model class '${cls.table_name}' is not allowed (key: ${key}, value: ${value})`);
 }
-function map(tbl, func) {
-  const res = [];
-  for (let i = 0; i < tbl.length; i = i + 1) {
-    res[i] = func(tbl[i]);
+function dict(t1, t2) {
+  const res = clone(t1);
+  if (t2) {
+    for (const [key, value] of Object.entries(t2)) {
+      res[key] = value;
+    }
   }
   return res;
 }
 function check_reserved(name) {
-  assert(
-    typeof name === "string",
-    `name must by string, not ${typeof name} (${name})`
-  );
-  assert(!name.includes("__"), "don't use __ in a field name");
-  assert(
-    !IS_PG_KEYWORDS[name.to_upper_case()],
-    `${name} is a postgresql reserved word`
-  );
+  assert(typeof name === "string", `name must by string, not ${typeof name} (${name})`);
+  assert(!name.find("__", 1, true), "don't use __ in a field name");
+  assert(!IS_PG_KEYWORDS[name.upper()], `${name} is a postgresql reserved word`);
 }
-function normalize_array_and_hash_fields(fields) {
-  assert(typeof fields === "object", "you must provide fields for a model");
-  const aligned_fields = [];
-  const field_names = [];
-  if (Array.isArray(fields)) {
-    for (const field of fields) {
-      aligned_fields[field.name] = field;
-      field_names.push(field.name);
-    }
-  } else {
-    for (const [name, field] of Object.entries(fields)) {
-      if (typeof name === "number") {
-        assert(
-          field.name,
-          "you must define name for a field when using array fields"
-        );
-        aligned_fields[field.name] = field;
-        field_names.push(field.name);
-      } else {
-        aligned_fields[name] = field;
-        field_names.push(name);
-      }
+function is_field_class(t) {
+  return typeof t === "object" && getmetatable(t) && getmetatable(t).__is_field_class__;
+}
+const shortcuts_names = ["name", "label", "type", "required"];
+function normalize_field_shortcuts(field) {
+  field = clone(field);
+  for (const [i, prop] of shortcuts_names.entries()) {
+    if (field[prop] === undefined && field[i] !== undefined) {
+      field[prop] = field[i];
+      field[i] = undefined;
     }
   }
-
-  return [aligned_fields, field_names];
+  return field;
+}
+function ensure_field_as_options(field, name) {
+  if (is_field_class(field)) {
+    field = field.get_options();
+  } else {
+    field = normalize_field_shortcuts(field);
+  }
+  if (name) {
+    field.name = name;
+  }
+  assert(field.name, "you must define a name for a field");
+  return field;
 }
 function normalize_field_names(field_names) {
-  assert(
-    typeof field_names === "object",
-    "you must provide field_names for a model"
-  );
-  for (const name of field_names) {
-    assert(typeof name === "string", "element of field_names must be string");
+  assert(typeof field_names === "object", "you must provide field_names for a model");
+  for (const [_, name] of field_names.entries()) {
+    assert(typeof name === "string", `field_names must be string, not ${typeof name}`);
   }
-  return field_names;
+  return array(field_names);
 }
 function get_foreign_object(attrs, prefix) {
-  const fk = {};
+  const fk = [];
   const n = prefix.length;
   for (const [k, v] of Object.entries(attrs)) {
-    if (k.slice(0, n) === prefix) {
-      fk[k.slice(n)] = v;
-      delete attrs[k];
+    if (k.sub(1, n) === prefix) {
+      fk[k.sub(n + 1)] = v;
+      attrs[k] = undefined;
     }
   }
   return fk;
 }
-function make_record_class(model) {
-  class Record {
-    constructor(attrs) {
-      Object.assign(this, attrs);
-    }
-    async delete(key) {
-      key = model.check_unique_key(key || model.primary_key);
-      if (this[key] === undefined) {
-        throw new Error("empty value for delete key:" + key);
-      }
-      return await model
-        .new_sql()
-        .delete({ [key]: this[key] })
-        .returning(key)
-        .exec();
-    }
-    async save(names, key) {
-      return await model.save(this, names, key);
-    }
-    async save_create(names, key) {
-      return await model.save_create(this, names, key);
-    }
-    async save_update(names, key) {
-      return await model.save_update(this, names, key);
-    }
-    validate(names, key) {
-      return model.validate(this, names, key);
-    }
-    validate_update(names) {
-      return model.validate_update(this, names);
-    }
-    validate_create(names) {
-      return model.validate_create(this, names);
-    }
-  }
-  return Record;
-}
-function assert(bool, err_msg) {
-  if (!bool) {
-    throw new Error(err_msg);
-  } else {
-    return bool;
-  }
-}
-class Validate_error extends Error {
-  constructor({ name, message, label }) {
-    super(message);
-    Object.assign(this, { name, label, message });
-  }
-  String() {
-    return `MODEL FIELD ERROR: ${this.name}(${this.label})+${this.message}`;
-  }
-}
-class Validate_batch_error extends Validate_error {
-  constructor({ name, message, label, index }) {
-    super({ name, message, label });
-    this.index = index;
-  }
-}
 function make_field_from_json(json, kwargs) {
-  const options = { ...json, ...kwargs };
+  const options = dict(json, kwargs);
+  assert(!options[0]);
+  assert(options.name, "no name provided");
   if (!options.type) {
     if (options.reference) {
       options.type = "foreignkey";
@@ -206,2682 +236,1375 @@ function make_field_from_json(json, kwargs) {
       options.type = "string";
     }
   }
-  if (
-    (options.type === "string" || options.type === "alioss") &&
-    !options.maxlength
-  ) {
+  if ((options.type === "string" || options.type === "alioss") && !options.maxlength) {
     options.maxlength = DEFAULT_STRING_MAXLENGTH;
   }
-  const fcls = Field[`${capitalize(utils.snake_to_camel(options.type))}Field`];
+  const fcls = Field[options.type];
   if (!fcls) {
     throw new Error("invalid field type:" + String(options.type));
   }
-  return fcls.new(options);
+  return fcls.create_field(options);
 }
-function make_token(s) {
-  function raw_token() {
-    return s;
-  }
-  return raw_token;
+function is_sql_instance(row) {
+  const meta = getmetatable(row);
+  return meta && meta.__SQL_BUILDER__;
 }
-const DEFAULT = make_token("DEFAULT");
-const NULL = make_token("NULL");
-const PG_SET_MAP = {
-  _union: "UNION",
-  _union_all: "UNION ALL",
-  _except: "EXCEPT",
-  _except_all: "EXCEPT ALL",
-  _intersect: "INTERSECT",
-  _intersect_all: "INTERSECT ALL",
+const as_token = Sql.as_token;
+const as_literal = Sql.as_literal;
+const as_literal_without_brackets = Sql.as_literal_without_brackets;
+const ModelSql = Sql._class([], true);
+ModelSql.prototype.increase = function (name, amount) {
+  return this.update({ [name]: this.token(`${name} + ${amount || 1}`) });
 };
-function _escape_factory(is_literal, is_bracket) {
-  function as_sql_token(value) {
-    if ("string" === typeof value) {
-      if (is_literal) {
-        return "'" + value.replace_all("'", "''") + "'";
-      } else {
-        return value;
-      }
-    } else if ("number" === typeof value || "bigint" === typeof value) {
-      return String(value);
-    } else if ("boolean" === typeof value) {
-      return value === true ? "TRUE" : "FALSE";
-    } else if ("function" === typeof value) {
-      return value();
-    } else if (NULL === value) {
-      return "NULL";
-    } else if (value instanceof Model) {
-      return "(" + value.statement() + ")";
-    } else if (Array.isArray(value)) {
-      if (value.length === 0) {
-        throw new Error("empty array as Sql value is not allowed");
-      }
-      const token = value.map(as_sql_token).join(", ");
-      if (is_bracket) {
-        return "(" + token + ")";
-      } else {
-        return token;
-      }
+ModelSql.prototype.decrease = function (name, amount) {
+  return this.update({ [name]: this.token(`${name} - ${amount || 1}`) });
+};
+ModelSql.prototype._base_get_multiple = function (keys, columns) {
+  if (keys.length === 0) {
+    throw new Error("empty keys passed to get_multiple");
+  }
+  columns = columns || utils.get_keys(keys[0]);
+  [keys, columns] = this._get_cte_values_literal(keys, columns, false);
+  const join_cond = this._get_join_conditions(columns, "V", this._as || this.table_name);
+  const cte_name = `V(${columns.join(", ")})`;
+  const cte_values = `(VALUES ${as_token(keys)})`;
+  return this.with(cte_name, cte_values).right_join("V", join_cond);
+};
+ModelSql.prototype._get_cte_values_literal = function (rows, columns, no_check) {
+  columns = columns || utils.get_keys(rows);
+  rows = this._rows_to_array(rows, columns);
+  const first_row = rows[0];
+  for (const [i, col] of columns.entries()) {
+    const field = this._find_field_model(col);
+    if (field) {
+      first_row[i] = `${as_literal(first_row[i])}::${field.db_type}`;
+    } else if (no_check) {
+      first_row[i] = as_literal(first_row[i]);
     } else {
-      throw new Error(
-        `don't know how to escape value: ${value} (${typeof value})`
-      );
-    }
-  }
-  return as_sql_token;
-}
-const as_literal = _escape_factory(true, true);
-const as_token = _escape_factory(false, false);
-function get_cte_returning_values(columns, literals) {
-  const values = [];
-  for (const col of columns) {
-    values.push(as_token(col));
-  }
-  if (literals) {
-    for (const e of literals) {
-      values.push(as_literal(e));
-    }
-  }
-  return values;
-}
-function get_returning_token(opts) {
-  if (opts.cte_returning) {
-    return (
-      " RETURNING " +
-      as_token(
-        get_cte_returning_values(
-          opts.cte_returning.columns,
-          opts.cte_returning.literals
-        )
-      )
-    );
-  } else if (opts.returning) {
-    return " RETURNING " + opts.returning;
-  } else {
-    return "";
-  }
-}
-function assemble_sql(opts) {
-  let statement;
-  if (opts.update) {
-    const from = (opts.from && " FROM " + opts.from) || "";
-    const where = (opts.where && " WHERE " + opts.where) || "";
-    const returning = get_returning_token(opts);
-    statement = `UPDATE ${opts.table_name} SET ${opts.update}${from}${where}${returning}`;
-  } else if (opts.insert) {
-    const returning = get_returning_token(opts);
-    statement = `INSERT INTO ${opts.table_name} ${opts.insert}${returning}`;
-  } else if (opts.delete) {
-    const using = (opts.using && " USING " + opts.using) || "";
-    const where = (opts.where && " WHERE " + opts.where) || "";
-    const returning = get_returning_token(opts);
-    statement = `DELETE FROM ${opts.table_name}${using}${where}${returning}`;
-  } else {
-    const from = opts.from || opts.table_name;
-    const where = (opts.where && " WHERE " + opts.where) || "";
-    const group = (opts.group && " GROUP BY " + opts.group) || "";
-    const having = (opts.having && " HAVING " + opts.having) || "";
-    const order = (opts.order && " ORDER BY " + opts.order) || "";
-    const limit = (opts.limit && " LIMIT " + opts.limit) || "";
-    const offset = (opts.offset && " OFFSET " + opts.offset) || "";
-    const distinct = (opts.distinct && "DISTINCT ") || "";
-    const select = opts.select || "*";
-    statement = `SELECT ${distinct}${select} FROM ${from}${where}${group}${having}${order}${limit}${offset}`;
-  }
-  return (opts.with && `WITH ${opts.with} ${statement}`) || statement;
-}
-
-class Model_proxy {
-  static create_proxy(modelclass) {
-    return new Proxy(modelclass, {
-      get(obj, prop) {
-        if (prop in obj) {
-          return obj[prop];
-        } else if (prop in obj.prototype) {
-          return obj.new_sql()[prop];
-        } else {
-          return;
-        }
-      },
-      set(obj, prop, value) {
-        obj[prop] = value;
-        return true;
-      },
-    });
-  }
-}
-
-class Model {
-  static Validate_error = Validate_error;
-  static Validate_batch_error = Validate_batch_error;
-  static base_model = base_model;
-  static make_field_from_json = make_field_from_json;
-  static token = make_token;
-  static NULL = NULL;
-  static DEFAULT = DEFAULT;
-  static as_token = as_token;
-  static as_literal = as_literal;
-  static http_model_cache = {};
-  constructor(attrs) {
-    Object.assign(this, attrs);
-  }
-  to_string() {
-    return this.statement();
-  }
-  static new(self) {
-    return new this(self);
-  }
-  static async create_model_async(options) {
-    // 目前主要是异步获取reference_url和choices_url资源
-    for (const name of options.field_names || Object.keys(options.fields)) {
-      const field = options.fields[name];
-      if (field.choices_url) {
-        const fetch_choices = async () => {
-          const choices_url = options.is_admin_mode
-            ? field.choices_url_admin || field.choices_url // 如果不是fk,那么choices_url_admin不会定义
-            : field.choices_url;
-          const { data: choices } = await Http[
-            field.choices_url_method || "post"
-          ](choices_url);
-          const res = options.choices_callback
-            ? options.choices_callback(choices, field)
-            : choices;
-          return res;
-        };
-        if (field.preload) {
-          field.choices = await fetch_choices();
-        } else {
-          field.choices = fetch_choices;
-        }
-      }
-      if (typeof field.reference == "string") {
-        if (field.reference == field.table_name) {
-          field.reference = "self";
-        } else {
-          const model_url = options.is_admin_mode
-            ? field.reference_url_admin
-            : field.reference_url || field.reference;
-          field.reference = await this.get_http_model(
-            model_url,
-            options.is_admin_mode
-          );
-        }
-      }
-      if (field.type == "table" && !field.model?.__is_model_class__) {
-        const model_key = field.model.table_name;
-        if (!this.http_model_cache[model_key]) {
-          this.http_model_cache[model_key] = await Model.create_model_async({
-            ...field.model,
-            is_admin_mode: options.is_admin_mode,
-          });
-        }
-        field.model = this.http_model_cache[model_key];
-      }
-    }
-    return Model.create_model(options);
-  }
-  static async get_http_model(model_key, is_admin_mode) {
-    if (!this.http_model_cache[model_key]) {
-      const model_url =
-        model_key.match(/^https?:/) || model_key.match(/^\//)
-          ? model_key
-          : `/admin/model/${model_key}`;
-      const { data } = await Http.get(model_url);
-      // is_admin_mode具有传染性
-      this.http_model_cache[model_key] = await Model.create_model_async({
-        ...data,
-        is_admin_mode,
-      });
-    } else {
-      console.log("cached:" + model_key);
-    }
-    return this.http_model_cache[model_key];
-  }
-  static create_model(options) {
-    const Xodel_class = this.make_model_class(this.normalize(options));
-    return Model_proxy.create_proxy(Xodel_class);
-  }
-  static set_label_name_dict() {
-    this.label_to_name = {};
-    this.name_to_label = {};
-    for (const [name, field] of Object.entries(this.fields)) {
-      this.label_to_name[field.label] = name;
-      this.name_to_label[name] = field.label;
-    }
-  }
-  static set_class_name(table_name) {
-    const class_name = {
-      value: `${capitalize(table_name)}Model`,
-    };
-    Object.define_property(this, "name", class_name);
-  }
-  static make_model_class(opts) {
-    class Concrete_model extends this {
-      static sql_query = opts.sql_query ? opts.sql_query : this.sql_query;
-      static table_name = opts.table_name;
-      static admin = opts.admin || {};
-      static label = opts.label || opts.table_name;
-      static fields = opts.fields;
-      static field_names = opts.field_names;
-      static primary_key = opts.primary_key;
-      static default_primary_key = opts.default_primary_key;
-      static mixins = opts.mixins;
-      static extend = opts.extend;
-      static abstract = opts.abstract;
-      static name_to_label = opts.name_to_label;
-      static label_to_name = opts.label_to_name;
-      static disable_auto_primary_key =
-        opts.disable_auto_primary_key == undefined ? true : false;
-      cls = Concrete_model;
-    }
-    let pk_defined = false;
-    Concrete_model.foreign_keys = {};
-    Concrete_model.names = [];
-    for (const [name, field] of Object.entries(Concrete_model.fields)) {
-      let fk_model = field.reference;
-      if (fk_model === "self") {
-        fk_model = Concrete_model;
-        field.reference = Concrete_model;
-      }
-      if (fk_model) {
-        Concrete_model.foreign_keys[name] = field;
-      }
-      if (field.primary_key) {
-        const pk_name = field.name;
-        assert(
-          !pk_defined,
-          `duplicated primary key: "${pk_name}" and "${pk_defined}"`
-        );
-        pk_defined = pk_name;
-        Concrete_model.primary_key = pk_name;
-      } else if (field.auto_now) {
-        Concrete_model.auto_now_name = field.name;
-      } else if (field.auto_now_add) {
-        Concrete_model.auto_now_add_name = field.name;
-      } else {
-        Concrete_model.names.push(name);
-      }
-    }
-    for (const [_, field] of Object.entries(Concrete_model.fields)) {
-      if (field.db_type === Field.Base_field.FK_TYPE_NOT_DEFIEND) {
-        field.db_type = Concrete_model.fields[field.reference_column].db_type;
-      }
-    }
-    Concrete_model.__is_model_class__ = true;
-    if (Concrete_model.table_name) {
-      Concrete_model.materialize_with_table_name({
-        table_name: Concrete_model.table_name,
-      });
-    } else {
-      Concrete_model.set_class_name("Abstract");
-    }
-    Concrete_model.set_label_name_dict();
-    return Concrete_model;
-  }
-
-  static materialize_with_table_name({ table_name, label }) {
-    if (!table_name) {
-      const names_hint =
-        (this.field_names && this.field_names.join(",")) || "no field_names";
-      throw new Error(
-        `you must define table_name for a non-abstract model (${names_hint})`
-      );
-    }
-    check_reserved(table_name);
-    this.set_class_name(table_name);
-    this.table_name = table_name;
-    this.label = this.label || label || table_name;
-    this.abstract = false;
-    if (!this.primary_key && !this.disable_auto_primary_key) {
-      const pk_name = this.default_primary_key || "id";
-      this.primary_key = pk_name;
-      this.fields[pk_name] = Field.Integer_field.new({
-        name: pk_name,
-        primary_key: true,
-        serial: true,
-      });
-      this.field_names.unshift(pk_name);
-    }
-    this.name_cache = {};
-    for (const [name, field] of Object.entries(this.fields)) {
-      this.name_cache[name] = this.table_name + ("." + name);
-      if (field.reference) {
-        field.table_name = table_name;
-      }
-    }
-    this.Record_class = make_record_class(this);
-    return this;
-  }
-  static get_defaults() {
-    return Object.from_entries(
-      this.names.map((k) => [k, this.fields[k].default])
-    );
-  }
-  static to_form_value(values, names) {
-    const res = {};
-    for (const name of names || this.field_names) {
-      const field = this.fields[name];
-      const value = field.to_form_value(values[name]);
-      res[name] = value;
-    }
-    return res;
-  }
-  static to_post_value(values, names) {
-    const data = {};
-    for (const name of names || this.field_names) {
-      const field = this.fields[name];
-      data[name] = field.to_post_value(values[name]);
-    }
-    return data;
-  }
-  static normalize(options) {
-    const extend = options.extend;
-    const model = {
-      admin: options.admin || {},
-      table_name: options.table_name || extend?.table_name,
-      sql_query: options.sql_query,
-    };
-    const [opts_fields, opts_field_names] = normalize_array_and_hash_fields(
-      options.fields || []
-    );
-    let opts_names = options.field_names;
-    if (!opts_names) {
-      if (extend) {
-        opts_names = unique([...extend.field_names, ...opts_field_names]);
-      } else {
-        opts_names = opts_field_names;
-      }
-    }
-    model.field_names = normalize_field_names(clone(opts_names));
-    model.fields = {};
-    for (const name of opts_names) {
-      check_reserved(name);
-      if (
-        name !== "name" &&
-        name !== "apply" &&
-        name !== "call" &&
-        this[name] !== undefined
-      ) {
-        throw new Error(
-          `field name "${name}" conflicts with model class attributes`
-        );
-      }
-      let field = opts_fields[name];
-      if (!field) {
-        const tname = options.table_name || "[abstract model]";
-        if (extend) {
-          field = extend.fields[name];
-          if (!field) {
-            throw new Error(
-              `'${tname}' field name '${name}' is not in fields and parent fields`
-            );
-          }
-        } else {
-          throw new Error(`'${tname}' field name '${name}' is not in fields`);
-        }
-      } else if (!(field instanceof Field.Base_field)) {
-        if (extend) {
-          const pfield = extend.fields[name];
-          if (pfield) {
-            field = { ...pfield.get_options(), ...field };
-            if (pfield.model && field.model) {
-              field.model = this.create_model({
-                abstract: true,
-                extend: pfield.model,
-                fields: field.model.fields,
-                field_names: field.model.field_names,
-              });
-            }
-          }
-        }
-      }
-      if (!(field instanceof Field.Base_field)) {
-        model.fields[name] = make_field_from_json(field, { name: name });
-      } else {
-        model.fields[name] = make_field_from_json(field.get_options(), {
-          name: name,
-          type: field.type,
-        });
-      }
-    }
-    for (const [key, value] of Object.entries(options)) {
-      if (model[key] === undefined && !NON_MERGE_NAMES[key]) {
-        model[key] = value;
-      }
-    }
-    let abstract;
-    if (options.abstract !== undefined) {
-      abstract = !!options.abstract;
-    } else {
-      abstract = options.table_name === undefined;
-    }
-    model.abstract = abstract;
-    model.__normalized__ = true;
-    if (options.mixins) {
-      return this.merge_models([...options.mixins, model]);
-    } else {
-      return model;
-    }
-  }
-  static mix_with_base(...varargs) {
-    return this.mix(base_model, ...varargs);
-  }
-  static mix(...varargs) {
-    return Model_proxy.create_proxy(
-      this.make_model_class(this.merge_models([...varargs]))
-    );
-  }
-  static merge_models(models) {
-    if (models.length < 2) {
-      throw new Error("provide at least two models to merge");
-    } else if (models.length === 2) {
-      return this.merge_model(...models);
-    } else {
-      let merged = models[0];
-      for (let i = 2; i <= models.length; i = i + 1) {
-        merged = this.merge_model(merged, models[i]);
-      }
-      return merged;
-    }
-  }
-  static merge_model(a, b) {
-    const A = (a.__normalized__ && a) || this.normalize(a);
-    const B = (b.__normalized__ && b) || this.normalize(b);
-    const C = {};
-    const field_names = unique([...A.field_names, ...B.field_names]);
-    const fields = {};
-    for (const name of field_names) {
-      const af = A.fields[name];
-      const bf = B.fields[name];
-      if (af && bf) {
-        fields[name] = Model.merge_field(af, bf);
-      } else if (af) {
-        fields[name] = af;
-      } else {
-        fields[name] = assert(
-          bf,
-          `can't find field ${name} for model ${B.table_name}`
-        );
-      }
-    }
-    for (const M of [A, B]) {
-      for (const [key, value] of Object.entries(M)) {
-        if (!NON_MERGE_NAMES[key]) {
-          C[key] = value;
-        }
-      }
-    }
-    C.field_names = field_names;
-    C.fields = fields;
-    return this.normalize(C);
-  }
-  static merge_field(a, b) {
-    const aopts = a instanceof Field ? a.get_options() : clone(a);
-    const bopts = b instanceof Field ? b.get_options() : clone(b);
-    const options = { ...aopts, ...bopts };
-    if (aopts.model && bopts.model) {
-      options.model = this.merge_model(aopts.model, bopts.model);
-    }
-    return make_field_from_json(options);
-  }
-  static async filter(kwargs) {
-    return await this.new_sql().where(kwargs).exec();
-  }
-  static async all() {
-    const records = await this.sql_query("SELECT * FROM " + this.table_name);
-    for (let i = 0; i < records.length; i = i + 1) {
-      records[i] = this.load(records[i]);
-    }
-    return records;
-  }
-  static async save(input, names, key) {
-    key = key || this.primary_key;
-    if (input[key] !== undefined) {
-      return await this.save_update(input, names, key);
-    } else {
-      return await this.save_create(input, names, key);
-    }
-  }
-  static check_unique_key(key) {
-    const pkf = this.fields[key];
-    if (!pkf) {
-      throw new Error("invalid field name: " + key);
-    }
-    if (!(pkf.primary_key || pkf.unique)) {
-      throw new Error(`field '${key}' is not primary_key or not unique`);
-    }
-    return key;
-  }
-  static async save_create(input, names, key) {
-    const data = this.validate_create(input, names);
-    key = key || this.primary_key;
-    const prepared = this.prepare_for_db(data);
-    const created = await this.new_sql()
-      ._base_insert(prepared)
-      ._base_returning(key)
-      .execr();
-    data[key] = created[0][key];
-    return this.new_record(data);
-  }
-  static async save_update(input, names, key) {
-    const data = this.validate_update(input, names);
-    if (!key) {
-      key = this.primary_key;
-    } else {
-      key = this.check_unique_key(key);
-    }
-    const look_value = input[key];
-    if (look_value === undefined) {
-      throw new Error("no primary or unique key value for save_update");
-    }
-    const prepared = this.prepare_for_db(data, names, true);
-    const updated = await this.new_sql()
-      ._base_update(prepared)
-      .where({ [key]: look_value })
-      ._base_returning(key)
-      .execr();
-    if (updated.length === 1) {
-      data[key] = updated[0][key];
-      return this.new_record(data);
-    } else if (updated.length === 0) {
-      throw new Error(
-        `update failed, record does not exist(model:${this.table_name}, key:${key}, value:${look_value})`
-      );
-    } else {
-      throw new Error(
-        `expect 1 but ${updated.affected_rows} records are updated(model:${this.table_name}, key:${key}, value:${look_value})`
-      );
-    }
-  }
-  static new_record(data) {
-    return new this.Record_class(data);
-  }
-  static new_sql() {
-    return new this({ table_name: this.table_name });
-  }
-  static throw_field_error({ name, message, index }) {
-    const label = this.fields[name].label;
-    if (index !== undefined) {
-      throw new Validate_batch_error({ name, message, label, index });
-    } else {
-      throw new Validate_error({ name, message, label });
-    }
-  }
-  static check_upsert_key(rows, key) {
-    assert(key, "no key for upsert");
-    if (rows instanceof Array) {
-      if (typeof key === "string") {
-        for (const [i, row] of rows.entries()) {
-          if (row[key] === undefined || row[key] === "") {
-            return this.throw_field_error({
-              message: "不能为空",
-              index: i,
-              name: key,
-            });
-          }
-        }
-      } else {
-        for (const [i, row] of rows.entries()) {
-          for (const k of key) {
-            if (row[k] === undefined || row[k] === "") {
-              return this.throw_field_error({
-                message: "不能为空",
-                index: i,
-                name: k,
-              });
-            }
-          }
-        }
-      }
-    } else if (typeof key === "string") {
-      if (rows[key] === undefined || rows[key] === "") {
-        return this.throw_field_error({
-          message: "不能为空",
-          name: key,
-        });
-      }
-    } else {
-      for (const k of key) {
-        if (rows[k] === undefined || rows[k] === "") {
-          return this.throw_field_error({
-            message: "不能为空",
-            name: k,
-          });
-        }
-      }
-    }
-    return [rows, key];
-  }
-  static validate(input, names, key) {
-    if (input[key || this.primary_key] !== undefined) {
-      return this.validate_update(input, names);
-    } else {
-      return this.validate_create(input, names);
-    }
-  }
-  static validate_create(input, names) {
-    const data = {};
-    let value;
-    for (const name of names || this.names) {
-      const field = this.fields[name];
-      if (!field) {
-        throw new Error(
-          `invalid field name '${name}' for model '${this.table_name}'`
-        );
-      }
-      try {
-        value = field.validate(input[name], input);
-      } catch (error) {
-        return this.throw_field_error({
-          name,
-          message: error.message,
-        });
-      }
-      if (field.default && (value === undefined || value === "")) {
-        if (typeof field.default !== "function") {
-          value = field.default;
-        } else {
-          try {
-            value = field.default(input);
-          } catch (error) {
-            return this.throw_field_error({
-              name,
-              message: error.message,
-            });
-          }
-        }
-      }
-      data[name] = value;
-    }
-    if (!this.clean) {
-      return data;
-    } else {
-      return this.clean(data);
-    }
-  }
-  static validate_update(input, names) {
-    const data = {};
-    let value;
-    for (const name of names || this.names) {
-      const field = this.fields[name];
-      if (!field) {
-        throw new Error(
-          `invalid field name '${name}' for model '${this.table_name}'`
-        );
-      }
-      value = input[name];
-      if (value !== undefined) {
-        try {
-          value = field.validate(input[name], input);
-          if (value === undefined) {
-            data[name] = "";
-          } else {
-            data[name] = value;
-          }
-        } catch (error) {
-          return this.throw_field_error({
-            name,
-            message: error.message,
-          });
-        }
-      }
-    }
-    if (!this.clean) {
-      return data;
-    } else {
-      return this.clean(data);
-    }
-  }
-  static parse_error_message(err) {
-    if (typeof err === "object") {
-      return err;
-    }
-    const captured = /^(?<name>.+?)~(?<message>.+?)$/.exec(err);
-    if (!captured) {
-      throw new Error("can't parse this model error message: " + err);
-    } else {
-      const { name, message } = captured.groups;
-      const label = this.name_to_label[name];
-      return { name, message, label };
-    }
-  }
-  static load(data) {
-    for (const name of this.names) {
-      const field = this.fields[name];
-      const value = data[name];
-      if (value !== undefined) {
-        if (!field.load) {
-          data[name] = value;
-        } else {
-          data[name] = field.load(value);
-        }
-      }
-    }
-    return this.new_record(data);
-  }
-  static validate_create_data(rows, columns) {
-    let cleaned;
-    columns = columns || this.get_keys(rows);
-    if (rows instanceof Array) {
-      cleaned = [];
-      for (const [index, row] of rows.entries()) {
-        try {
-          cleaned[index] = this.validate_create(row, columns);
-        } catch (error) {
-          if (error instanceof Validate_error) {
-            return this.throw_field_error({
-              index,
-              name: error.name,
-              message: error.message,
-            });
-          } else {
-            throw error;
-          }
-        }
-      }
-    } else {
-      cleaned = this.validate_create(rows, columns);
-    }
-    return [cleaned, columns];
-  }
-  static validate_update_data(rows, columns) {
-    let cleaned;
-    columns = columns || this.get_keys(rows);
-    if (rows instanceof Array) {
-      cleaned = [];
-      for (const [index, row] of rows.entries()) {
-        try {
-          cleaned[index] = this.validate_update(row, columns);
-        } catch (error) {
-          if (error instanceof Validate_error) {
-            return this.throw_field_error({
-              index,
-              name: error.name,
-              message: error.message,
-            });
-          } else {
-            throw error;
-          }
-        }
-      }
-    } else {
-      cleaned = this.validate_update(rows, columns);
-    }
-    return [cleaned, columns];
-  }
-  static validate_create_rows(rows, key, columns) {
-    const [checked_rows, checked_key] = this.check_upsert_key(
-      rows,
-      key || this.primary_key
-    );
-    const [cleaned_rows, cleaned_columns] = this.validate_create_data(
-      checked_rows,
-      columns
-    );
-    return [cleaned_rows, checked_key, cleaned_columns];
-  }
-  static validate_update_rows(rows, key, columns) {
-    const [checked_rows, checked_key] = this.check_upsert_key(
-      rows,
-      key || this.primary_key
-    );
-    const [cleaned_rows, cleaned_columns] = this.validate_update_data(
-      checked_rows,
-      columns
-    );
-    return [cleaned_rows, checked_key, cleaned_columns];
-  }
-  static prepare_db_rows(rows, columns, is_update) {
-    let cleaned;
-    columns = columns || this.get_keys(rows);
-    if (rows instanceof Array) {
-      cleaned = [];
-      for (const [i, row] of rows.entries()) {
-        cleaned[i] = this.prepare_for_db(row, columns, is_update);
-      }
-    } else {
-      cleaned = this.prepare_for_db(rows, columns, is_update);
-    }
-    if (is_update) {
-      const utime = this.auto_now_name;
-      if (utime && !columns.includes(utime)) {
-        columns.push(utime);
-      }
-      return [cleaned, columns];
-    } else {
-      return [cleaned, columns];
-    }
-  }
-  static prepare_for_db(data, columns, is_update) {
-    const prepared = {};
-    for (const name of columns || this.names) {
-      const field = this.fields[name];
-      if (!field) {
-        throw new Error(
-          `invalid field name '${name}' for model '${this.table_name}'`
-        );
-      }
-      const value = data[name];
-      if (field.prepare_for_db && value !== undefined) {
-        try {
-          const val = field.prepare_for_db(value, data);
-          prepared[name] = val;
-        } catch (error) {
-          return this.throw_field_error({
-            name: name,
-            message: error.message,
-          });
-        }
-      } else {
-        prepared[name] = value;
-      }
-    }
-    if (is_update && this.auto_now_name) {
-      prepared[this.auto_now_name] = get_local_time();
-    }
-    return prepared;
-  }
-  static get_keys(rows) {
-    const columns = [];
-    if (rows instanceof Array) {
-      const d = [];
-      for (const row of rows) {
-        for (const k of Object.keys(row)) {
-          if (!d[k]) {
-            d[k] = true;
-            columns.push(k);
-          }
-        }
-      }
-    } else {
-      for (const k of Object.keys(rows)) {
-        columns.push(k);
-      }
-    }
-    return columns;
-  }
-  _base_select(a, b, ...varargs) {
-    const s = this._base_get_select_token(a, b, ...varargs);
-    if (!this._select) {
-      this._select = s;
-    } else if (s !== undefined && s !== "") {
-      this._select = this._select + ", " + s;
-    }
-    return this;
-  }
-  _base_get_select_token(a, b, ...varargs) {
-    if (b === undefined) {
-      if (typeof a === "object") {
-        return this._base_get_select_token(...a);
-      } else {
-        return as_token(a);
-      }
-    } else {
-      let s = as_token(a) + ", " + as_token(b);
-      for (let i = 0; i < varargs.length; i = i + 1) {
-        s = s + ", " + as_token(varargs[i]);
-      }
-      return s;
-    }
-  }
-  _base_insert(rows, columns) {
-    if (typeof rows === "object") {
-      if (rows instanceof Model) {
-        if (rows._select) {
-          this._set_select_subquery_insert_token(rows, columns);
-        } else {
-          this._set_cud_subquery_insert_token(rows);
-        }
-      } else if (rows instanceof Array) {
-        this._insert = this._get_bulk_insert_token(rows, columns);
-      } else if (Object.keys(rows).length) {
-        this._insert = this._get_insert_token(rows, columns);
-      } else {
-        throw new Error("can't pass empty table to Xodel._base_insert");
-      }
-    } else if (typeof rows === "string") {
-      this._insert = rows;
-    } else {
-      throw new Error(
-        "invalid value type to Model._base_insert:" + typeof rows
-      );
-    }
-    return this;
-  }
-  _base_update(row, columns) {
-    if (row instanceof Model) {
-      this._update = this._base_get_update_query_token(row, columns);
-    } else if (typeof row === "object") {
-      this._update = this._get_update_token(row, columns);
-    } else {
-      this._update = row;
-    }
-    return this;
-  }
-  _base_merge(rows, key, columns) {
-    [rows, columns] = this._get_cte_values_literal(rows, columns, false);
-    const cte_name = `V(${columns.join(", ")})`;
-    const cte_values = `(VALUES ${as_token(rows)})`;
-    const join_cond = this._get_join_conditions(key, "V", "T");
-    const vals_columns = columns.map(_prefix_with_V);
-    const insert_subquery = Model.new({ table_name: "V" })
-      ._base_select(vals_columns)
-      ._base_left_join("U AS T", join_cond)
-      ._base_where_null("T." + (Array.isArray(key) ? key[0] : key));
-    let updated_subquery;
-    if (
-      (typeof key === "object" && key.length === columns.length) ||
-      columns.length === 1
-    ) {
-      updated_subquery = Model.new({ table_name: "V" })
-        ._base_select(vals_columns)
-        ._base_join(this.table_name + " AS T", join_cond);
-    } else {
-      updated_subquery = Model.new({ table_name: this.table_name, _as: "T" })
-        ._base_update(this._get_update_token_with_prefix(columns, key, "V"))
-        ._base_from("V")
-        ._base_where(join_cond)
-        ._base_returning(vals_columns);
-    }
-    this.with(cte_name, cte_values).with("U", updated_subquery);
-    return this._base_insert(insert_subquery, columns);
-  }
-  _base_upsert(rows, key, columns) {
-    assert(key, "you must provide key for upsert(string or table)");
-    if (rows instanceof Model) {
-      assert(
-        columns !== undefined,
-        "you must specify columns when use subquery as values of upsert"
-      );
-      this._insert = this._get_upsert_query_token(rows, key, columns);
-    } else if (Array.isArray(rows)) {
-      this._insert = this._get_bulk_upsert_token(rows, key, columns);
-    } else {
-      this._insert = this._get_upsert_token(rows, key, columns);
-    }
-    return this;
-  }
-  _base_updates(rows, key, columns) {
-    if (rows instanceof Model) {
-      columns = columns || rows._returning_args.flat();
-      const cte_name = `V(${columns.join(", ")})`;
-      const join_cond = this._get_join_conditions(
-        key,
-        "V",
-        this._as || this.table_name
-      );
-      this.with(cte_name, rows);
-      return this._base_update(
-        this._get_update_token_with_prefix(columns, key, "V")
-      )
-        .from("V")
-        .where(join_cond);
-    } else if (rows.length === 0) {
-      throw new Error("empty rows passed to updates");
-    } else {
-      [rows, columns] = this._get_cte_values_literal(rows, columns, false);
-      const cte_name = `V(${columns.join(", ")})`;
-      const cte_values = `(VALUES ${as_token(rows)})`;
-      const join_cond = this._get_join_conditions(
-        key,
-        "V",
-        this._as || this.table_name
-      );
-      this.with(cte_name, cte_values);
-      return this._base_update(
-        this._get_update_token_with_prefix(columns, key, "V")
-      )
-        .from("V")
-        .where(join_cond);
-    }
-  }
-  _base_get_multiple(keys, columns) {
-    if (keys.length === 0) {
-      throw new Error("empty keys passed to get_multiple");
-    }
-    columns = columns || this.cls.get_keys(keys[0]);
-    [keys, columns] = this._get_cte_values_literal(keys, columns, false);
-    const join_cond = this._get_join_conditions(
-      columns,
-      "V",
-      this._as || this.table_name
-    );
-    const cte_name = `V(${columns.join(", ")})`;
-    const cte_values = `(VALUES ${as_token(keys)})`;
-    return this.with(cte_name, cte_values).right_join("V", join_cond);
-  }
-  _base_returning(a, b, ...varargs) {
-    const s = this._base_get_select_token(a, b, ...varargs);
-    if (!this._returning) {
-      this._returning = s;
-    } else if (s !== undefined && s !== "") {
-      this._returning = this._returning + ", " + s;
-    } else {
-      return this;
-    }
-    if (this._returning_args) {
-      this._returning_args = [this._returning_args, ...varargs];
-    } else {
-      this._returning_args = [...varargs];
-    }
-    return this;
-  }
-  _base_from(a, ...varargs) {
-    if (!this._from) {
-      this._from = this._base_get_select_token(a, ...varargs);
-    } else {
-      this._from =
-        this._from + ", " + this._base_get_select_token(a, ...varargs);
-    }
-    return this;
-  }
-  _base_join(right_table, key, op, val) {
-    const join_token = this._get_join_token("INNER", right_table, key, op, val);
-    this._from = `${this._from || this.get_table()} ${join_token}`;
-    return this;
-  }
-  _base_left_join(right_table, key, op, val) {
-    const join_token = this._get_join_token("LEFT", right_table, key, op, val);
-    this._from = `${this._from || this.get_table()} ${join_token}`;
-    return this;
-  }
-  _base_right_join(right_table, key, op, val) {
-    const join_token = this._get_join_token("RIGHT", right_table, key, op, val);
-    this._from = `${this._from || this.get_table()} ${join_token}`;
-    return this;
-  }
-  _base_full_join(right_table, key, op, val) {
-    const join_token = this._get_join_token("FULL", right_table, key, op, val);
-    this._from = `${this._from || this.get_table()} ${join_token}`;
-    return this;
-  }
-  _base_where(cond, op, dval) {
-    const where_token = this._base_get_condition_token(cond, op, dval);
-    return this._handle_where_token(where_token, "(%s) AND (%s)");
-  }
-  _base_get_condition_token_from_table(kwargs, logic) {
-    const tokens = [];
-    if (Array.isArray(kwargs)) {
-      for (const value of kwargs) {
-        const token = this._base_get_condition_token(value);
-        if (token !== undefined && token !== "") {
-          tokens.push("(" + token + ")");
-        }
-      }
-    } else {
-      for (const [k, value] of Object.entries(kwargs)) {
-        tokens.push(`${k} = ${as_literal(value)}`);
-      }
-    }
-    if (logic === undefined) {
-      return tokens.join(" AND ");
-    } else {
-      return tokens.join(" " + logic + " ");
-    }
-  }
-  _base_get_condition_token(cond, op, dval) {
-    if (op === undefined) {
-      const argtype = typeof cond;
-      if (argtype === "object") {
-        return this._base_get_condition_token_from_table(cond);
-      } else if (argtype === "string") {
-        return cond;
-      } else if (argtype === "function") {
-        const old_where = this._where;
-        delete this._where;
-        const res = cond.call(this);
-        if (res === this) {
-          const group_where = this._where;
-          if (group_where === undefined) {
-            throw new Error(
-              "no where token generate after calling condition function"
-            );
-          } else {
-            this._where = old_where;
-            return group_where;
-          }
-        } else {
-          this._where = old_where;
-          return res;
-        }
-      } else {
-        throw new Error("invalid condition type: " + argtype);
-      }
-    } else if (dval === undefined) {
-      return `${cond} = ${as_literal(op)}`;
-    } else {
-      return `${cond} ${op} ${as_literal(dval)}`;
-    }
-  }
-  _base_where_in(cols, range) {
-    const in_token = this._get_in_token(cols, range);
-    if (this._where) {
-      this._where = `(${this._where}) AND ${in_token}`;
-    } else {
-      this._where = in_token;
-    }
-    return this;
-  }
-  _base_where_not_in(cols, range) {
-    const not_in_token = this._get_in_token(cols, range, "NOT IN");
-    if (this._where) {
-      this._where = `(${this._where}) AND ${not_in_token}`;
-    } else {
-      this._where = not_in_token;
-    }
-    return this;
-  }
-  _base_where_null(col) {
-    if (this._where) {
-      this._where = `(${this._where}) AND ${col} IS NULL`;
-    } else {
-      this._where = col + " IS NULL";
-    }
-    return this;
-  }
-  _base_where_not_null(col) {
-    if (this._where) {
-      this._where = `(${this._where}) AND ${col} IS NOT NULL`;
-    } else {
-      this._where = col + " IS NOT NULL";
-    }
-    return this;
-  }
-  _base_where_between(col, low, high) {
-    if (this._where) {
-      this._where = `(${this._where}) AND (${col} BETWEEN ${low} AND ${high})`;
-    } else {
-      this._where = `${col} BETWEEN ${low} AND ${high}`;
-    }
-    return this;
-  }
-  _base_where_not_between(col, low, high) {
-    if (this._where) {
-      this._where = `(${this._where}) AND (${col} NOT BETWEEN ${low} AND ${high})`;
-    } else {
-      this._where = `${col} NOT BETWEEN ${low} AND ${high}`;
-    }
-    return this;
-  }
-  _base_or_where_in(cols, range) {
-    const in_token = this._get_in_token(cols, range);
-    if (this._where) {
-      this._where = `${this._where} OR ${in_token}`;
-    } else {
-      this._where = in_token;
-    }
-    return this;
-  }
-  _base_or_where_not_in(cols, range) {
-    const not_in_token = this._get_in_token(cols, range, "NOT IN");
-    if (this._where) {
-      this._where = `${this._where} OR ${not_in_token}`;
-    } else {
-      this._where = not_in_token;
-    }
-    return this;
-  }
-  _base_or_where_null(col) {
-    if (this._where) {
-      this._where = `${this._where} OR ${col} IS NULL`;
-    } else {
-      this._where = col + " IS NULL";
-    }
-    return this;
-  }
-  _base_or_where_not_null(col) {
-    if (this._where) {
-      this._where = `${this._where} OR ${col} IS NOT NULL`;
-    } else {
-      this._where = col + " IS NOT NULL";
-    }
-    return this;
-  }
-  _base_or_where_between(col, low, high) {
-    if (this._where) {
-      this._where = `${this._where} OR (${col} BETWEEN ${low} AND ${high})`;
-    } else {
-      this._where = `${col} BETWEEN ${low} AND ${high}`;
-    }
-    return this;
-  }
-  _base_or_where_not_between(col, low, high) {
-    if (this._where) {
-      this._where = `${this._where} OR (${col} NOT BETWEEN ${low} AND ${high})`;
-    } else {
-      this._where = `${col} NOT BETWEEN ${low} AND ${high}`;
-    }
-    return this;
-  }
-  _rows_to_array(rows, columns) {
-    const c = columns.length;
-    const n = rows.length;
-    const res = new Array(n);
-    const fields = this.cls.fields;
-    for (let i = 0; i < n; i = i + 1) {
-      res[i] = new Array(c);
-    }
-    for (const [i, col] of columns.entries()) {
-      for (let j = 0; j < n; j = j + 1) {
-        const v = rows[j][col];
-        if (v !== undefined && v !== "") {
-          res[j][i] = v;
-        } else if (fields[col]) {
-          const dft = fields[col].default;
-          if (dft !== undefined) {
-            res[j][i] = fields[col].get_default(rows[j]);
-          } else {
-            res[j][i] = NULL;
-          }
+      throw new Error("invalid field name for _get_cte_values_literal: " + col);
+    }
+  }
+  const res = [];
+  res[0] = "(" + (as_token(first_row) + ")");
+  for (let i = 2; i <= rows.length; i = i + 1) {
+    res[i] = as_literal(rows[i]);
+  }
+  return [res, columns];
+};
+ModelSql.prototype._rows_to_array = function (rows, columns) {
+  const c = columns.length;
+  const n = rows.length;
+  const res = table_new(n, 0);
+  const fields = this.model.fields;
+  for (let i = 0; i < n; i = i + 1) {
+    res[i] = table_new(c, 0);
+  }
+  for (const [i, col] of columns.entries()) {
+    for (let j = 0; j < n; j = j + 1) {
+      const v = rows[j][col];
+      if (v !== undefined && v !== "") {
+        res[j][i] = v;
+      } else if (fields[col]) {
+        const _js_default = fields[col]._js_default;
+        if (_js_default !== undefined) {
+          res[j][i] = fields[col].get_default(rows[j]);
         } else {
           res[j][i] = NULL;
         }
-      }
-    }
-    return res;
-  }
-  _get_insert_values_token(row, columns) {
-    const value_list = [];
-    if (!columns) {
-      columns = [];
-      for (const [k, v] of Object.entries(row)) {
-        columns.push(k);
-        value_list.push(v);
-      }
-    } else {
-      for (const col of columns) {
-        const v = row[col];
-        if (v !== undefined) {
-          value_list.push(v);
-        } else {
-          value_list.push(DEFAULT);
-        }
-      }
-    }
-    return [as_literal(value_list), columns];
-  }
-  _get_bulk_insert_values_token(rows, columns) {
-    columns = columns || this.cls.get_keys(rows);
-    rows = this._rows_to_array(rows, columns);
-    return [map(rows, as_literal), columns];
-  }
-  _get_update_token_with_prefix(columns, key, table_name) {
-    const tokens = [];
-    if (typeof key === "string") {
-      for (const col of columns) {
-        if (col !== key) {
-          tokens.push(`${col} = ${table_name}.${col}`);
-        }
-      }
-    } else {
-      const sets = [];
-      for (const k of key) {
-        sets[k] = true;
-      }
-      for (const col of columns) {
-        if (!sets[col]) {
-          tokens.push(`${col} = ${table_name}.${col}`);
-        }
-      }
-    }
-    return tokens.join(", ");
-  }
-  _get_select_token(a, b, ...varargs) {
-    if (b === undefined) {
-      if (Array.isArray(a)) {
-        const tokens = a.map((e) => this._get_select_column(e));
-        return as_token(tokens);
-      } else if (typeof a === "string") {
-        return this._get_select_column(a);
       } else {
-        return as_token(a);
-      }
-    } else {
-      a = this._get_select_column(a);
-      b = this._get_select_column(b);
-      let s = as_token(a) + ", " + as_token(b);
-      for (const name of varargs) {
-        s = s + ", " + as_token(this._get_select_column(name));
-      }
-      return s;
-    }
-  }
-  _get_select_token_literal(a, b, ...varargs) {
-    if (b === undefined) {
-      if (Array.isArray(a)) {
-        const tokens = a.map(as_literal);
-        return as_token(tokens);
-      } else {
-        return as_literal(a);
-      }
-    } else {
-      let s = as_literal(a) + ", " + as_literal(b);
-      for (const name of varargs) {
-        s = s + ", " + as_literal(name);
-      }
-      return s;
-    }
-  }
-  _get_update_token(row, columns) {
-    const kv = [];
-    if (!columns) {
-      for (const [k, v] of Object.entries(row)) {
-        kv.push(`${k} = ${as_literal(v)}`);
-      }
-    } else {
-      for (const k of columns) {
-        const v = row[k];
-        kv.push(`${k} = ${(v !== undefined && as_literal(v)) || "DEFAULT"}`);
-      }
-    }
-    return kv.join(", ");
-  }
-  _get_with_token(name, token) {
-    if (token === undefined) {
-      return name;
-    } else if (token instanceof Model) {
-      return `${name} AS (${token.statement()})`;
-    } else {
-      return `${name} AS ${token}`;
-    }
-  }
-  _get_insert_token(row, columns) {
-    const [values_token, insert_columns] = this._get_insert_values_token(
-      row,
-      columns
-    );
-    return `(${as_token(insert_columns)}) VALUES ${values_token}`;
-  }
-  _get_bulk_insert_token(rows, columns) {
-    [rows, columns] = this._get_bulk_insert_values_token(rows, columns);
-    return `(${as_token(columns)}) VALUES ${as_token(rows)}`;
-  }
-  _set_select_subquery_insert_token(sub_query, columns) {
-    const columns_token = as_token(columns || sub_query._select || "");
-    if (columns_token !== "") {
-      this._insert = `(${columns_token}) ${sub_query.statement()}`;
-    } else {
-      this._insert = sub_query.statement();
-    }
-  }
-  _set_cud_subquery_insert_token(sub_query) {
-    const cte_return = sub_query._cte_returning;
-    if (cte_return) {
-      const cte_columns = cte_return.columns;
-      const insert_columns = [...cte_columns, ...cte_return.literal_columns];
-      const cud_select_query = Model.new({ table_name: "d" })._base_select(
-        insert_columns
-      );
-      this.with(`d(${as_token(insert_columns)})`, sub_query);
-      this._insert = `(${as_token(
-        insert_columns
-      )}) ${cud_select_query.statement()}`;
-    } else if (sub_query._returning_args) {
-      const insert_columns = sub_query._returning_args.flat();
-      const cud_select_query = Model.new({ table_name: "d" })._base_select(
-        insert_columns
-      );
-      this.with(`d(${as_token(insert_columns)})`, sub_query);
-      this._insert = `(${as_token(
-        insert_columns
-      )}) ${cud_select_query.statement()}`;
-    }
-  }
-  _get_upsert_token(row, key, columns) {
-    const [values_token, insert_columns] = this._get_insert_values_token(
-      row,
-      columns
-    );
-    const insert_token = `(${as_token(
-      insert_columns
-    )}) VALUES ${values_token} ON CONFLICT (${this._get_select_token(key)})`;
-    if (
-      (Array.isArray(key) && key.length === insert_columns.length) ||
-      insert_columns.length === 1
-    ) {
-      return `${insert_token} DO NOTHING`;
-    } else {
-      return `${insert_token} DO UPDATE SET ${this._get_update_token_with_prefix(
-        insert_columns,
-        key,
-        "EXCLUDED"
-      )}`;
-    }
-  }
-  _get_bulk_upsert_token(rows, key, columns) {
-    [rows, columns] = this._get_bulk_insert_values_token(rows, columns);
-    const insert_token = `(${as_token(columns)}) VALUES ${as_token(
-      rows
-    )} ON CONFLICT (${this._base_get_select_token(key)})`;
-    if (
-      (Array.isArray(key) && key.length === columns.length) ||
-      columns.length === 1
-    ) {
-      return `${insert_token} DO NOTHING`;
-    } else {
-      return `${insert_token} DO UPDATE SET ${this._get_update_token_with_prefix(
-        columns,
-        key,
-        "EXCLUDED"
-      )}`;
-    }
-  }
-  _get_upsert_query_token(rows, key, columns) {
-    const columns_token = this._get_select_token(columns);
-    const insert_token = `(${columns_token}) ${rows.statement()} ON CONFLICT (${this._get_select_token(
-      key
-    )})`;
-    if (
-      (Array.isArray(key) && key.length === columns.length) ||
-      columns.length === 1
-    ) {
-      return `${insert_token} DO NOTHING`;
-    } else {
-      return `${insert_token} DO UPDATE SET ${this._get_update_token_with_prefix(
-        columns,
-        key,
-        "EXCLUDED"
-      )}`;
-    }
-  }
-  _get_join_expr(key, op, val) {
-    if (op === undefined) {
-      return key;
-    } else if (val === undefined) {
-      return `${key} = ${op}`;
-    } else {
-      return `${key} ${op} ${val}`;
-    }
-  }
-  _get_join_token(join_type, right_table, key, op, val) {
-    if (key !== undefined) {
-      return `${join_type} JOIN ${right_table} ON (${this._get_join_expr(
-        key,
-        op,
-        val
-      )})`;
-    } else {
-      return `${join_type} JOIN ${right_table}`;
-    }
-  }
-  _get_in_token(cols, range, op) {
-    cols = as_token(cols);
-    op = op || "IN";
-    if (typeof range === "object") {
-      if (range instanceof Model) {
-        return `(${cols}) ${op} (${range.statement()})`;
-      } else {
-        return `(${cols}) ${op} ${as_literal(range)}`;
-      }
-    } else {
-      return `(${cols}) ${op} ${range}`;
-    }
-  }
-  _get_update_query_token(sub_select, columns) {
-    const columns_token =
-      (columns && this._get_select_token(columns)) || sub_select._select;
-    return `(${columns_token}) = (${sub_select.statement()})`;
-  }
-  _base_get_update_query_token(sub_select, columns) {
-    const columns_token =
-      (columns && this._base_get_select_token(columns)) || sub_select._select;
-    return `(${columns_token}) = (${sub_select.statement()})`;
-  }
-  _get_join_conditions(key, left_table, right_table) {
-    if (typeof key === "string") {
-      return `${left_table}.${key} = ${right_table}.${key}`;
-    }
-    const res = [];
-    for (const k of key) {
-      res.push(`${left_table}.${k} = ${right_table}.${k}`);
-    }
-    return res.join(" AND ");
-  }
-  _get_cte_values_literal(rows, columns, no_check) {
-    columns = columns || this.cls.get_keys(rows);
-    rows = this._rows_to_array(rows, columns);
-    const first_row = rows[0];
-    for (const [i, col] of columns.entries()) {
-      const [field] = this._find_field_model(col);
-      if (field) {
-        first_row[i] = `${as_literal(first_row[i])}::${field.db_type}`;
-      } else if (no_check) {
-        first_row[i] = as_literal(first_row[i]);
-      } else {
-        throw new Error(
-          "invalid field name for _get_cte_values_literal: " + col
-        );
-      }
-    }
-    const res = [];
-    res[0] = "(" + as_token(first_row) + ")";
-    for (let i = 1; i < rows.length; i = i + 1) {
-      res[i] = as_literal(rows[i]);
-    }
-    return [res, columns];
-  }
-  _handle_join(join_type, join_table, join_cond) {
-    if (this._update) {
-      this.from(join_table);
-      this.where(join_cond);
-    } else if (this._delete) {
-      this.using(join_table);
-      this.where(join_cond);
-    } else if (join_type === "INNER") {
-      this._base_join(join_table, join_cond);
-    } else if (join_type === "LEFT") {
-      this._base_left_join(join_table, join_cond);
-    } else if (join_type === "RIGHT") {
-      this._base_right_join(join_table, join_cond);
-    } else {
-      this._base_full_join(join_table, join_cond);
-    }
-  }
-  _register_join_model(join_args, join_type) {
-    join_type = join_type || join_args.join_type || "INNER";
-    // let find = true;
-    const model = join_args.model || this;
-    const fk_model = join_args.fk_model;
-    const column = join_args.column;
-    const fk_column = join_args.fk_column;
-    let join_key;
-    if (join_args.join_key === undefined) {
-      if (this.table_name === model.table_name) {
-        join_key = column + "__" + fk_model.table_name;
-      } else {
-        join_key = `${join_type}__${model.table_name}__${column}__${fk_model.table_name}__${fk_column}`;
-      }
-    } else {
-      join_key = join_args.join_key;
-    }
-    if (!this._join_keys) {
-      this._join_keys = {};
-    }
-    let join_obj = this._join_keys[join_key];
-    if (!join_obj) {
-      // find = false;
-      join_obj = {
-        join_type: join_type,
-        model: model,
-        column: column,
-        alias: join_args.alias || model.table_name,
-        fk_model: fk_model,
-        fk_column: fk_column,
-        fk_alias: "T" + this._get_join_number(),
-      };
-      const join_table = `${fk_model.table_name} ${join_obj.fk_alias}`;
-      const join_cond = `${join_obj.alias}.${join_obj.column} = ${join_obj.fk_alias}.${join_obj.fk_column}`;
-      this._handle_join(join_type, join_table, join_cond);
-      this._join_keys[join_key] = join_obj;
-    }
-    return join_obj; // [join_obj, find];
-  }
-  _find_field_model(col) {
-    const field = this.cls.fields[col];
-    if (field) {
-      return [field, this, this._as || this.cls.table_name];
-    }
-    if (!this._join_keys) {
-      return [false];
-    }
-    for (const join_obj of Object.values(this._join_keys)) {
-      const fk_field = join_obj.fk_model.fields[col];
-      if (join_obj.model.table_name === this.cls.table_name && fk_field) {
-        return [
-          fk_field,
-          join_obj.fk_model,
-          join_obj.fk_alias || join_obj.fk_model.table_name,
-        ];
+        res[j][i] = NULL;
       }
     }
   }
-  _get_where_key(key) {
-    let a = key.index_of("__");
-    if (a === -1) {
-      return [this._get_column(key), "eq"];
+  return res;
+};
+ModelSql.prototype._register_join_model = function (join_args, join_type) {
+  join_type = join_type || join_args.join_type || "INNER";
+  let find = true;
+  let model, table_name;
+  if (join_args.model) {
+    model = join_args.model;
+    table_name = model.table_name;
+  } else {
+    model = this.model;
+    table_name = this.table_name;
+  }
+  const column = join_args.column;
+  const f = assert(model.fields[column], `invalid name ${column} for model ${table_name}`);
+  const fk_model = join_args.fk_model || (f && f.reference);
+  const fk_column = join_args.fk_column || (f && f.reference_column);
+  let join_key;
+  if (join_args.join_key === undefined) {
+    if (this.table_name === table_name) {
+      join_key = column + ("__" + fk_model.table_name);
+    } else {
+      join_key = `${join_type}__${table_name}__${column}__${fk_model.table_name}__${fk_column}`;
     }
-    let e = key.slice(0, a);
-    let [field, model, prefix] = this._find_field_model(e);
-    if (!field) {
-      throw new Error(`${e} is not a valid field name for ${this.table_name}`);
+  } else {
+    join_key = join_args.join_key;
+  }
+  if (!this._join_keys) {
+    this._join_keys = [];
+  }
+  let join_obj = this._join_keys[join_key];
+  if (!join_obj) {
+    find = false;
+    join_obj = {
+      join_type: join_type,
+      model: model,
+      column: column,
+      alias: join_args.alias || table_name,
+      fk_model: fk_model,
+      fk_column: fk_column,
+      fk_alias: join_args.fk_alias || "T" + this._get_join_number(),
+    };
+    const join_table = `${fk_model.table_name} ${join_obj.fk_alias}`;
+    const join_cond = `${join_obj.alias}.${join_obj.column} = ${join_obj.fk_alias}.${join_obj.fk_column}`;
+    this._handle_join(join_type, join_table, join_cond);
+    this._join_keys[join_key] = join_obj;
+  }
+  return [join_obj, find];
+};
+ModelSql.prototype._find_field_model = function (col) {
+  const field = this.model.fields[col];
+  if (field) {
+    return [field, this.model, this._as || this.table_name];
+  }
+  if (!this._join_keys) {
+    return;
+  }
+  for (const [_, join_obj] of Object.entries(this._join_keys)) {
+    const fk_field = join_obj.fk_model.fields[col];
+    if (fk_field && join_obj.model.table_name === this.table_name) {
+      return [fk_field, join_obj.fk_model, join_obj.fk_alias || join_obj.fk_model.table_name];
     }
-    let i, state, fk_model, rc, join_key;
-    let op = "eq";
-    let field_name = e;
-    if (field.reference) {
+  }
+};
+ModelSql.prototype._parse_column = function (key, as_select, strict, disable_alias) {
+  let [a, b] = key.find("__", 1, true);
+  if (!a) {
+    return [this._get_column(key, strict), "eq"];
+  }
+  let token = key.sub(1, a - 1);
+  let [field, model, prefix] = this._find_field_model(token);
+  if (!field || !model) {
+    throw new Error(`${token} is not a valid field name for ${this.table_name}`);
+  }
+  let i, fk_model, rc, join_key, is_fk;
+  let op;
+  let field_name = token;
+  while (true) {
+    i = b + 1;
+    [a, b] = key.find("__", i, true);
+    if (!a) {
+      token = key.sub(i);
+    } else {
+      token = key.sub(i, a - 1);
+    }
+    if (!field.reference) {
+      op = token;
+      break;
+    } else {
       fk_model = field.reference;
       rc = field.reference_column;
-      state = FOREIGN_KEY;
-    } else {
-      state = NON_FOREIGN_KEY;
-    }
-    // eslint-disable-next-line no-constant-condition
-    while (true) {
-      i = a + 2;
-      a = key.index_of("__", i);
-      if (a === -1) {
-        e = key.slice(i);
-      } else {
-        e = key.slice(i, a);
-      }
-      if (state === NON_FOREIGN_KEY) {
-        op = e;
-        state = END;
-      } else if (state === FOREIGN_KEY) {
-        const field_of_fk = fk_model.fields[e];
-        if (field_of_fk) {
-          if (!join_key) {
-            join_key = field_name + "__" + fk_model.table_name;
-          } else {
-            join_key = join_key + "__" + field_name;
-          }
-          const join_obj = this._register_join_model({
-            join_key: join_key,
-            model: model,
-            column: field_name,
-            alias: prefix || model.table_name,
-            fk_model: fk_model,
-            fk_column: rc,
-          });
-          prefix = join_obj.fk_alias;
-          if (field_of_fk.reference) {
-            model = fk_model;
-            fk_model = field_of_fk.reference;
-            rc = field_of_fk.reference_column;
-          } else {
-            state = NON_FOREIGN_KEY;
-          }
-          field_name = e;
-        } else {
-          op = e;
-          state = END;
-        }
-      } else {
-        throw new Error(
-          `invalid cond table key parsing state ${state} with token ${e}`
-        );
-      }
-      if (a == -1) {
+      is_fk = true;
+      const fk_model_field = fk_model.fields[token];
+      if (!fk_model_field) {
+        op = token;
         break;
+      } else if (token === field.reference_column) {
+        break;
+      } else {
+        if (!join_key) {
+          join_key = field_name + ("__" + fk_model.table_name);
+        } else {
+          join_key = join_key + ("__" + field_name);
+        }
+        const join_obj = this._register_join_model({
+          join_type: this._join_type || "INNER",
+          join_key: join_key,
+          model: model,
+          column: field_name,
+          alias: assert(prefix, "prefix in _parse_column should never be falsy"),
+          fk_model: fk_model,
+          fk_column: rc,
+        });
+        field = fk_model_field;
+        model = fk_model;
+        prefix = join_obj.fk_alias;
+        field_name = token;
       }
     }
-    return [prefix + "." + field_name, op];
+    if (!a) {
+      break;
+    }
   }
-  _get_column(key) {
-    if (this.cls.fields[key]) {
-      return (this._as && this._as + "." + key) || this.cls.name_cache[key];
-    }
-    if (!this._join_keys) {
-      return key;
-    }
-    for (const join_obj of Object.values(this._join_keys)) {
-      if (
-        join_obj.model.table_name === this.table_name &&
-        join_obj.fk_model.fields[key]
-      ) {
-        return join_obj.fk_alias + "." + key;
-      }
-    }
+  const final_key = prefix + ("." + field_name);
+  if (as_select && is_fk && !disable_alias) {
+    assert(op === undefined, `invalid field name: ${op}`);
+    return [final_key + (" AS " + key), op];
+  } else {
+    return [final_key, op || "eq"];
+  }
+};
+ModelSql.prototype._get_column = function (key, strict) {
+  if (this.model.fields[key]) {
+    return (this._as && this._as + ("." + key)) || this.model.name_cache[key];
+  }
+  if (key === "*") {
+    return "*";
+  }
+  const [table_name, column] = match(key, "^([\\w_]+).([\\w_]+)$", "josui");
+  if (table_name) {
     return key;
   }
-  _get_select_column(key) {
-    if (typeof key !== "string") {
-      return key;
-    } else {
-      return this._get_column(key);
+  if (this._join_keys) {
+    for (const [_, join_obj] of Object.entries(this._join_keys)) {
+      if (join_obj.model.table_name === this.table_name && join_obj.fk_model.fields[key]) {
+        return join_obj.fk_alias + ("." + key);
+      }
     }
   }
-  _get_expr_token(value, key, op) {
-    if (op === "eq") {
-      return `${key} = ${as_literal(value)}`;
-    } else if (op === "in") {
-      return `${key} IN ${as_literal(value)}`;
-    } else if (op === "notin") {
-      return `${key} NOT IN ${as_literal(value)}`;
-    } else if (COMPARE_OPERATORS[op]) {
-      return `${key} ${COMPARE_OPERATORS[op]} ${as_literal(value)}`;
-    } else if (op === "contains") {
-      return `${key} LIKE '%${value.gsub("'", "''")}%'`;
-    } else if (op === "startswith") {
-      return `${key} LIKE '${value.gsub("'", "''")}%'`;
-    } else if (op === "endswith") {
-      return `${key} LIKE '%${value.gsub("'", "''")}'`;
-    } else if (op === "null") {
-      if (value) {
-        return `${key} IS NULL`;
-      } else {
-        return `${key} IS NOT NULL`;
+  if (strict) {
+    throw new Error(`invalid field name: \`${key}\``);
+  } else {
+    return key;
+  }
+};
+ModelSql.prototype.join = function (join_args, key, op, val) {
+  if (typeof join_args === "object") {
+    this._register_join_model(join_args, "INNER");
+  } else if (this.model.foreign_keys[join_args]) {
+    const fk = this.model.foreign_keys[join_args];
+    this._register_join_model(
+      {
+        model: this.model,
+        column: join_args,
+        fk_model: fk.reference,
+        fk_column: fk.reference_column,
+        fk_alias: fk.reference.table_name,
+      },
+      "INNER"
+    );
+  } else {
+    Sql.prototype._base_join.call(this, join_args, key, op, val);
+  }
+  return this;
+};
+ModelSql.prototype.inner_join = function (join_args, key, op, val) {
+  if (typeof join_args === "object") {
+    this._register_join_model(join_args, "INNER");
+  } else {
+    Sql.prototype._base_join.call(this, join_args, key, op, val);
+  }
+  return this;
+};
+ModelSql.prototype.left_join = function (join_args, key, op, val) {
+  if (typeof join_args === "object") {
+    this._register_join_model(join_args, "LEFT");
+  } else {
+    Sql.prototype._base_left_join.call(this, join_args, key, op, val);
+  }
+  return this;
+};
+ModelSql.prototype.right_join = function (join_args, key, op, val) {
+  if (typeof join_args === "object") {
+    this._register_join_model(join_args, "RIGHT");
+  } else {
+    Sql.prototype._base_right_join.call(this, join_args, key, op, val);
+  }
+  return this;
+};
+ModelSql.prototype.full_join = function (join_args, key, op, val) {
+  if (typeof join_args === "object") {
+    this._register_join_model(join_args, "FULL");
+  } else {
+    Sql.prototype._base_full_join.call(this, join_args, key, op, val);
+  }
+  return this;
+};
+ModelSql.prototype.insert = function (rows, columns) {
+  if (!is_sql_instance(rows)) {
+    if (!this._skip_validate) {
+      [rows, columns] = this.model.validate_create_data(rows, columns);
+      if (rows === undefined) {
+        throw new Error(columns);
+      }
+    }
+    [rows, columns] = this.model.prepare_db_rows(rows, columns);
+    if (rows === undefined) {
+      throw new Error(columns);
+    }
+    return Sql.prototype._base_insert.call(this, rows, columns);
+  } else {
+    return Sql.prototype._base_insert.call(this, rows, columns);
+  }
+};
+ModelSql.prototype.update = function (row, columns) {
+  if (typeof row === "string") {
+    return Sql.prototype._base_update.call(this, row);
+  } else if (!is_sql_instance(row)) {
+    let err;
+    if (!this._skip_validate) {
+      [row, err] = this.model.validate_update(row, columns);
+      if (row === undefined) {
+        throw new Error(err);
+      }
+    }
+    [row, columns] = this.model.prepare_db_rows(row, columns, true);
+    if (row === undefined) {
+      throw new Error(columns);
+    }
+    return Sql.prototype._base_update.call(this, row, columns);
+  } else {
+    return Sql.prototype._base_update.call(this, row, columns);
+  }
+};
+ModelSql.prototype.merge = function (rows, key, columns) {
+  if (rows.length === 0) {
+    throw new Error("empty rows passed to merge");
+  }
+  if (!this._skip_validate) {
+    [rows, key, columns] = this.model.validate_create_rows(rows, key, columns);
+    if (rows === undefined) {
+      throw new Error(key);
+    }
+  }
+  [rows, columns] = this.model.prepare_db_rows(rows, columns, false);
+  if (rows === undefined) {
+    throw new Error(columns);
+  }
+  return Sql.prototype._base_merge.call(this, rows, key, columns);
+};
+ModelSql.prototype.upsert = function (rows, key, columns) {
+  if (rows.length === 0) {
+    throw new Error("empty rows passed to merge");
+  }
+  if (!this._skip_validate) {
+    [rows, key, columns] = this.model.validate_create_rows(rows, key, columns);
+    if (rows === undefined) {
+      throw new Error(key);
+    }
+  }
+  [rows, columns] = this.model.prepare_db_rows(rows, columns, false);
+  if (rows === undefined) {
+    throw new Error(columns);
+  }
+  return Sql.prototype._base_upsert.call(this, rows, key, columns);
+};
+ModelSql.prototype.updates = function (rows, key, columns) {
+  if (rows.length === 0) {
+    throw new Error("empty rows passed to merge");
+  }
+  if (!this._skip_validate) {
+    [rows, key, columns] = this.model.validate_update_rows(rows, key, columns);
+    if (rows === undefined) {
+      throw new Error(columns);
+    }
+  }
+  [rows, columns] = this.model.prepare_db_rows(rows, columns, true);
+  if (rows === undefined) {
+    throw new Error(columns);
+  }
+  return Sql.prototype._base_updates.call(this, rows, key, columns);
+};
+ModelSql.prototype.get_multiple = function (keys, columns) {
+  if (this._commit === undefined || this._commit) {
+    return Sql.prototype._base_get_multiple.call(this, keys, columns).exec();
+  } else {
+    return Sql.prototype._base_get_multiple.call(this, keys, columns);
+  }
+};
+ModelSql.prototype.exec_statement = function (statement) {
+  const records = assert(this.model.query(statement, this._compact));
+  if (this._raw || this._compact || this._update || this._insert || this._delete) {
+    if ((this._update || this._insert || this._delete) && this._returning) {
+      records.affected_rows = undefined;
+    }
+    return array.new(records);
+  } else {
+    const cls = this.model;
+    if (!this._load_fk) {
+      for (const [i, record] of records.entries()) {
+        records[i] = cls.load(record);
       }
     } else {
-      throw new Error("invalid sql op: " + String(op));
-    }
-  }
-  _get_join_number() {
-    if (this._join_keys) {
-      return Object.keys(this._join_keys).length + 1;
-    } else {
-      return 1;
-    }
-  }
-  _handle_where_token(where_token, tpl) {
-    if (where_token === "") {
-      return this;
-    } else if (this._where === undefined) {
-      this._where = where_token;
-    } else {
-      this._where = string_format(tpl, this._where, where_token);
-    }
-    return this;
-  }
-  _get_condition_token_from_table(kwargs, logic) {
-    const tokens = [];
-    if (Array.isArray(kwargs)) {
-      for (const value of kwargs) {
-        const token = this._get_condition_token(value);
-        if (token !== undefined && token !== "") {
-          tokens.push("(" + token + ")");
+      const fields = cls.fields;
+      const field_names = cls.field_names;
+      for (const [i, record] of records.entries()) {
+        for (const [_, name] of field_names.entries()) {
+          const field = fields[name];
+          const value = record[name];
+          if (value !== undefined) {
+            const fk_model = this._load_fk[name];
+            if (!fk_model) {
+              if (!field.load) {
+                record[name] = value;
+              } else {
+                record[name] = field.load(value);
+              }
+            } else {
+              record[name] = fk_model.load(get_foreign_object(record, name + "__"));
+            }
+          }
         }
-      }
-    } else {
-      for (const [k, value] of Object.entries(kwargs)) {
-        tokens.push(this._get_expr_token(value, ...this._get_where_key(k)));
+        records[i] = cls.create_record(record);
       }
     }
-    if (logic === undefined) {
-      return tokens.join(" AND ");
-    } else {
-      return tokens.join(" " + logic + " ");
-    }
-  }
-  _get_condition_token(cond, op, dval) {
-    if (op === undefined) {
-      if (typeof cond === "object") {
-        return this._get_condition_token_from_table(cond);
-      } else {
-        return this._base_get_condition_token(cond);
-      }
-    } else if (dval === undefined) {
-      return `${this._get_column(cond)} = ${as_literal(op)}`;
-    } else {
-      return `${this._get_column(cond)} ${op} ${as_literal(dval)}`;
-    }
-  }
-  _get_condition_token_or(cond, op, dval) {
-    if (typeof cond === "object") {
-      return this._get_condition_token_from_table(cond, "OR");
-    } else {
-      return this._get_condition_token(cond, op, dval);
-    }
-  }
-  _get_condition_token_not(cond, op, dval) {
-    let token;
-    if (typeof cond === "object") {
-      token = this._get_condition_token_from_table(cond, "OR");
-    } else {
-      token = this._get_condition_token(cond, op, dval);
-    }
-    return (token !== "" && `NOT (${token})`) || "";
-  }
-  _handle_set_option(other_sql, inner_attr) {
-    if (!this[inner_attr]) {
-      this[inner_attr] = other_sql.statement();
-    } else {
-      this[inner_attr] = `(${this[inner_attr]}) ${
-        PG_SET_MAP[inner_attr]
-      } (${other_sql.statement()})`;
-    }
-    this.statement = this._statement_for_set;
-    return this;
-  }
-  _statement_for_set() {
-    let statement = this.statement();
-    if (this._intersect) {
-      statement = `(${statement}) INTERSECT (${this._intersect})`;
-    } else if (this._intersect_all) {
-      statement = `(${statement}) INTERSECT ALL (${this._intersect_all})`;
-    } else if (this._union) {
-      statement = `(${statement}) UNION (${this._union})`;
-    } else if (this._union_all) {
-      statement = `(${statement}) UNION ALL (${this._union_all})`;
-    } else if (this._except) {
-      statement = `(${statement}) EXCEPT (${this._except})`;
-    } else if (this._except_all) {
-      statement = `(${statement}) EXCEPT ALL (${this._except_all})`;
-    }
-    return statement;
-  }
-  statement() {
-    const table_name = this.get_table();
-    const statement = assemble_sql({
-      table_name: table_name,
-      with: this._with,
-      join: this._join,
-      distinct: this._distinct,
-      returning: this._returning,
-      cte_returning: this._cte_returning,
-      insert: this._insert,
-      update: this._update,
-      delete: this._delete,
-      using: this._using,
-      select: this._select,
-      from: this._from,
-      where: this._where,
-      group: this._group,
-      having: this._having,
-      order: this._order,
-      limit: this._limit,
-      offset: this._offset,
-    });
-    return statement;
-  }
-  with(name, token) {
-    const with_token = this._get_with_token(name, token);
-    if (this._with) {
-      this._with = `${this._with}, ${with_token}`;
-    } else {
-      this._with = with_token;
-    }
-    return this;
-  }
-  union(other_sql) {
-    return this._handle_set_option(other_sql, "_union");
-  }
-  union_all(other_sql) {
-    return this._handle_set_option(other_sql, "_union_all");
-  }
-  except(other_sql) {
-    return this._handle_set_option(other_sql, "_except");
-  }
-  except_all(other_sql) {
-    return this._handle_set_option(other_sql, "_except_all");
-  }
-  intersect(other_sql) {
-    return this._handle_set_option(other_sql, "_intersect");
-  }
-  intersect_all(other_sql) {
-    return this._handle_set_option(other_sql, "_intersect_all");
-  }
-  as(table_alias) {
-    this._as = table_alias;
-    return this;
-  }
-  with_values(name, rows) {
-    let columns = this.cls.get_keys(rows[0]);
-    [rows, columns] = this._get_cte_values_literal(rows, columns, true);
-    const cte_name = `${name}(${columns.join(", ")})`;
-    const cte_values = `(VALUES ${as_token(rows)})`;
-    return this.with(cte_name, cte_values);
-  }
-  insert(rows, columns) {
-    if (!(rows instanceof Model)) {
-      if (!this._skip_validate) {
-        [rows, columns] = this.cls.validate_create_data(rows, columns);
-      }
-      [rows, columns] = this.cls.prepare_db_rows(rows, columns);
-    }
-    return this._base_insert(rows, columns);
-  }
-  update(row, columns) {
-    if (typeof row === "string") {
-      return this._base_update(row);
-    } else if (!(row instanceof Model)) {
-      if (!this._skip_validate) {
-        row = this.cls.validate_update(row, columns);
-      }
-      [row, columns] = this.cls.prepare_db_rows(row, columns, true);
-    }
-    return this._base_update(row, columns);
-  }
-  async get_multiple(keys, columns) {
-    if (this._commit === undefined || this._commit) {
-      return await this._base_get_multiple(keys, columns).exec();
-    } else {
-      return this._base_get_multiple(keys, columns);
-    }
-  }
-  async merge(rows, key, columns) {
-    if (rows.length === 0) {
-      throw new Error("empty rows passed to merge");
-    }
-    if (!this._skip_validate) {
-      [rows, key, columns] = this.cls.validate_create_rows(rows, key, columns);
-    }
-    [rows, columns] = this.cls.prepare_db_rows(rows, columns, false);
-    this._base_merge(rows, key, columns).compact();
-    if (!this._returning) {
-      this.returning(key);
-    }
-    if (this._commit === undefined || this._commit) {
-      return await this.exec();
-    } else {
-      return this;
-    }
-  }
-  async upsert(rows, key, columns) {
-    if (rows.length === 0) {
-      throw new Error("empty rows passed to merge");
-    }
-    if (!this._skip_validate) {
-      [rows, key, columns] = this.cls.validate_create_rows(rows, key, columns);
-    }
-    [rows, columns] = this.cls.prepare_db_rows(rows, columns, false);
-    this._base_upsert(rows, key, columns).compact();
-    if (!this._returning) {
-      this.returning(key);
-    }
-    if (this._commit === undefined || this._commit) {
-      return await this.exec();
-    } else {
-      return this;
-    }
-  }
-  async updates(rows, key, columns) {
-    if (rows.length === 0) {
-      throw new Error("empty rows passed to merge");
-    }
-    if (!this._skip_validate) {
-      [rows, key, columns] = this.cls.validate_update_rows(rows, key, columns);
-    }
-    [rows, columns] = this.cls.prepare_db_rows(rows, columns, true);
-    this._base_updates(rows, key, columns).compact();
-    if (!this._returning) {
-      this.returning(key);
-    }
-    if (this._commit === undefined || this._commit) {
-      return await this.exec();
-    } else {
-      return this;
-    }
-  }
-  async get_merge(rows, key) {
-    let columns = this.cls.get_keys(rows[0]);
-    [rows, columns] = this._get_cte_values_literal(rows, columns, true);
-    const join_cond = this._get_join_conditions(
-      key,
-      "V",
-      this._as || this.table_name
-    );
-    const cte_name = `V(${columns.join(", ")})`;
-    const cte_values = `(VALUES ${as_token(rows)})`;
-    this._base_select("V.*")
-      .with(cte_name, cte_values)
-      ._base_right_join("V", join_cond);
-    if (this._commit === undefined || this._commit) {
-      return await this.execr();
-    } else {
-      return this;
-    }
-  }
-  copy() {
-    const copy_sql = {};
-    for (const [key, value] of Object.entries(this)) {
-      if (typeof value === "object") {
-        copy_sql[key] = clone(value);
-      } else {
-        copy_sql[key] = value;
-      }
-    }
-    return Model.new(copy_sql);
-  }
-  delete(cond, op, dval) {
-    this._delete = true;
-    if (cond !== undefined) {
-      this.where(cond, op, dval);
-    }
-    return this;
-  }
-  distinct() {
-    this._distinct = true;
-    return this;
-  }
-  select(a, b, ...varargs) {
-    const s = this._get_select_token(a, b, ...varargs);
-    if (!this._select) {
-      this._select = s;
-    } else if (s !== undefined && s !== "") {
-      this._select = this._select + ", " + s;
-    }
-    return this;
-  }
-  select_literal(a, b, ...varargs) {
-    const s = this._get_select_token_literal(a, b, ...varargs);
-    if (!this._select) {
-      this._select = s;
-    } else if (s !== undefined && s !== "") {
-      this._select = this._select + ", " + s;
-    }
-    return this;
-  }
-  returning(a, b, ...varargs) {
-    const s = this._get_select_token(a, b, ...varargs);
-    if (!this._returning) {
-      this._returning = s;
-    } else if (s !== undefined && s !== "") {
-      this._returning = this._returning + ", " + s;
-    } else {
-      return this;
-    }
-    if (this._returning_args) {
-      this._returning_args = [this._returning_args, a, b, ...varargs];
-    } else {
-      this._returning_args = [a, b, ...varargs];
-    }
-    return this;
-  }
-  returning_literal(a, b, ...varargs) {
-    const s = this._get_select_token_literal(a, b, ...varargs);
-    if (!this._returning) {
-      this._returning = s;
-    } else if (s !== undefined && s !== "") {
-      this._returning = this._returning + ", " + s;
-    }
-    if (this._returning_args) {
-      this._returning_args = [this._returning_args, a, b, ...varargs];
-    } else {
-      this._returning_args = [a, b, ...varargs];
-    }
-    return this;
-  }
-  cte_returning(opts) {
-    this._cte_returning = opts;
-    return this;
-  }
-  group(...varargs) {
-    if (!this._group) {
-      this._group = this._get_select_token(...varargs);
-    } else {
-      this._group = this._group + ", " + this._get_select_token(...varargs);
-    }
-    return this;
-  }
-  group_by(...varargs) {
-    return this.group(...varargs);
-  }
-  order(...varargs) {
-    if (!this._order) {
-      this._order = this._get_select_token(...varargs);
-    } else {
-      this._order = this._order + ", " + this._get_select_token(...varargs);
-    }
-    return this;
-  }
-  order_by(...varargs) {
-    return this.order(...varargs);
-  }
-  using(a, ...varargs) {
-    this._delete = true;
-    this._using = this._get_select_token(a, ...varargs);
-    return this;
-  }
-  from(a, ...varargs) {
-    if (!this._from) {
-      this._from = this._get_select_token(a, ...varargs);
-    } else {
-      this._from = this._from + ", " + this._get_select_token(a, ...varargs);
-    }
-    return this;
-  }
-  get_table() {
-    return (
-      (this._as === undefined && this.table_name) ||
-      this.table_name + " AS " + this._as
-    );
-  }
-  join(join_args, key, op, val) {
-    if (typeof join_args === "object") {
-      this._register_join_model(join_args, "INNER");
-    } else {
-      this._base_join(join_args, key, op, val);
-    }
-    return this;
-  }
-  inner_join(join_args, key, op, val) {
-    if (typeof join_args === "object") {
-      this._register_join_model(join_args, "INNER");
-    } else {
-      this._base_join(join_args, key, op, val);
-    }
-    return this;
-  }
-  left_join(join_args, key, op, val) {
-    if (typeof join_args === "object") {
-      this._register_join_model(join_args, "LEFT");
-    } else {
-      this._base_left_join(join_args, key, op, val);
-    }
-    return this;
-  }
-  right_join(join_args, key, op, val) {
-    if (typeof join_args === "object") {
-      this._register_join_model(join_args, "RIGHT");
-    } else {
-      this._base_right_join(join_args, key, op, val);
-    }
-    return this;
-  }
-  full_join(join_args, key, op, val) {
-    if (typeof join_args === "object") {
-      this._register_join_model(join_args, "FULL");
-    } else {
-      this._base_full_join(join_args, key, op, val);
-    }
-    return this;
-  }
-  limit(n) {
-    this._limit = n;
-    return this;
-  }
-  offset(n) {
-    this._offset = n;
-    return this;
-  }
-  where(cond, op, dval) {
-    const where_token = this._get_condition_token(cond, op, dval);
-    return this._handle_where_token(where_token, "(%s) AND (%s)");
-  }
-  where_or(cond, op, dval) {
-    const where_token = this._get_condition_token_or(cond, op, dval);
-    return this._handle_where_token(where_token, "(%s) AND (%s)");
-  }
-  or_where_or(cond, op, dval) {
-    const where_token = this._get_condition_token_or(cond, op, dval);
-    return this._handle_where_token(where_token, "%s OR %s");
-  }
-  where_not(cond, op, dval) {
-    const where_token = this._get_condition_token_not(cond, op, dval);
-    return this._handle_where_token(where_token, "(%s) AND (%s)");
-  }
-  or_where(cond, op, dval) {
-    const where_token = this._get_condition_token(cond, op, dval);
-    return this._handle_where_token(where_token, "%s OR %s");
-  }
-  or_where_not(cond, op, dval) {
-    const where_token = this._get_condition_token_not(cond, op, dval);
-    return this._handle_where_token(where_token, "%s OR %s");
-  }
-  where_exists(builder) {
-    if (this._where) {
-      this._where = `(${this._where}) AND EXISTS (${builder})`;
-    } else {
-      this._where = `EXISTS (${builder})`;
-    }
-    return this;
-  }
-  where_not_exists(builder) {
-    if (this._where) {
-      this._where = `(${this._where}) AND NOT EXISTS (${builder})`;
-    } else {
-      this._where = `NOT EXISTS (${builder})`;
-    }
-    return this;
-  }
-  where_in(cols, range) {
-    if (typeof cols === "string") {
-      return this._base_where_in(this._get_column(cols), range);
-    } else {
-      const res = cols.map((e) => this._get_column(e));
-      return this._base_where_in(res, range);
-    }
-  }
-  where_not_in(cols, range) {
-    if (typeof cols === "string") {
-      cols = this._get_column(cols);
-    } else {
-      for (let i = 0; i < cols.length; i = i + 1) {
-        cols[i] = this._get_column(cols[i]);
-      }
-    }
-    return this._base_where_not_in(cols, range);
-  }
-  where_null(col) {
-    return this._base_where_null(this._get_column(col));
-  }
-  where_not_null(col) {
-    return this._base_where_not_null(this._get_column(col));
-  }
-  where_between(col, low, high) {
-    return this._base_where_between(this._get_column(col), low, high);
-  }
-  where_not_between(col, low, high) {
-    return this._base_where_not_between(this._get_column(col), low, high);
-  }
-  or_where_in(cols, range) {
-    if (typeof cols === "string") {
-      cols = this._get_column(cols);
-    } else {
-      for (let i = 0; i < cols.length; i = i + 1) {
-        cols[i] = this._get_column(cols[i]);
-      }
-    }
-    return this._base_or_where_in(cols, range);
-  }
-  or_where_not_in(cols, range) {
-    if (typeof cols === "string") {
-      cols = this._get_column(cols);
-    } else {
-      for (let i = 0; i < cols.length; i = i + 1) {
-        cols[i] = this._get_column(cols[i]);
-      }
-    }
-    return this._base_or_where_not_in(cols, range);
-  }
-  or_where_null(col) {
-    return this._base_or_where_null(this._get_column(col));
-  }
-  or_where_not_null(col) {
-    return this._base_or_where_not_null(this._get_column(col));
-  }
-  or_where_between(col, low, high) {
-    return this._base_or_where_between(this._get_column(col), low, high);
-  }
-  or_where_not_between(col, low, high) {
-    return this._base_or_where_not_between(this._get_column(col), low, high);
-  }
-  or_where_exists(builder) {
-    if (this._where) {
-      this._where = `${this._where} OR EXISTS (${builder})`;
-    } else {
-      this._where = `EXISTS (${builder})`;
-    }
-    return this;
-  }
-  or_where_not_exists(builder) {
-    if (this._where) {
-      this._where = `${this._where} OR NOT EXISTS (${builder})`;
-    } else {
-      this._where = `NOT EXISTS (${builder})`;
-    }
-    return this;
-  }
-  having(cond, op, dval) {
-    if (this._having) {
-      this._having = `(${this._having}) AND (${this._get_condition_token(
-        cond,
-        op,
-        dval
-      )})`;
-    } else {
-      this._having = this._get_condition_token(cond, op, dval);
-    }
-    return this;
-  }
-  having_not(cond, op, dval) {
-    if (this._having) {
-      this._having = `(${this._having}) AND (${this._get_condition_token_not(
-        cond,
-        op,
-        dval
-      )})`;
-    } else {
-      this._having = this._get_condition_token_not(cond, op, dval);
-    }
-    return this;
-  }
-  having_exists(builder) {
-    if (this._having) {
-      this._having = `(${this._having}) AND EXISTS (${builder})`;
-    } else {
-      this._having = `EXISTS (${builder})`;
-    }
-    return this;
-  }
-  having_not_exists(builder) {
-    if (this._having) {
-      this._having = `(${this._having}) AND NOT EXISTS (${builder})`;
-    } else {
-      this._having = `NOT EXISTS (${builder})`;
-    }
-    return this;
-  }
-  having_in(cols, range) {
-    const in_token = this._get_in_token(cols, range);
-    if (this._having) {
-      this._having = `(${this._having}) AND ${in_token}`;
-    } else {
-      this._having = in_token;
-    }
-    return this;
-  }
-  having_not_in(cols, range) {
-    const not_in_token = this._get_in_token(cols, range, "NOT IN");
-    if (this._having) {
-      this._having = `(${this._having}) AND ${not_in_token}`;
-    } else {
-      this._having = not_in_token;
-    }
-    return this;
-  }
-  having_null(col) {
-    if (this._having) {
-      this._having = `(${this._having}) AND ${col} IS NULL`;
-    } else {
-      this._having = col + " IS NULL";
-    }
-    return this;
-  }
-  having_not_null(col) {
-    if (this._having) {
-      this._having = `(${this._having}) AND ${col} IS NOT NULL`;
-    } else {
-      this._having = col + " IS NOT NULL";
-    }
-    return this;
-  }
-  having_between(col, low, high) {
-    if (this._having) {
-      this._having = `(${this._having}) AND (${col} BETWEEN ${low} AND ${high})`;
-    } else {
-      this._having = `${col} BETWEEN ${low} AND ${high}`;
-    }
-    return this;
-  }
-  having_not_between(col, low, high) {
-    if (this._having) {
-      this._having = `(${this._having}) AND (${col} NOT BETWEEN ${low} AND ${high})`;
-    } else {
-      this._having = `${col} NOT BETWEEN ${low} AND ${high}`;
-    }
-    return this;
-  }
-  or_having(cond, op, dval) {
-    if (this._having) {
-      this._having = `${this._having} OR ${this._get_condition_token(
-        cond,
-        op,
-        dval
-      )}`;
-    } else {
-      this._having = this._get_condition_token(cond, op, dval);
-    }
-    return this;
-  }
-  or_having_not(cond, op, dval) {
-    if (this._having) {
-      this._having = `${this._having} OR ${this._get_condition_token_not(
-        cond,
-        op,
-        dval
-      )}`;
-    } else {
-      this._having = this._get_condition_token_not(cond, op, dval);
-    }
-    return this;
-  }
-  or_having_exists(builder) {
-    if (this._having) {
-      this._having = `${this._having} OR EXISTS (${builder})`;
-    } else {
-      this._having = `EXISTS (${builder})`;
-    }
-    return this;
-  }
-  or_having_not_exists(builder) {
-    if (this._having) {
-      this._having = `${this._having} OR NOT EXISTS (${builder})`;
-    } else {
-      this._having = `NOT EXISTS (${builder})`;
-    }
-    return this;
-  }
-  or_having_in(cols, range) {
-    const in_token = this._get_in_token(cols, range);
-    if (this._having) {
-      this._having = `${this._having} OR ${in_token}`;
-    } else {
-      this._having = in_token;
-    }
-    return this;
-  }
-  or_having_not_in(cols, range) {
-    const not_in_token = this._get_in_token(cols, range, "NOT IN");
-    if (this._having) {
-      this._having = `${this._having} OR ${not_in_token}`;
-    } else {
-      this._having = not_in_token;
-    }
-    return this;
-  }
-  or_having_null(col) {
-    if (this._having) {
-      this._having = `${this._having} OR ${col} IS NULL`;
-    } else {
-      this._having = col + " IS NULL";
-    }
-    return this;
-  }
-  or_having_not_null(col) {
-    if (this._having) {
-      this._having = `${this._having} OR ${col} IS NOT NULL`;
-    } else {
-      this._having = col + " IS NOT NULL";
-    }
-    return this;
-  }
-  or_having_between(col, low, high) {
-    if (this._having) {
-      this._having = `${this._having} OR (${col} BETWEEN ${low} AND ${high})`;
-    } else {
-      this._having = `${col} BETWEEN ${low} AND ${high}`;
-    }
-    return this;
-  }
-  or_having_not_between(col, low, high) {
-    if (this._having) {
-      this._having = `${this._having} OR (${col} NOT BETWEEN ${low} AND ${high})`;
-    } else {
-      this._having = `${col} NOT BETWEEN ${low} AND ${high}`;
-    }
-    return this;
-  }
-  async exists() {
-    const statement = `SELECT EXISTS (${this.select(1).limit(1).statement()})`;
-    const res = await this.cls.sql_query(statement);
-    return res;
-  }
-  compact() {
-    this._compact = true;
-    return this;
-  }
-  raw() {
-    this._raw = true;
-    return this;
-  }
-  commit(bool) {
-    if (bool === undefined) {
-      bool = true;
-    }
-    this._commit = bool;
-    return this;
-  }
-  skip_validate(bool) {
-    if (bool === undefined) {
-      bool = true;
-    }
-    this._skip_validate = bool;
-    return this;
-  }
-  async flat(depth) {
-    const res = await this.compact().execr();
-    return res.flat(depth);
-  }
-  async count(cond, op, dval) {
-    let res;
-    if (cond !== undefined) {
-      res = this.select("count(*)").where(cond, op, dval).compact().exec();
-    } else {
-      res = this.select("count(*)").compact().exec();
-    }
+    return array.new(records);
+  }
+};
+ModelSql.prototype.exec = function () {
+  return this.exec_statement(this.statement());
+};
+ModelSql.prototype.count = function (cond, op, dval) {
+  let res, err;
+  if (cond !== undefined) {
+    [res, err] = this._base_select("count(*)").where(cond, op, dval).compact().exec();
+  } else {
+    [res, err] = this._base_select("count(*)").compact().exec();
+  }
+  if (res === undefined) {
+    throw new Error(err);
+  } else {
     return res[0][0];
   }
-  async create(rows, columns) {
-    return await this.insert(rows, columns).returning("*").execr();
+};
+ModelSql.prototype.create = function (rows, columns) {
+  return this.insert(rows, columns).execr();
+};
+ModelSql.prototype.exists = function () {
+  const statement = `SELECT EXISTS (${this.select(1).limit(1).compact().statement()})`;
+  const [res, err] = this.model.query(statement, this._compact);
+  if (res === undefined) {
+    throw new Error(err);
+  } else {
+    return res[0][0];
   }
-  async try_get(cond, op, dval) {
-    let records;
-    if (cond !== undefined) {
-      if (typeof cond === "object" && is_empty_object(cond)) {
-        throw new Error("empty condition table is not allowed");
-      }
-      records = await this.where(cond, op, dval).limit(2).exec();
-    } else {
-      records = await this.limit(2).exec();
+};
+ModelSql.prototype.compact = function () {
+  this._compact = true;
+  return this;
+};
+ModelSql.prototype.raw = function () {
+  this._raw = true;
+  return this;
+};
+ModelSql.prototype.commit = function (bool) {
+  if (bool === undefined) {
+    bool = true;
+  }
+  this._commit = bool;
+  return this;
+};
+ModelSql.prototype.join_type = function (jtype) {
+  this._join_type = jtype;
+  return this;
+};
+ModelSql.prototype.skip_validate = function (bool) {
+  if (bool === undefined) {
+    bool = true;
+  }
+  this._skip_validate = bool;
+  return this;
+};
+ModelSql.prototype.flat = function (col) {
+  if (col) {
+    return this.returning(col).compact().execr().flat();
+  } else {
+    return this.compact().execr().flat();
+  }
+};
+ModelSql.prototype.try_get = function (cond, op, dval) {
+  let records;
+  if (cond !== undefined) {
+    if (typeof cond === "object" && next(cond) === undefined) {
+      throw new Error("empty condition table is not allowed");
     }
-    if (records.length === 1) {
-      return records[0];
+    records = this.where(cond, op, dval).limit(2).exec();
+  } else {
+    records = this.limit(2).exec();
+  }
+  if (records.length === 1) {
+    return records[0];
+  } else {
+    throw new Error(records.length);
+  }
+};
+ModelSql.prototype.get = function (cond, op, dval) {
+  const [record, record_number] = this.try_get(cond, op, dval);
+  if (!record) {
+    if (record_number === 0) {
+      throw new Error("record not found");
+    } else {
+      throw new Error("multiple records returned: " + record_number);
+    }
+  } else {
+    return record;
+  }
+};
+ModelSql.prototype.as_set = function () {
+  return this.compact().execr().flat().as_set();
+};
+ModelSql.prototype.execr = function () {
+  return this.raw().exec();
+};
+ModelSql.prototype.load_all_fk_labels = function () {
+  for (const [i, name] of this.model.names.entries()) {
+    const field = this.model.fields[name];
+    if (field && field.type === "foreignkey" && field.reference_label_column) {
+      this.load_fk(field.name, field.reference_label_column);
+    }
+  }
+  return this;
+};
+ModelSql.prototype.load_fk = function (fk_name, select_names, ...varargs) {
+  const fk = this.model.foreign_keys[fk_name];
+  if (fk === undefined) {
+    throw new Error(fk_name + (" is not a valid forein key name for " + this.table_name));
+  }
+  const fk_model = fk.reference;
+  const join_key = fk_name + ("__" + fk_model.table_name);
+  const join_obj = this._register_join_model({
+    join_type: this._join_type || "INNER",
+    join_key: join_key,
+    column: fk_name,
+    fk_model: fk_model,
+    fk_column: fk.reference_column,
+  });
+  if (!this._load_fk) {
+    this._load_fk = [];
+  }
+  this._load_fk[fk_name] = fk_model;
+  this.select(fk_name);
+  if (!select_names) {
+    return this;
+  }
+  const right_alias = join_obj.fk_alias;
+  let fks;
+  if (typeof select_names === "object") {
+    const res = [];
+    for (const [_, fkn] of select_names.entries()) {
+      assert(fk_model.fields[fkn], "invalid field name for fk model: " + fkn);
+      res.push(`${right_alias}.${fkn} AS ${fk_name}__${fkn}`);
+    }
+    fks = res.join(", ");
+  } else if (select_names === "*") {
+    const res = [];
+    for (const [i, fkn] of fk_model.field_names.entries()) {
+      res.push(`${right_alias}.${fkn} AS ${fk_name}__${fkn}`);
+    }
+    fks = res.join(", ");
+  } else if (typeof select_names === "string") {
+    assert(fk_model.fields[select_names], "invalid field name for fk model: " + select_names);
+    fks = `${right_alias}.${select_names} AS ${fk_name}__${select_names}`;
+    for (let i = 0; i < varargs.length; i = i + 1) {
+      const fkn = varargs[i];
+      assert(fk_model.fields[fkn], "invalid field name for fk model: " + fkn);
+      fks = `${fks}, ${right_alias}.${fkn} AS ${fk_name}__${fkn}`;
+    }
+  } else {
+    throw new Error(`invalid argument type ${typeof select_names} for load_fk`);
+  }
+  return Sql.prototype._base_select.call(this, fks);
+};
+function make_record_meta(model) {
+  const RecordMeta = dict(object, []);
+  RecordMeta.__index = RecordMeta;
+  RecordMeta.prototype.__call = function (data) {
+    for (const [k, v] of Object.entries(data)) {
+      this[k] = v;
+    }
+    return this;
+  };
+  RecordMeta.prototype.delete = function (key) {
+    key = model.check_unique_key(key || model.primary_key);
+    if (this[key] === undefined) {
+      throw new Error("empty value for delete key:" + key);
+    }
+    return model
+      .create_sql()
+      .delete({ [key]: this[key] })
+      .returning(key)
+      .exec();
+  };
+  RecordMeta.prototype.save = function (names, key) {
+    return model.prototype.save.call(this, names, key);
+  };
+  RecordMeta.prototype.save_create = function (names, key) {
+    return model.prototype.save_create.call(this, names, key);
+  };
+  RecordMeta.prototype.save_update = function (names, key) {
+    return model.prototype.save_update.call(this, names, key);
+  };
+  RecordMeta.prototype.validate = function (names, key) {
+    return model.prototype.validate.call(this, names, key);
+  };
+  RecordMeta.prototype.validate_update = function (names) {
+    return model.prototype.validate_update.call(this, names);
+  };
+  RecordMeta.prototype.validate_create = function (names) {
+    return model.prototype.validate_create.call(this, names);
+  };
+  return RecordMeta;
+}
+function create_model_proxy(Model) {
+  const proxy = { __model__: Model };
+  function __index(_, k) {
+    const sql_k = ModelSql[k];
+    if (sql_k !== undefined) {
+      if (typeof sql_k === "function") {
+        return function (_, ...varargs) {
+          return sql_k(Model.create_sql(), ...varargs);
+        };
+      } else {
+        return sql_k;
+      }
+    }
+    const model_k = Model[k];
+    if (model_k !== undefined) {
+      if (typeof model_k === "function") {
+        return function (cls, ...varargs) {
+          if (cls === proxy) {
+            return model_k(Model, ...varargs);
+          } else {
+            throw new Error(`calling model proxy method \`${k}\` with first argument not being itself is not allowed`);
+          }
+        };
+      } else {
+        return model_k;
+      }
     } else {
       return undefined;
     }
   }
-  async get(cond, op, dval) {
-    let records;
-    if (cond !== undefined) {
-      if (typeof cond === "object" && is_empty_object(cond)) {
-        throw new Error("empty condition table is not allowed");
-      }
-      records = await this.where(cond, op, dval).limit(2).exec();
+  function __newindex(t, k, v) {
+    Model[k] = v;
+  }
+  return setmetatable(proxy, {
+    __call: Model.create_record,
+    __index: __index,
+    __newindex: __newindex,
+  });
+}
+const Xodel = {
+  __SQL_BUILDER__: true,
+  _query: default_query,
+  DEFAULT_PRIMARY_KEY: DEFAULT_PRIMARY_KEY,
+  NULL: NULL,
+  make_field_from_json: make_field_from_json,
+  token: Sql.token,
+  DEFAULT: Sql.DEFAULT,
+  as_token: Sql.as_token,
+  as_literal: Sql.as_literal,
+};
+setmetatable(Xodel, {
+  __call: function (t, ...varargs) {
+    return t.mix_with_base(...varargs);
+  },
+});
+Xodel.__index = Xodel;
+Xodel.query = function (statement, compact) {
+  return this._query(statement, compact);
+};
+Xodel.new = function (self) {
+  return setmetatable(self || [], this);
+};
+Xodel.create_model = function (options) {
+  const XodelClass = this._make_model_class(this.normalize(options));
+  return create_model_proxy(XodelClass);
+};
+Xodel.create_sql = function () {
+  return ModelSql.new({ model: this, table_name: this.table_name });
+};
+Xodel.create_sql_as = function (table_name, rows) {
+  const alias_sql = ModelSql.new({ model: this, table_name: table_name }).as(table_name);
+  if (rows) {
+    return alias_sql.with_values(table_name, rows);
+  } else {
+    return alias_sql;
+  }
+};
+Xodel.is_model_class = function (model) {
+  return typeof model === "object" && model.__is_model_class__;
+};
+Xodel.normalize = function (options) {
+  const _extends = options._extends;
+  const model = {
+    admin: clone(options.admin || []),
+    table_name: options.table_name || (_extends && _extends.table_name) || undefined,
+  };
+  model.admin.list_names = array(clone(model.admin.list_names || []));
+  const opts_fields = [];
+  const opts_field_names = array([]);
+  for (let [i, field] of options.entries()) {
+    field = ensure_field_as_options(field);
+    opts_field_names.push(field.name);
+    opts_fields[field.name] = field;
+  }
+  for (let [key, field] of Object.entries(options.fields || [])) {
+    if (typeof key === "string") {
+      field = ensure_field_as_options(field, key);
+      opts_field_names.push(key);
+      opts_fields[key] = field;
     } else {
-      records = await this.limit(2).exec();
+      field = ensure_field_as_options(field);
+      opts_field_names.push(field.name);
+      opts_fields[field.name] = field;
     }
-    if (records.length === 1) {
-      return records[0];
-    } else if (records.length === 0) {
-      throw new Error("record not found");
+  }
+  let opts_names = options.field_names;
+  if (!opts_names) {
+    if (_extends) {
+      opts_names = array.concat(_extends.field_names, opts_field_names).uniq();
     } else {
-      throw new Error("multiple records returned: " + records.length);
+      opts_names = opts_field_names.uniq();
     }
   }
-  async get_or_create(params, defaults) {
-    const records = await this.where(params).limit(2).exec();
-    if (records.length === 1) {
-      return [records[0], false];
-    } else if (records.length === 0) {
-      const pk = this.primary_key;
-      const data = { ...params, ...defaults };
-      //**NOTE: transacion here?
-      const res = await this.new_sql()
-        .insert(data, this.names)
-        .returning(pk)
-        .execr();
-      data[pk] = res[0][pk];
-      return [this.cls.new_record(data), true];
-    } else {
-      throw new Error("expect 1 row returned, but now get " + records.length);
+  model.field_names = normalize_field_names(clone(opts_names));
+  model.fields = [];
+  for (const [_, name] of model.field_names.entries()) {
+    check_reserved(name);
+    if (this[name]) {
+      throw new Error(`field name '${name}' conflicts with model class attributes`);
     }
-  }
-  async as_set() {
-    const res = (await this.compact().execr()).flat();
-    return new Set(res);
-  }
-  static async sql_query(statement) {
-    // if (process?.env["PRINT_QUERY_SQL"] === "on") {
-    //   console.log("  ", statement);
-    // }
-    return statement;
-  }
-  async execr() {
-    return await this.raw().exec();
-  }
-  async exec() {
-    const cls = this.cls;
-    const statement = this.statement();
-    const records = await cls.sql_query(statement);
-    if (
-      this._raw ||
-      this._compact ||
-      this._update ||
-      this._insert ||
-      this._delete
-    ) {
-      return records;
-    } else {
-      if (!this._load_fk) {
-        for (const [i, record] of records.entries()) {
-          records[i] = cls.load(record);
+    let field = opts_fields[name];
+    if (!field) {
+      const tname = model.table_name || "[abstract model]";
+      if (_extends) {
+        field = _extends.fields[name];
+        if (!field) {
+          throw new Error(`'${tname}' field name '${name}' is not in fields and parent fields`);
+        } else {
+          field = ensure_field_as_options(field, name);
         }
       } else {
-        const fields = cls.fields;
-        const field_names = cls.field_names;
-        for (const [i, record] of records.entries()) {
-          for (const name of field_names) {
-            const field = fields[name];
-            const value = record[name];
-            if (value !== undefined) {
-              const fk_model = this._load_fk[name];
-              if (!fk_model) {
-                if (!field.load) {
-                  record[name] = value;
-                } else {
-                  record[name] = field.load(value);
-                }
-              } else {
-                record[name] = fk_model.load(
-                  get_foreign_object(record, name + "__")
-                );
-              }
-            }
-          }
-          records[i] = cls.new_record(record);
+        throw new Error(`Model class '${tname}'s field name '${name}' is not in fields`);
+      }
+    } else if (_extends && _extends.fields[name]) {
+      const pfield = _extends.fields[name];
+      field = dict(pfield.get_options(), field);
+      if (pfield.model && field.model) {
+        field.model = this.create_model({
+          abstract: true,
+          _extends: pfield.model,
+          fields: field.model.fields,
+          field_names: field.model.field_names,
+        });
+      }
+    }
+    model.fields[name] = make_field_from_json(field, { name: name });
+  }
+  for (const [key, value] of Object.entries(options)) {
+    if (model[key] === undefined && MODEL_MERGE_NAMES[key]) {
+      model[key] = value;
+    }
+  }
+  let unique_together = options.unique_together || [];
+  if (typeof unique_together[0] === "string") {
+    unique_together = [unique_together];
+  }
+  model.unique_together = unique_together;
+  let abstract;
+  if (options.abstract !== undefined) {
+    abstract = !!options.abstract;
+  } else {
+    abstract = model.table_name === undefined;
+  }
+  model.abstract = abstract;
+  model.__normalized__ = true;
+  if (options.mixins) {
+    const merge_model = this.merge_models([...options.mixins, model]);
+    return merge_model;
+  } else {
+    return model;
+  }
+};
+Xodel.set_label_name_dict = function () {
+  this.label_to_name = [];
+  this.name_to_label = [];
+  for (const [name, field] of Object.entries(this.fields)) {
+    this.label_to_name[field.label] = name;
+    this.name_to_label[name] = field.label;
+  }
+};
+Xodel._make_model_class = function (opts) {
+  const model = dict.call(this, {
+    _query: (opts.db_options && Query(opts.db_options)) || (this.db_options && Query(this.db_options)) || this._query,
+    table_name: opts.table_name,
+    admin: opts.admin || [],
+    label: opts.label || opts.table_name,
+    fields: opts.fields,
+    field_names: opts.field_names,
+    mixins: opts.mixins,
+    _extends: opts._extends,
+    abstract: opts.abstract,
+    primary_key: opts.primary_key,
+    unique_together: opts.unique_together,
+    disable_auto_primary_key: opts.disable_auto_primary_key,
+  });
+  model.__index = model;
+  let pk_defined = false;
+  model.foreign_keys = [];
+  model.names = array([]);
+  for (const [i, name] of Object.entries(model.field_names)) {
+    const field = model.fields[name];
+    if (field.primary_key) {
+      const pk_name = field.name;
+      assert(!pk_defined, `duplicated primary key: "${pk_name}" and "${pk_defined}"`);
+      pk_defined = pk_name;
+      model.primary_key = pk_name;
+    } else if (field.auto_now) {
+      model.auto_now_name = field.name;
+    } else if (field.auto_now_add) {
+      model.auto_now_add_name = field.name;
+    } else {
+      model.names.push(name);
+    }
+  }
+  const uniques = array([]);
+  for (const [i, unique_group] of (model.unique_together || []).entries()) {
+    for (const [i, name] of unique_group.entries()) {
+      if (!model.fields[name]) {
+        throw new Error(`invalid unique_together name ${name} for model ${model.table_name}`);
+      }
+    }
+    uniques.push(array(clone(unique_group)));
+  }
+  model.unique_together = uniques;
+  model.__is_model_class__ = true;
+  if (model.table_name) {
+    model.materialize_with_table_name({ table_name: model.table_name });
+    model.set_label_name_dict();
+    setmetatable(model, {
+      __call: model.create_record,
+      __newindex: disable_setting_model_attrs,
+    });
+  } else {
+    model.set_label_name_dict();
+  }
+  const admin = model.admin;
+  const ctime_name = model.auto_now_add_name;
+  if (!admin.list_names || admin.list_names.length === 0) {
+    admin.list_names = model.names + array([ctime_name]);
+  } else if (!admin.list_names.includes(ctime_name)) {
+    admin.list_names = admin.list_names + array([ctime_name]);
+  }
+  for (const [i, name] of Object.entries(model.field_names)) {
+    const field = model.fields[name];
+    let fk_model = field.reference;
+    if (fk_model === "self") {
+      fk_model = model;
+      field.reference = model;
+      field.setup_with_fk_model(model);
+    }
+    if (fk_model) {
+      model.foreign_keys[name] = field;
+    }
+  }
+  return model;
+};
+Xodel.materialize_with_table_name = function (opts) {
+  const table_name = opts.table_name;
+  const label = opts.label;
+  if (!table_name) {
+    const names_hint = (this.field_names && this.field_names.join(",")) || "no field_names";
+    throw new Error(`you must define table_name for a non-abstract model (${names_hint})`);
+  }
+  check_reserved(table_name);
+  this.table_name = table_name;
+  this.label = this.label || label || table_name;
+  this.abstract = false;
+  if (!this.primary_key && !this.disable_auto_primary_key) {
+    const pk_name = DEFAULT_PRIMARY_KEY;
+    this.primary_key = pk_name;
+    this.fields[pk_name] = Field.integer({
+      name: pk_name,
+      primary_key: true,
+      serial: true,
+    });
+    this.field_names.unshift(pk_name);
+  }
+  this.name_cache = [];
+  for (const [name, field] of Object.entries(this.fields)) {
+    this.name_cache[name] = this.table_name + ("." + name);
+    if (field.reference) {
+      field.table_name = table_name;
+    }
+  }
+  this.RecordClass = make_record_meta.call(this);
+  return this;
+};
+Xodel.mix_with_base = function (...varargs) {
+  return this.mix(base_model, ...varargs);
+};
+Xodel.mix = function (...varargs) {
+  return create_model_proxy(this._make_model_class(this.merge_models([...varargs])));
+};
+Xodel.merge_models = function (models) {
+  if (models.length < 2) {
+    throw new Error("provide at least two models to merge");
+  } else if (models.length === 2) {
+    return this.merge_model(...models);
+  } else {
+    let merged = models[0];
+    for (let i = 2; i <= models.length; i = i + 1) {
+      merged = this.merge_model(merged, models[i]);
+    }
+    return merged;
+  }
+};
+Xodel.merge_model = function (a, b) {
+  const A = (a.__normalized__ && a) || this.normalize(a);
+  const B = (b.__normalized__ && b) || this.normalize(b);
+  const C = [];
+  const field_names = (A.field_names + B.field_names).uniq();
+  const fields = [];
+  for (const [i, name] of field_names.entries()) {
+    const af = A.fields[name];
+    const bf = B.fields[name];
+    if (af && bf) {
+      fields[name] = Xodel.merge_field(af, bf);
+    } else if (af) {
+      fields[name] = af;
+    } else if (bf) {
+      fields[name] = bf;
+    } else {
+      throw new Error(`can't find field ${name} for model ${A.table_name} and ${B.table_name}`);
+    }
+  }
+  for (const [i, M] of [A, B].entries()) {
+    for (const [key, value] of Object.entries(M)) {
+      if (MODEL_MERGE_NAMES[key]) {
+        C[key] = value;
+      }
+    }
+  }
+  C.field_names = field_names;
+  C.fields = fields;
+  return this.normalize(C);
+};
+Xodel.merge_field = function (a, b) {
+  const aopts = (a.__is_field_class__ && a.get_options()) || clone(a);
+  const bopts = (b.__is_field_class__ && b.get_options()) || clone(b);
+  const options = dict(aopts, bopts);
+  if (aopts.model && bopts.model) {
+    options.model = this.merge_model(aopts.model, bopts.model);
+  }
+  return make_field_from_json(options);
+};
+Xodel.to_json = function () {
+  return {
+    table_name: this.table_name,
+    primary_key: this.primary_key,
+    admin: clone(this.admin),
+    unique_together: clone(this.unique_together),
+    label: this.label || this.table_name,
+    names: clone(this.names),
+    field_names: clone(this.field_names),
+    label_to_name: clone(this.label_to_name),
+    name_to_label: clone(this.name_to_label),
+    fields: object.from_entries(
+      this.field_names.map(function (name) {
+        return [name, this.fields[name].json()];
+      })
+    ),
+  };
+};
+Xodel.to_camel_json = function () {
+  const res = [];
+  const model_json = this.to_json();
+  for (const [key, value] of Object.entries(model_json)) {
+    res[utils.snake_to_camel(key)] = value;
+  }
+  res.admin = {
+    formNames: res.admin.form_names,
+    listNames: res.admin.list_names,
+  };
+  for (const [key, field] of Object.entries(res.fields)) {
+    for (const [i, name] of this.fields[key].option_names.entries()) {
+      if (field[name] !== undefined) {
+        const ckey = utils.snake_to_camel(name);
+        field[ckey] = field[name];
+        if (ckey !== name) {
+          field[name] = undefined;
         }
       }
-      return records;
+    }
+    field.type = utils.snake_to_camel(field.type);
+    if (field.type === "array") {
+      field.arrayType = utils.snake_to_camel(field.arrayType || "");
     }
   }
-  load_fk(fk_name, select_names, ...varargs) {
-    const fk = this.foreign_keys[fk_name];
-    if (fk === undefined) {
-      throw new Error(
-        fk_name + (" is not a valid forein key name for " + this.table_name)
-      );
+  return res;
+};
+Xodel.all = function () {
+  const records = assert(this.query("SELECT * FROM " + this.table_name));
+  for (let i = 0; i < records.length; i = i + 1) {
+    records[i] = this.load(records[i]);
+  }
+  return setmetatable(records, array);
+};
+Xodel.get_or_create = function (params, defaults, columns) {
+  const [values_list, insert_columns] = Sql._get_insert_values_token(dict(params, defaults));
+  const insert_columns_token = as_token(insert_columns);
+  const all_columns_token = as_token(utils.list(columns || [this.primary_key], insert_columns).uniq());
+  const insert_sql = `(INSERT INTO ${this.table_name}(${insert_columns_token}) SELECT ${as_literal_without_brackets(
+    values_list
+  )} WHERE NOT EXISTS (${this.create_sql().select(1).where(params)}) RETURNING ${all_columns_token})`;
+  const inserted_set = this.create_sql_as("new_records")
+    .with(`new_records(${all_columns_token})`, insert_sql)
+    ._base_select(all_columns_token)
+    ._base_select("TRUE AS __is_inserted__");
+  const selected_set = this.create_sql().where(params)._base_select(all_columns_token)._base_select("FALSE AS __is_inserted__");
+  const records = inserted_set.union_all(selected_set).exec();
+  if (records.length > 1) {
+    throw new Error("multiple records returned");
+  }
+  const ins = records[0];
+  const created = ins.__is_inserted__;
+  ins.__is_inserted__ = undefined;
+  return [ins, created];
+};
+Xodel.save = function (input, names, key) {
+  key = key || this.primary_key;
+  if (rawget(input, key) !== undefined) {
+    return this.save_update(input, names, key);
+  } else {
+    return this.save_create(input, names, key);
+  }
+};
+Xodel.check_unique_key = function (key) {
+  const pkf = this.fields[key];
+  if (!pkf) {
+    throw new Error("invalid field name: " + key);
+  }
+  if (!(pkf.primary_key || pkf.unique)) {
+    throw new Error(`field '${key}' is not primary_key or not unique`);
+  }
+  return key;
+};
+Xodel.save_create = function (input, names, key) {
+  const data = assert(this.validate_create(input, names));
+  const prepared = assert(this.prepare_for_db(data, names));
+  key = key || this.primary_key;
+  const created = this.create_sql()._base_insert(prepared)._base_returning("*").execr();
+  utils.dict_update(data, created[0]);
+  return this.create_record(data);
+};
+Xodel.save_update = function (input, names, key) {
+  const data = assert(this.validate_update(input, names));
+  if (!key) {
+    key = this.primary_key;
+  } else {
+    key = this.check_unique_key(key);
+  }
+  const look_value = input[key];
+  if (look_value === undefined) {
+    throw new Error("no primary or unique key value for save_update");
+  }
+  const prepared = assert(this.prepare_for_db(data, names, true));
+  const updated = this.create_sql()
+    ._base_update(prepared)
+    .where({ [key]: look_value })
+    ._base_returning(key)
+    .execr();
+  if (updated.length === 1) {
+    data[key] = updated[0][key];
+    return this.create_record(data);
+  } else if (updated.length === 0) {
+    throw new Error(`update failed, record does not exist(model:${this.table_name}, key:${key}, value:${look_value})`);
+  } else {
+    throw new Error(`expect 1 but ${updated.length} records are updated(model:${this.table_name}, key:${key}, value:${look_value})`);
+  }
+};
+Xodel.prepare_for_db = function (data, columns, is_update) {
+  const prepared = [];
+  for (const [_, name] of (columns || this.names).entries()) {
+    const field = this.fields[name];
+    if (!field) {
+      throw new Error(`invalid field name '${name}' for model '${this.table_name}'`);
     }
-    const fk_model = fk.reference;
-    const join_key = fk_name + "__" + fk_model.table_name;
-    const join_obj = this._register_join_model({
-      join_key: join_key,
-      column: fk_name,
-      fk_model: fk_model,
-      fk_column: fk.reference_column,
-    });
-    if (!this._load_fk) {
-      this._load_fk = {};
-    }
-    this._load_fk[fk_name] = fk_model;
-    this.select(fk_name);
-    if (!select_names) {
-      return this;
-    }
-    const right_alias = join_obj.fk_alias;
-    let fks;
-    if (typeof select_names === "object") {
-      const res = [];
-      for (const fkn of select_names) {
-        assert(fk_model.fields[fkn], "invalid field name for fk model: " + fkn);
-        res.push(`${right_alias}.${fkn} AS ${fk_name}__${fkn}`);
-      }
-      fks = res.join(", ");
-    } else if (select_names === "*") {
-      const res = [];
-      for (const fkn of fk_model.field_names) {
-        res.push(`${right_alias}.${fkn} AS ${fk_name}__${fkn}`);
-      }
-      fks = res.join(", ");
-    } else if (typeof select_names === "string") {
-      assert(
-        fk_model.fields[select_names],
-        "invalid field name for fk model: " + select_names
-      );
-      fks = `${right_alias}.${select_names} AS ${fk_name}__${select_names}`;
-      for (let i = 0; i < varargs.length; i = i + 1) {
-        const fkn = varargs[i];
-        assert(fk_model.fields[fkn], "invalid field name for fk model: " + fkn);
-        fks = `${fks}, ${right_alias}.${fkn} AS ${fk_name}__${fkn}`;
+    const value = data[name];
+    if (field.prepare_for_db && value !== undefined) {
+      const [val, err] = field.prepare_for_db(value, data);
+      if (val === undefined && err) {
+        throw new Error(this.make_field_error(name, err));
+      } else {
+        prepared[name] = val;
       }
     } else {
-      throw new Error(
-        `invalid argument type ${typeof select_names} for load_fk`
-      );
+      prepared[name] = value;
     }
-    return this._base_select(fks);
+  }
+  if (is_update && this.auto_now_name) {
+    prepared[this.auto_now_name] = ngx_localtime();
+  }
+  return prepared;
+};
+Xodel.validate = function (input, names, key) {
+  if (rawget(input, key || this.primary_key) !== undefined) {
+    return this.validate_update(input, names);
+  } else {
+    return this.validate_create(input, names);
+  }
+};
+Xodel.validate_create = function (input, names) {
+  const data = [];
+  let value, err;
+  for (const [_, name] of (names || this.names).entries()) {
+    const field = this.fields[name];
+    if (!field) {
+      throw new Error(`invalid field name '${name}' for model '${this.table_name}'`);
+    }
+    [value, err] = field.validate(rawget(input, name), input);
+    if (err !== undefined) {
+      throw new Error(this.make_field_error(name, err));
+    } else if (field._js_default && (value === undefined || value === "")) {
+      if (typeof field._js_default !== "function") {
+        value = field._js_default;
+      } else {
+        [value, err] = field._js_default(input);
+        if (value === undefined) {
+          throw new Error(this.make_field_error(name, err));
+        }
+      }
+    }
+    data[name] = value;
+  }
+  if (!this.clean) {
+    return data;
+  } else {
+    const [res, clean_err] = this.clean(data);
+    if (res === undefined) {
+      throw new Error(this.parse_error_message(clean_err));
+    } else {
+      return res;
+    }
+  }
+};
+Xodel.validate_update = function (input, names) {
+  const data = [];
+  let value, err;
+  for (const [_, name] of (names || this.names).entries()) {
+    const field = this.fields[name];
+    if (!field) {
+      throw new Error(`invalid field name '${name}' for model '${this.table_name}'`);
+    }
+    value = rawget(input, name);
+    if (value !== undefined) {
+      [value, err] = field.validate(value, input);
+      if (err !== undefined) {
+        throw new Error(this.make_field_error(name, err));
+      } else if (value === undefined) {
+        data[name] = "";
+      } else {
+        data[name] = value;
+      }
+    }
+  }
+  if (!this.clean) {
+    return data;
+  } else {
+    const [res, clean_err] = this.clean(data);
+    if (res === undefined) {
+      throw new Error(this.parse_error_message(clean_err));
+    } else {
+      return res;
+    }
+  }
+};
+Xodel.check_upsert_key = function (rows, key) {
+  assert(key, "no key for upsert");
+  if (rows[0]) {
+    if (typeof key === "string") {
+      for (const [i, row] of rows.entries()) {
+        if (row[key] === undefined || row[key] === "") {
+          throw new Error(this.make_field_error(key, key + "不能为空", i));
+        }
+      }
+    } else {
+      for (const [i, row] of rows.entries()) {
+        for (const [_, k] of key.entries()) {
+          if (row[k] === undefined || row[k] === "") {
+            throw new Error(this.make_field_error(k, k + "不能为空", i));
+          }
+        }
+      }
+    }
+  } else if (typeof key === "string") {
+    if (rows[key] === undefined || rows[key] === "") {
+      throw new Error(this.make_field_error(key, key + "不能为空"));
+    }
+  } else {
+    for (const [_, k] of key.entries()) {
+      if (rows[k] === undefined || rows[k] === "") {
+        throw new Error(this.make_field_error(k, k + "不能为空"));
+      }
+    }
+  }
+  return [rows, key];
+};
+Xodel.make_field_error = function (name, err, index) {
+  const res = {
+    name: name,
+    message: err,
+    label: this.fields[name].label,
+    index: index,
+  };
+  if (index) {
+    res.type = "field_error_batch";
+  } else {
+    res.type = "field_error";
+  }
+  return res;
+};
+Xodel.parse_error_message = function (err) {
+  if (typeof err === "object") {
+    return err;
+  }
+  const captured = match(err, "^(?<name>.+?)~(?<message>.+?)$", "josui");
+  if (!captured) {
+    throw new Error("can't parse this model error message: " + err);
+  } else {
+    const name = captured.name;
+    const message = captured.message;
+    return this.make_field_error(name, message);
+  }
+};
+Xodel.load = function (data) {
+  for (const [_, name] of this.names.entries()) {
+    const field = this.fields[name];
+    const value = data[name];
+    if (value !== undefined) {
+      if (!field.load) {
+        data[name] = value;
+      } else {
+        data[name] = field.load(value);
+      }
+    }
+  }
+  return this.create_record(data);
+};
+Xodel.validate_create_data = function (rows, columns) {
+  let err_obj, cleaned;
+  columns = columns || this.names;
+  if (rows[0]) {
+    cleaned = [];
+    for (let [i, row] of rows.entries()) {
+      [row, err_obj] = this.validate_create(row, columns);
+      if (row === undefined) {
+        err_obj.index = i;
+        err_obj.type = "field_error_batch";
+        throw new Error(err_obj);
+      }
+      cleaned[i] = row;
+    }
+  } else {
+    [cleaned, err_obj] = this.validate_create(rows, columns);
+    if (err_obj) {
+      throw new Error(err_obj);
+    }
+  }
+  return [cleaned, columns];
+};
+Xodel.validate_update_data = function (rows, columns) {
+  let err_obj, cleaned;
+  columns = columns || this.names;
+  if (rows[0]) {
+    cleaned = [];
+    for (let [i, row] of rows.entries()) {
+      [row, err_obj] = this.validate_update(row, columns);
+      if (row === undefined) {
+        err_obj.index = i;
+        err_obj.type = "field_error_batch";
+        throw new Error(err_obj);
+      }
+      cleaned[i] = row;
+    }
+  } else {
+    [cleaned, err_obj] = this.validate_update(rows, columns);
+    if (err_obj) {
+      throw new Error(err_obj);
+    }
+  }
+  return [cleaned, columns];
+};
+Xodel.validate_create_rows = function (rows, key, columns) {
+  const [checked_rows, checked_key] = this.check_upsert_key(rows, key || this.primary_key);
+  if (checked_rows === undefined) {
+    throw new Error(checked_key);
+  }
+  const [cleaned_rows, cleaned_columns] = this.validate_create_data(checked_rows, columns);
+  if (cleaned_rows === undefined) {
+    throw new Error(cleaned_columns);
+  }
+  return [cleaned_rows, checked_key, cleaned_columns];
+};
+Xodel.validate_update_rows = function (rows, key, columns) {
+  const [checked_rows, checked_key] = this.check_upsert_key(rows, key || this.primary_key);
+  if (checked_rows === undefined) {
+    throw new Error(checked_key);
+  }
+  const [cleaned_rows, cleaned_columns] = this.validate_update_data(checked_rows, columns);
+  if (cleaned_rows === undefined) {
+    throw new Error(cleaned_columns);
+  }
+  return [cleaned_rows, checked_key, cleaned_columns];
+};
+Xodel.prepare_db_rows = function (rows, columns, is_update) {
+  let err, cleaned;
+  columns = columns || utils.get_keys(rows);
+  if (rows[0]) {
+    cleaned = [];
+    for (let [i, row] of rows.entries()) {
+      [row, err] = this.prepare_for_db(row, columns, is_update);
+      if (err !== undefined) {
+        err.index = i;
+        throw new Error(err);
+      }
+      cleaned[i] = row;
+    }
+  } else {
+    [cleaned, err] = this.prepare_for_db(rows, columns, is_update);
+    if (err !== undefined) {
+      throw new Error(err);
+    }
+  }
+  if (is_update) {
+    const utime = this.auto_now_name;
+    if (utime && !array(columns).includes(utime)) {
+      columns.push(utime);
+    }
+    return [cleaned, columns];
+  } else {
+    return [cleaned, columns];
+  }
+};
+Xodel.is_instance = function (row) {
+  return is_sql_instance(row);
+};
+Xodel.filter = function (kwargs) {
+  return this.create_sql().where(kwargs).exec();
+};
+Xodel.filter_with_fk_labels = function (kwargs) {
+  const records = this.create_sql().load_all_fk_labels().where(kwargs);
+  return records.exec();
+};
+Xodel.create_record = function (data) {
+  return setmetatable(data, this.RecordClass);
+};
+const whitelist = {
+  DEFAULT: true,
+  as_token: true,
+  as_literal: true,
+  __call: true,
+  new: true,
+  token: true,
+};
+for (const [k, v] of Object.entries(ModelSql)) {
+  if (typeof v === "function" && !whitelist[k]) {
+    assert(Xodel[k] === undefined, "same function name appears:" + k);
   }
 }
-
-export { Model };
+export default Xodel;

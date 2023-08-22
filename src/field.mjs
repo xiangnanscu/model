@@ -113,9 +113,10 @@ const base_option_names = [
   "attrs",
 ];
 class basefield {
+  static base_option_names = base_option_names;
+  static option_names = [];
   __is_field_class__ = true;
   required = false;
-  option_names = base_option_names;
   static new(options) {
     return this.create_field(options);
   }
@@ -127,7 +128,7 @@ class basefield {
   constructor(options) {
     this.name = assert(options.name, "you must define a name for a field");
     this.type = options.type;
-    for (const [_, name] of this.option_names.entries()) {
+    for (const name of this.option_names) {
       if (options[name] !== undefined) {
         this[name] = options[name];
       }
@@ -149,6 +150,9 @@ class basefield {
       this.choices = get_choices(this.choices);
     }
     return this;
+  }
+  get option_names() {
+    return [...base_option_names, ...(super.constructor.option_names || []), ...this.constructor.option_names];
   }
   get_error_message(key) {
     if (this.error_messages && this.error_messages[key]) {
@@ -189,7 +193,7 @@ class basefield {
       options = this;
     }
     const ret = { name: options.name, type: options.type };
-    for (const [_, name] of this.option_names.entries()) {
+    for (const name of this.option_names) {
       if (options[name] !== undefined) {
         ret[name] = options[name];
       }
@@ -283,414 +287,402 @@ class basefield {
     }
   }
 }
+
 function get_max_choice_length(choices) {
   let n = 0;
-  for (const [_, c] of choices.entries()) {
+  for (const c of choices) {
     const value = c.value;
-    const n1 = utils.utf8len(value);
+    const n1 = value.length;
     if (n1 > n) {
       n = n1;
     }
   }
   return n;
 }
-const string_option_names = utils.list(basefield.option_names, [
-  "compact",
-  "trim",
-  "pattern",
-  "length",
-  "minlength",
-  "maxlength",
-  "input_type",
-]);
-const string = basefield._class({
-  type: "string",
-  db_type: "varchar",
-  compact: true,
-  trim: true,
-  option_names: string_option_names,
-  init: function (self, options) {
+
+class string extends basefield {
+  static option_names = ["compact", "trim", "pattern", "length", "minlength", "maxlength", "input_type"];
+  type = "string";
+  db_type = "varchar";
+  compact = true;
+  trim = true;
+  constructor(options) {
     if (!options.choices && !options.length && !options.maxlength) {
       throw new Error(`field '${options.name}' must define maxlength or choices or length`);
     }
-    basefield.init(self, options);
-    if (self.compact === undefined) {
-      self.compact = true;
+    super(options);
+    if (this.compact === undefined) {
+      this.compact = true;
     }
-    if (self._js_default === undefined && !self.primary_key && !self.unique) {
-      self._js_default = "";
+    if (this.default === undefined && !this.primary_key && !this.unique) {
+      this.default = "";
     }
-    if (self.choices && self.choices.length > 0) {
-      const n = get_max_choice_length(self.choices);
-      assert(n > 0, "invalid string choices(empty choices or zero length value):" + self.name);
-      const m = self.length || self.maxlength;
+    if (Array.isArray(this.choices) && this.choices.length > 0) {
+      const n = get_max_choice_length(this.choices);
+      assert(n > 0, "invalid string choices(empty choices or zero length value):" + this.name);
+      const m = this.length || this.maxlength;
       if (!m || n > m) {
-        self.maxlength = n;
+        this.maxlength = n;
       }
     }
-  },
-  get_validators: function (self, validators) {
+  }
+  get_validators(validators) {
     for (const [_, e] of ["pattern", "length", "minlength", "maxlength"].entries()) {
-      if (self[e]) {
-        validators.unshift(Validator[e](self[e], self.get_error_message(e)));
+      if (this[e]) {
+        validators.unshift(Validator[e](this[e], this.get_error_message(e)));
       }
     }
-    if (self.compact) {
+    if (this.compact) {
       validators.unshift(Validator.delete_spaces);
-    } else if (self.trim) {
+    } else if (this.trim) {
       validators.unshift(Validator.trim);
     }
     validators.unshift(Validator.string);
-    return basefield.get_validators(self, validators);
-  },
-  widget_attrs: function (self, extra_attrs) {
-    const attrs = { minlength: self.minlength };
-    return utils.dict(basefield.widget_attrs(self), attrs, extra_attrs);
-  },
-});
-const text_option_names = utils.list(basefield.option_names, ["trim", "pattern"]);
-const text = basefield._class({
-  type: "text",
-  db_type: "text",
-  option_names: text_option_names,
-  init: function (self, options) {
-    basefield.init(self, options);
-    if (self._js_default === undefined) {
-      self._js_default = "";
+    return super.get_validators(validators);
+  }
+  widget_attrs(extra_attrs) {
+    const attrs = { minlength: this.minlength };
+    return { ...basefield.prototype.widget_attrs.call(this), ...attrs, ...extra_attrs };
+  }
+  to_form_value(value) {
+    if (!value) {
+      return "";
     }
-  },
-});
-const sfzh_option_names = utils.list(string.option_names, []);
-const sfzh = string._class({
-  type: "sfzh",
-  db_type: "varchar",
-  option_names: sfzh_option_names,
-  init: function (self, options) {
-    string.init(self, utils.dict(options, { length: 18 }));
-  },
-  get_validators: function (self, validators) {
-    validators.unshift(Validator.sfzh);
-    return string.get_validators(self, validators);
-  },
-});
-const email = string._class({
-  type: "email",
-  db_type: "varchar",
-  init: function (self, options) {
-    string.init(self, utils.dict({ maxlength: 255 }, options));
-  },
-});
-const password = string._class({
-  type: "password",
-  db_type: "varchar",
-  init: function (self, options) {
-    string.init(self, utils.dict({ maxlength: 255 }, options));
-  },
-});
-const year_month = string._class({
-  type: "year_month",
-  db_type: "varchar",
-  init: function (self, options) {
-    string.init(self, utils.dict({ maxlength: 7 }, options));
-  },
-  get_validators: function (self, validators) {
-    validators.unshift(Validator.year_month);
-    return basefield.get_validators(self, validators);
-  },
-});
-const number_validator_names = ["min", "max"];
-function add_min_or_max_validators(self, validators) {
-  for (const [_, name] of number_validator_names.entries()) {
-    if (self[name]) {
-      validators.unshift(Validator[name](self[name], self.get_error_message(name)));
+    return typeof value == "string" ? value : String(value);
+  }
+  to_post_value(value) {
+    return this.compact ? value?.replace(/\s/g, "") : value || "";
+  }
+}
+
+class text extends basefield {
+  static option_names = ["trim", "pattern"];
+  type = "text";
+  db_type = "text";
+  constructor(options) {
+    super(options);
+    if (this.default === undefined) {
+      this.default = "";
+    }
+    if (!this.attrs.auto_size) {
+      this.attrs.auto_size = true;
     }
   }
 }
-const integer_option_names = utils.list(basefield.option_names, ["min", "max", "step", "serial"]);
-const integer = basefield._class({
-  type: "integer",
-  db_type: "integer",
-  option_names: integer_option_names,
-  get_validators: function (self, validators) {
-    add_min_or_max_validators(self, validators);
+
+class sfzh extends string {
+  type = "sfzh";
+  db_type = "varchar";
+  constructor(options) {
+    super({ ...options, length: 18 });
+  }
+  get_validators(validators) {
+    validators.unshift(Validator.sfzh);
+    return super.get_validators(validators);
+  }
+}
+
+class email extends string {
+  type = "email";
+  db_type = "varchar";
+  constructor(options) {
+    super({ maxlength: 255, ...options });
+  }
+}
+
+class password extends string {
+  type = "password";
+  db_type = "varchar";
+  constructor(options) {
+    super({ maxlength: 255, ...options });
+  }
+}
+
+class year_month extends string {
+  type = "year_month";
+  db_type = "varchar";
+  constructor(options) {
+    super({ length: 7, ...options });
+  }
+  get_validators(validators) {
+    validators.unshift(Validator.year_month);
+    return super.get_validators(validators);
+  }
+}
+
+const number_validator_names = ["min", "max"];
+class integer {
+  static option_names = ["min", "max", "step", "serial"];
+  type = "integer";
+  db_type = "integer";
+  get_validators(validators) {
+    this.add_min_or_max_validators(validators);
     validators.unshift(Validator.integer);
-    return basefield.get_validators(self, validators);
-  },
-  json: function (self) {
-    const json = basefield.json(self);
+    return super.get_validators(validators);
+  }
+  add_min_or_max_validators(validators) {
+    for (const e of number_validator_names) {
+      if (this[e]) {
+        validators.unshift(Validator[e](this[e], this.error_messages[e]));
+      }
+    }
+  }
+  json() {
+    const json = super.json();
     if (json.primary_key && json.disabled === undefined) {
       json.disabled = true;
     }
     return json;
-  },
-  prepare_for_db: function (self, value, data) {
+  }
+  prepare_for_db(value) {
     if (value === "" || value === undefined) {
       return NULL;
     } else {
       return value;
     }
-  },
-});
-const year = integer._class({
-  type: "year",
-  db_type: "integer",
-  init: function (self, options) {
-    integer.init(self, utils.dict({ min: 1000, max: 9999 }, options));
-  },
-});
-const month = integer._class({
-  type: "month",
-  db_type: "integer",
-  init: function (self, options) {
-    integer.init(self, utils.dict({ min: 1, max: 12 }, options));
-  },
-});
-const float_option_names = utils.list(basefield.option_names, ["min", "max", "step", "precision"]);
-const float = basefield._class({
-  type: "float",
-  db_type: "float",
-  option_names: float_option_names,
-  get_validators: function (self, validators) {
-    add_min_or_max_validators(self, validators);
+  }
+}
+
+class year extends integer {
+  type = "year";
+  db_type = "integer";
+  constructor(options) {
+    super({ min: 1000, max: 9999, ...options });
+  }
+}
+
+class month extends integer {
+  type = "month";
+  db_type = "integer";
+  constructor(options) {
+    super({ min: 1, max: 12, ...options });
+  }
+}
+
+class float extends basefield {
+  static option_names = ["min", "max", "step", "precision"];
+  type = "float";
+  db_type = "float";
+  get_validators(validators) {
+    this.add_min_or_max_validators(validators);
     validators.unshift(Validator.number);
-    return basefield.get_validators(self, validators);
-  },
-  prepare_for_db: function (self, value, data) {
+    return super.get_validators(validators);
+  }
+  add_min_or_max_validators(validators) {
+    for (const e of number_validator_names) {
+      if (this[e]) {
+        validators.unshift(Validator[e](this[e], this.error_messages[e]));
+      }
+    }
+  }
+  prepare_for_db(value) {
     if (value === "" || value === undefined) {
       return NULL;
     } else {
       return value;
     }
-  },
-});
+  }
+}
+
 const DEFAULT_BOOLEAN_CHOICES = [
-  { label: "是", value: true },
-  { label: "否", value: false },
+  { label: "是", value: "true", text: "是" },
+  { label: "否", value: "false", text: "否" },
 ];
-const boolean_option_names = utils.list(basefield.option_names, ["cn"]);
-const boolean = basefield._class({
-  type: "boolean",
-  db_type: "boolean",
-  option_names: boolean_option_names,
-  init: function (self, options) {
-    basefield.init(self, options);
-    if (self.choices === undefined) {
-      self.choices = DEFAULT_BOOLEAN_CHOICES;
+class boolean extends basefield {
+  static option_names = ["cn"];
+  type = "boolean";
+  db_type = "boolean";
+  constructor(options) {
+    super(options);
+    if (this.choices === undefined) {
+      this.choices = clone(DEFAULT_BOOLEAN_CHOICES);
     }
-  },
-  get_validators: function (self, validators) {
-    if (self.cn) {
+    return this;
+  }
+  get_validators(validators) {
+    if (this.cn) {
       validators.unshift(Validator.boolean_cn);
     } else {
       validators.unshift(Validator.boolean);
     }
-    return basefield.get_validators(self, validators);
-  },
-  prepare_for_db: function (self, value, data) {
+    return super.get_validators(validators);
+  }
+  prepare_for_db(value) {
     if (value === "" || value === undefined) {
       return NULL;
     } else {
       return value;
     }
-  },
-});
-const datetime_option_names = utils.list(basefield.option_names, ["auto_now_add", "auto_now", "precision", "timezone"]);
-const datetime = basefield._class({
-  type: "datetime",
-  db_type: "timestamp",
-  precision: 0,
-  timezone: true,
-  option_names: datetime_option_names,
-  init: function (self, options) {
-    basefield.init(self, options);
-    if (self.auto_now_add) {
-      self._js_default = ngx_localtime;
+  }
+}
+
+class datetime extends basefield {
+  static option_names = ["auto_now_add", "auto_now", "precision", "timezone"];
+  type = "datetime";
+  db_type = "timestamp";
+  precision = 0;
+  timezone = true;
+
+  constructor(options) {
+    super(options);
+    if (this.auto_now_add) {
+      this.default = get_localtime;
     }
-  },
-  get_validators: function (self, validators) {
+    return this;
+  }
+
+  get_validators(validators) {
     validators.unshift(Validator.datetime);
-    return basefield.get_validators(self, validators);
-  },
-  json: function (self) {
-    const ret = basefield.json(self);
+    return super.get_validators(validators);
+  }
+  json() {
+    const ret = super.json();
     if (ret.disabled === undefined && (ret.auto_now || ret.auto_now_add)) {
       ret.disabled = true;
     }
     return ret;
-  },
-  prepare_for_db: function (self, value, data) {
-    if (self.auto_now) {
-      return ngx_localtime();
+  }
+  prepare_for_db(value) {
+    if (this.auto_now) {
+      return get_localtime();
     } else if (value === "" || value === undefined) {
       return NULL;
     } else {
       return value;
     }
-  },
-});
-const date_option_names = utils.list(basefield.option_names, []);
-const date = basefield._class({
-  type: "date",
-  db_type: "date",
-  option_names: date_option_names,
-  get_validators: function (self, validators) {
+  }
+}
+
+class date extends basefield {
+  type = "date";
+  db_type = "date";
+  get_validators(validators) {
     validators.unshift(Validator.date);
-    return basefield.get_validators(self, validators);
-  },
-  prepare_for_db: function (self, value, data) {
+    return super.get_validators(validators);
+  }
+  prepare_for_db(value) {
     if (value === "" || value === undefined) {
       return NULL;
     } else {
       return value;
     }
-  },
-});
-const time_option_names = utils.list(basefield.option_names, ["precision", "timezone"]);
-const time = basefield._class({
-  type: "time",
-  db_type: "time",
-  precision: 0,
-  timezone: true,
-  option_names: time_option_names,
-  get_validators: function (self, validators) {
+  }
+}
+
+class time extends basefield {
+  static option_names = ["precision", "timezone"];
+  type = "time";
+  db_type = "time";
+  precision = 0;
+  timezone = true;
+
+  get_validators(validators) {
     validators.unshift(Validator.time);
-    return basefield.get_validators(self, validators);
-  },
-  prepare_for_db: function (self, value, data) {
+    return super.get_validators(validators);
+  }
+  prepare_for_db(value) {
     if (value === "" || value === undefined) {
       return NULL;
     } else {
       return value;
     }
-  },
-});
+  }
+}
+
 const VALID_FOREIGN_KEY_TYPES = {
-  foreignkey: tostring,
-  string: tostring,
-  sfzh: tostring,
+  foreignkey: String,
+  string: String,
+  sfzh: String,
   integer: Validator.integer,
-  float: tonumber,
+  float: Number,
   datetime: Validator.datetime,
   date: Validator.date,
   time: Validator.time,
 };
-const foreignkey_option_names = utils.list(basefield.option_names, [
-  "reference",
-  "reference_column",
-  "reference_label_column",
-  "reference_url",
-  "reference_url_admin",
-  "on_delete",
-  "on_update",
-  "autocomplete",
-  "table_name",
-  "admin_url_name",
-  "models_url_name",
-  "keyword_query_name",
-  "limit_query_name",
-]);
-const foreignkey = basefield._class({
-  type: "foreignkey",
-  FK_TYPE_NOT_DEFIEND: FK_TYPE_NOT_DEFIEND,
-  on_delete: "CASCADE",
-  on_update: "CASCADE",
-  admin_url_name: "admin",
-  models_url_name: "model",
-  keyword_query_name: "keyword",
-  limit_query_name: "limit",
-  convert: tostring,
-  option_names: foreignkey_option_names,
-  init: function (self, options) {
-    basefield.init(self, utils.dict({ db_type: FK_TYPE_NOT_DEFIEND }, options));
-    const fk_model = self.reference;
+
+class foreignkey extends basefield {
+  static option_names = [
+    "reference",
+    "reference_column",
+    "reference_label_column",
+    "reference_url",
+    "reference_url_admin",
+    "on_delete",
+    "on_update",
+    "table_name",
+    "admin_url_name",
+    "models_url_name",
+    "keyword_query_name",
+    "limit_query_name",
+  ];
+  type = "foreignkey";
+  FK_TYPE_NOT_DEFIEND = FK_TYPE_NOT_DEFIEND;
+  on_delete = "CASCADE";
+  on_update = "CASCADE";
+  admin_url_name = "admin";
+  models_url_name = "model";
+  keyword_query_name = "keyword";
+  limit_query_name = "limit";
+  convert = String;
+
+  constructor(options) {
+    super({ db_type: FK_TYPE_NOT_DEFIEND, ...options });
+    const fk_model = this.reference;
     if (fk_model === "self") {
-      return self;
+      return this;
     }
-    self.setup_with_fk_model(fk_model);
-    return self;
-  },
-  setup_with_fk_model: function (self, fk_model) {
+    this.setup_with_fk_model(fk_model);
+  }
+  setup_with_fk_model(fk_model) {
     assert(
       typeof fk_model === "object" && fk_model.__is_model_class__,
       `a foreignkey must define a reference model. not ${fk_model}(type: ${typeof fk_model})`
     );
-    const rc = self.reference_column || fk_model.primary_key || fk_model.DEFAULT_PRIMARY_KEY || "id";
+    const rc = this.reference_column || fk_model.primary_key || fk_model.DEFAULT_PRIMARY_KEY || "id";
     const fk = fk_model.fields[rc];
     assert(
       fk,
       `invalid foreignkey name ${rc} for foreign model ${fk_model.table_name || "[TABLE NAME NOT DEFINED YET]"}`
     );
-    self.reference_column = rc;
-    const rlc = self.reference_label_column || rc;
+    this.reference_column = rc;
+    const rlc = this.reference_label_column || rc;
     assert(
       fk_model.fields[rlc],
       `invalid foreignkey label name ${rlc} for foreign model ${fk_model.table_name || "[TABLE NAME NOT DEFINED YET]"}`
     );
-    self.reference_label_column = rlc;
-    self.convert = assert(VALID_FOREIGN_KEY_TYPES[fk.type], `invalid foreignkey (name:${fk.name}, type:${fk.type})`);
+    this.reference_label_column = rlc;
+    this.convert = assert(VALID_FOREIGN_KEY_TYPES[fk.type], `invalid foreignkey (name:${fk.name}, type:${fk.type})`);
     assert(fk.primary_key || fk.unique, "foreignkey must be a primary key or unique key");
-    if (self.db_type === FK_TYPE_NOT_DEFIEND) {
-      self.db_type = fk.db_type || fk.type;
+    if (this.db_type === FK_TYPE_NOT_DEFIEND) {
+      this.db_type = fk.db_type || fk.type;
     }
-  },
-  get_validators: function (self, validators) {
-    const fk_name = self.reference_column;
-    function foreignkey_validator(v) {
-      let err;
+  }
+  get_validators(validators) {
+    const fk_name = this.reference_column;
+    const foreignkey_validator = (v) => {
       if (typeof v === "object") {
         v = v[fk_name];
       }
-      [v, err] = self.convert(v);
-      if (err) {
-        throw new Error("error when converting foreign key:" + String(err));
+      try {
+        v = this.convert(v);
+      } catch (error) {
+        throw new Error("error when converting foreign key:" + error.message);
       }
       return v;
-    }
+    };
     validators.unshift(foreignkey_validator);
-    return basefield.get_validators(self, validators);
-  },
-  load: function (self, value) {
-    const fk_name = self.reference_column;
-    const fk_model = self.reference;
-    function __index(t, key) {
-      if (fk_model[key]) {
-        return fk_model[key];
-      } else if (fk_model.fields[key]) {
-        const pk = rawget(t, fk_name);
-        if (!pk) {
-          return undefined;
-        }
-        const res = fk_model.get({ [fk_name]: pk });
-        if (!res) {
-          return undefined;
-        }
-        for (const [k, v] of Object.entries(res)) {
-          rawset(t, k, v);
-        }
-        fk_model.create_record(t);
-        return t[key];
-      } else {
-        return undefined;
-      }
-    }
-    return setmetatable({ [fk_name]: value }, { __index: __index });
-  },
-  prepare_for_db: function (self, value, data) {
-    if (value === "" || value === undefined) {
-      return NULL;
-    } else {
-      return value;
-    }
-  },
-  json: function (self) {
-    const ret = basefield.json(self);
-    ret.reference = self.reference.table_name;
-    if (ret.keyword_query_name === undefined) {
-      ret.keyword_query_name = "keyword";
-    }
-    if (ret.limit_query_name === undefined) {
-      ret.limit_query_name = "limit";
-    }
+    return super.get_validators(validators);
+  }
+  load(value) {
+    //** todo 用Proxy改写
+    const fk_name = this.reference_column;
+    const fk_model = this.reference;
+    return fk_model.new_record({ [fk_name]: value });
+  }
+  json() {
+    const ret = super.json();
+    ret.reference = this.reference.table_name;
+    ret.autocomplete = true;
     ret.choices_url_admin = `/${ret.admin_url_name}/${ret.models_url_name}/${ret.table_name}/fk/${ret.name}/${ret.reference_label_column}`;
     ret.reference_url_admin = `/${ret.admin_url_name}/${ret.models_url_name}/${ret.reference}`;
     if (ret.choices_url === undefined) {
@@ -700,34 +692,50 @@ const foreignkey = basefield._class({
       ret.reference_url = `/${ret.reference}/json`;
     }
     return ret;
-  },
-});
-const json = basefield._class({
-  type: "json",
-  db_type: "jsonb",
-  json: function (self) {
-    const json = basefield.json(self);
+  }
+  prepare_for_db(value) {
+    if (value === "" || value === undefined) {
+      return NULL;
+    } else {
+      return value;
+    }
+  }
+  to_form_value(value) {
+    if (typeof value == "object") {
+      return value[this.reference_column];
+    } else {
+      return value;
+    }
+  }
+}
+
+class json extends basefield {
+  type = "json";
+  db_type = "jsonb";
+  json() {
+    const json = super.json();
     json.tag = "textarea";
     return json;
-  },
-  prepare_for_db: function (self, value, data) {
+  }
+  prepare_for_db(value) {
     if (value === "" || value === undefined) {
       return NULL;
     } else {
       return Validator.encode(value);
     }
-  },
-});
+  }
+}
+
 function skip_validate_when_string(v) {
   if (typeof v === "string") {
-    return [v, v];
+    throw new Validator.Skip_validate_error();
   } else {
     return v;
   }
 }
 function check_array_type(v) {
-  if (typeof v !== "object") {
-    throw new Error("array field must be a table");
+  if (!(v instanceof Array)) {
+    throw new Error("value of array field must be a array");
   } else {
     return v;
   }
@@ -743,203 +751,324 @@ function non_empty_array_required(message) {
   }
   return array_validator;
 }
-const basearray = json._class({
-  init: function (self, options) {
-    json.init(self, options);
-    if (typeof self._js_default === "string") {
-      self._js_default = string_choices_to_array(self._js_default);
+
+class basearray extends json {
+  constructor(options) {
+    super(options);
+    if (typeof this.default === "string") {
+      this.default = string_choices_to_array(this.default);
     }
-  },
-  get_validators: function (self, validators) {
-    if (self.required) {
-      validators.unshift(non_empty_array_required(self.get_error_message("required")));
+  }
+  get_validators(validators) {
+    if (this.required) {
+      validators.unshift(non_empty_array_required(this.get_error_message("required")));
     }
     validators.unshift(check_array_type);
     validators.unshift(skip_validate_when_string);
-    validators.push(Validator.encode_as_array);
-    return json.get_validators(self, validators);
-  },
-  get_empty_value_to_update: function () {
-    return utils.array();
-  },
-});
-const array = basearray._class({
-  type: "array",
-  array_type: "string",
-  init: function (self, options) {
-    const fields = require("xodel.field");
-    const array_field_cls = fields[options.array_type || self.array_type || "string"];
+    // validators.push(Validator.encode_as_array);
+    return super.get_validators(validators);
+  }
+  get_empty_value_to_update() {
+    return [];
+  }
+  to_form_value(value) {
+    if (Array.isArray(value)) {
+      // 拷贝, 避免弹出表格修改了值但没有提交
+      return [...value];
+    } else {
+      return [];
+    }
+  }
+}
+
+class array extends basearray {
+  type = "array";
+  array_type = "string";
+  constructor(options) {
+    super(options);
+    const fields = {
+      basefield: basefield,
+      string: string,
+      sfzh: sfzh,
+      email: email,
+      password: password,
+      text: text,
+      integer: integer,
+      float: float,
+      datetime: datetime,
+      date: date,
+      year_month: year_month,
+      year: year,
+      month: month,
+      time: time,
+      json: json,
+      // array: array,
+      // table: table,
+      foreignkey: foreignkey,
+      boolean: boolean,
+      alioss: alioss,
+      alioss_image: alioss_image,
+      // alioss_list: alioss_list,
+      // alioss_image_list: alioss_image_list,
+    };
+    const array_field_cls = fields[options.array_type || this.array_type || "string"];
     if (!array_field_cls) {
       throw new Error("invalid array_type: " + options.array_type);
     }
-    self.option_names = utils.list(array_field_cls.option_names, ["array_type"]);
-    self.array_field = array_field_cls.create_field(options);
-    basearray.init(self, options);
-  },
-});
-function make_empty_array() {
-  return utils.array();
+    this.option_names = [
+      ...base_option_names,
+      ...array_field_cls.option_names,
+      "min",
+      "max",
+      "maxlength",
+      "minlength",
+      "array_type",
+    ];
+    this.array_field = array_field_cls.create_field(options);
+  }
+  get_validators(validators) {
+    validators.unshift((v) =>
+      v.map((e) => {
+        return this.array_field.validate(e);
+      })
+    );
+    return super.get_validators(validators);
+  }
 }
-const table_option_names = utils.list(basearray.option_names, ["model", "max_rows", "uploadable", "columns"]);
-const table = basearray._class({
-  type: "table",
-  max_rows: TABLE_MAX_ROWS,
-  option_names: table_option_names,
-  init: function (self, options) {
-    basearray.init(self, options);
-    if (typeof self.model !== "object" || !self.model.__is_model_class__) {
-      throw new Error("please define model for a table field: " + self.name);
+
+function make_empty_array() {
+  return [];
+}
+
+class table extends basearray {
+  static option_names = ["model", "max_rows", "uploadable", "columns"];
+  type = "table";
+  max_rows = TABLE_MAX_ROWS;
+  constructor(options) {
+    super(options);
+    if (!this.model?.__is_model_class__) {
+      throw new Error("please define model for a table field: " + this.name);
     }
-    if (!self._js_default || self._js_default === "") {
-      self._js_default = make_empty_array;
+    if (!this.default || this.default === "") {
+      this.default = make_empty_array;
     }
-    if (!self.model.table_name) {
-      self.model.materialize_with_table_name({
-        table_name: self.name,
-        label: self.label,
+    if (!this.model.table_name) {
+      this.model.materialize_with_table_name({
+        table_name: this.name,
+        label: this.label,
       });
     }
-  },
-  get_validators: function (self, validators) {
+  }
+  get_validators(validators) {
+    const model = this.model;
     function validate_by_each_field(rows) {
-      let err;
       for (let [i, row] of rows.entries()) {
-        assert(typeof row === "object", "elements of table field must be table");
-        [row, err] = self.model.validate_create(row);
-        if (row === undefined) {
+        assert(typeof row === "object", "elements of table field must be object");
+        try {
+          row = model.validate_create(row);
+        } catch (err) {
           err.index = i;
-          throw new Error(err);
+          throw err;
         }
         rows[i] = row;
       }
       return rows;
     }
     validators.unshift(validate_by_each_field);
-    return basearray.get_validators(self, validators);
-  },
-  json: function (self) {
-    const ret = basearray.json(self);
+    return super.get_validators(validators);
+  }
+  json() {
+    const ret = super.json();
     const model = {
-      field_names: lua_array([]),
-      fields: [],
-      table_name: self.model.table_name,
-      label: self.model.label,
+      field_names: [],
+      fields: {},
+      table_name: this.model.table_name,
+      label: this.model.label,
     };
-    for (const [_, name] of self.model.field_names.entries()) {
-      const field = self.model.fields[name];
+    for (const [_, name] of this.model.field_names.entries()) {
+      const field = this.model.fields[name];
       model.field_names.push(name);
       model.fields[name] = field.json();
     }
     ret.model = model;
     return ret;
-  },
-  load: function (self, rows) {
-    if (typeof rows !== "object") {
+  }
+  load(rows) {
+    if (!(rows instanceof Array)) {
       throw new Error("value of table field must be table, not " + typeof rows);
     }
     for (let i = 0; i < rows.length; i = i + 1) {
-      rows[i] = self.model.load(rows[i]);
+      rows[i] = this.model.load(rows[i]);
     }
-    return lua_array(rows);
-  },
-});
-const ALIOSS_BUCKET = env("ALIOSS_BUCKET") || "";
-const ALIOSS_REGION = env("ALIOSS_REGION") || "";
-const ALIOSS_SIZE = env("ALIOSS_SIZE") || "1M";
-const alioss_option_names = utils.list(basefield.option_names, [
-  "size",
-  "size_arg",
-  "policy",
-  "payload",
-  "lifetime",
-  "key_secret",
-  "key_id",
-  "times",
-  "width",
-  "hash",
-  "image",
-  "maxlength",
-  "prefix",
-  "upload_url",
-  "payload_url",
-  "input_type",
-  "limit",
-  "media_type",
-]);
-const alioss = string._class({
-  type: "alioss",
-  db_type: "varchar",
-  option_names: alioss_option_names,
-  init: function (self, options) {
-    string.init(self, utils.dict({ maxlength: 255 }, options));
+    return rows;
+  }
+}
+
+const ALIOSS_BUCKET = process.env.ALIOSS_BUCKET || "";
+const ALIOSS_REGION = process.env.ALIOSS_REGION || "";
+const ALIOSS_SIZE = process.env.ALIOSS_SIZE || "1MB";
+const ALIOSS_LIFETIME = Number(process.env.ALIOSS_LIFETIME) || 30;
+const map_to_antd_file_value = (url = "") => {
+  const name = url.split("/").pop();
+  return typeof url == "object"
+    ? url
+    : {
+        name,
+        status: "done",
+        url: url,
+        extname: name.split(".")[1], // uni
+        oss_url: url,
+      };
+};
+class alioss extends string {
+  static option_names = [
+    "size",
+    "size_arg",
+    "policy",
+    "payload",
+    "lifetime",
+    "key_secret",
+    "key_id",
+    "times",
+    "width",
+    "hash",
+    "image",
+    "maxlength",
+    "prefix",
+    "upload_url",
+    "payload_url",
+    "input_type",
+    "limit",
+    "media_type",
+  ];
+  type = "alioss";
+  db_type = "varchar";
+  constructor(options) {
+    super({ maxlength: 255, ...options });
     const size = options.size || ALIOSS_SIZE;
-    self.key_secret = options.key_secret;
-    self.key_id = options.key_id;
-    self.size_arg = size;
-    self.size = utils.byte_size_parser(size);
-    self.lifetime = options.lifetime;
-    self.upload_url = `//${options.bucket || ALIOSS_BUCKET}.${options.region || ALIOSS_REGION}.aliyuncs.com/`;
-  },
-  get_options: function (self, options) {
-    const ret = string.get_options(self, options);
+    this.key_secret = options.key_secret;
+    this.key_id = options.key_id;
+    this.size_arg = size;
+    this.size = parse_size(size);
+    this.lifetime = options.lifetime || ALIOSS_LIFETIME;
+    this.upload_url = `//${options.bucket || ALIOSS_BUCKET}.${options.region || ALIOSS_REGION}.aliyuncs.com/`;
+  }
+  get_options(options) {
+    const ret = super.get_options(options);
     if (ret.size_arg) {
       ret.size = ret.size_arg;
-      ret.size_arg = undefined;
+      delete ret.size_arg;
     }
     return ret;
-  },
-  get_payload: function (self, options) {
-    return get_payload(utils.dict(self, options));
-  },
-  get_validators: function (self, validators) {
-    validators.unshift(Validator.url);
-    return string.get_validators(self, validators);
-  },
-  json: function (self) {
-    const ret = string.json(self);
+  }
+  async get_payload(options) {
+    const { data } = await Http.post(this.payload_url, {
+      ...options,
+      size: options.size || this.size,
+      lifetime: options.lifetime || this.lifetime,
+    });
+    return data;
+  }
+  get_validators(validators) {
+    // todo 暂时禁用验证
+    return [];
+  }
+  json() {
+    const ret = super.json();
     if (ret.input_type === undefined) {
       ret.input_type = "file";
     }
-    ret.key_secret = undefined;
-    ret.key_id = undefined;
+    delete ret.key_secret;
+    delete ret.key_id;
     return ret;
-  },
-});
-const alioss_image = alioss._class({
-  type: "alioss_image",
-  image: true,
-  media_type: "image",
-});
-const alioss_list = array._class({
-  type: "alioss_list",
-  array_type: "alioss",
-  option_names: alioss_option_names,
-  init: function (self, options) {
-    alioss.init(self, options);
-    array.init(self, options);
-  },
-  get_payload: function (self, options) {
-    return get_payload(utils.dict(self, options));
-  },
-  get_options: function (self, options) {
-    return utils.dict(array.get_options(self, options), alioss.get_options(self, options), {
-      type: self.type,
-      db_type: "jsonb",
+  }
+  to_form_value(url) {
+    if (this.attrs.wx_avatar) {
+      return url || "";
+    }
+    if (typeof url == "string") {
+      return url ? [map_to_antd_file_value(url)] : [];
+    } else if (Array.isArray(url)) {
+      return [...url];
+    } else {
+      return [];
+    }
+  }
+  to_post_value(file_list) {
+    if (this.attrs?.wx_avatar) {
+      return file_list;
+    } else if (!Array.isArray(file_list) || !file_list[0]) {
+      return "";
+    } else {
+      return file_list[0].oss_url || "";
+    }
+  }
+}
+
+class alioss_image extends alioss {
+  type = "alioss_image";
+  db_type = "varchar";
+  media_type = "image";
+  image = true;
+}
+
+class alioss_list extends array {
+  type = "alioss_list";
+  array_type = "alioss";
+  constructor(options) {
+    // todo解决重复调用的问题
+    super(options);
+    alioss.prototype.constructor.call(this, options);
+    // array在后确保default为数组
+    array.prototype.constructor.call(this, options);
+  }
+  async get_payload(options) {
+    const { data } = await Http.post(this.payload_url, {
+      ...options,
+      size: options.size || this.size,
+      lifetime: options.lifetime || this.lifetime,
     });
-  },
-  json: function (self) {
-    return utils.dict(array.json(self), alioss.json(self), {
-      type: self.type,
+    return data;
+  }
+  get_options(options) {
+    return {
+      ...array.prototype.get_options.call(this, options),
+      ...alioss.prototype.get_options.call(this, options),
+      type: this.type,
       db_type: "jsonb",
-    });
-  },
-});
-const alioss_image_list = alioss_list._class({
-  type: "alioss_image_list",
-  array_type: "alioss_image",
-  image: true,
-  media_type: "image",
-});
+    };
+  }
+  json() {
+    return {
+      ...array.prototype.json.call(this),
+      ...alioss.prototype.json.call(this),
+      type: this.type,
+      db_type: "jsonb",
+    };
+  }
+  to_form_value(urls) {
+    // console.log("call to_form_value2", JSON.stringify(urls));
+    if (Array.isArray(urls)) {
+      return urls.map(map_to_antd_file_value);
+    } else {
+      return [];
+    }
+  }
+  to_post_value(file_list) {
+    if (!Array.isArray(file_list) || !file_list[0]) {
+      return [];
+    } else {
+      return file_list.map((e) => e.oss_url);
+    }
+  }
+}
+class alioss_image_list extends alioss_list {
+  type = "alioss_image_list";
+  array_type = "alioss_image";
+  image = true;
+  media_type = "image";
+}
+
 export default {
   basefield: basefield,
   string: string,

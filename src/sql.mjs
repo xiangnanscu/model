@@ -13,42 +13,8 @@
 // foo = [] 要注意是否应该为 foo = {}, 如get_keys
 // match(key, ...) => key.match
 // lua循环起始值为2时js的处理, 例如:parse_where_exp
-const clone = (o) => JSON.parse(JSON.stringify(o));
-const string_format = (s, ...varargs) => {
-  let status = 0;
-  const res = [];
-  let j = -1;
-  for (let i = 0; i < s.length; i++) {
-    const c = s[i];
-    if (c === "%") {
-      if (status === 0) {
-        status = 1;
-      } else if (status === 1) {
-        status = 0;
-        res.push("%");
-      }
-    } else if (c === "s" && status === 1) {
-      j = j + 1;
-      res.push(varargs[j]);
-      status = 0;
-    } else {
-      res.push(c);
-    }
-  }
-  return res.join("");
-};
-function assert(bool, err_msg) {
-  if (!bool) {
-    throw new Error(err_msg);
-  } else {
-    return bool;
-  }
-}
-function next(obj) {
-  for (const key in obj) {
-    return key;
-  }
-}
+import { clone, string_format, assert, next } from "./utils";
+
 const PG_SET_MAP = {
   _union: "UNION",
   _union_all: "UNION ALL",
@@ -290,7 +256,10 @@ Sql.prototype._base_updates = function (rows, key, columns) {
     const cte_name = `V(${columns.join(", ")})`;
     const join_cond = this._get_join_conditions(key, "V", this._as || this.table_name);
     this.with(cte_name, rows);
-    return Sql.prototype._base_update.call(this, this._get_update_token_with_prefix(columns, key, "V"))._base_from("V")._base_where(join_cond);
+    return Sql.prototype._base_update
+      .call(this, this._get_update_token_with_prefix(columns, key, "V"))
+      ._base_from("V")
+      ._base_where(join_cond);
   } else if (rows.length === 0) {
     throw new Error("empty rows passed to updates");
   } else {
@@ -299,7 +268,10 @@ Sql.prototype._base_updates = function (rows, key, columns) {
     const cte_values = `(VALUES ${as_token(rows)})`;
     const join_cond = this._get_join_conditions(key, "V", this._as || this.table_name);
     this.with(cte_name, cte_values);
-    return Sql.prototype._base_update.call(this, this._get_update_token_with_prefix(columns, key, "V"))._base_from("V")._base_where(join_cond);
+    return Sql.prototype._base_update
+      .call(this, this._get_update_token_with_prefix(columns, key, "V"))
+      ._base_from("V")
+      ._base_where(join_cond);
   }
 };
 Sql.prototype._base_returning = function (a, b, ...varargs) {
@@ -669,7 +641,9 @@ Sql.prototype._set_cud_subquery_insert_token = function (sub_query, columns) {
 };
 Sql.prototype._get_upsert_token = function (row, key, columns) {
   const [values_list, insert_columns] = this._get_insert_values_token(row, columns);
-  const insert_token = `(${as_token(insert_columns)}) VALUES ${as_literal(values_list)} ON CONFLICT (${this._get_select_token(key)})`;
+  const insert_token = `(${as_token(insert_columns)}) VALUES ${as_literal(
+    values_list
+  )} ON CONFLICT (${this._get_select_token(key)})`;
   if ((Array.isArray(key) && key.length === insert_columns.length) || insert_columns.length === 1) {
     return `${insert_token} DO NOTHING`;
   } else {
@@ -678,7 +652,9 @@ Sql.prototype._get_upsert_token = function (row, key, columns) {
 };
 Sql.prototype._get_bulk_upsert_token = function (rows, key, columns) {
   [rows, columns] = this._get_bulk_insert_values_token(rows, columns);
-  const insert_token = `(${as_token(columns)}) VALUES ${as_token(rows)} ON CONFLICT (${this._base_get_select_token(key)})`;
+  const insert_token = `(${as_token(columns)}) VALUES ${as_token(rows)} ON CONFLICT (${this._base_get_select_token(
+    key
+  )})`;
   if ((Array.isArray(key) && key.length === columns.length) || columns.length === 1) {
     return `${insert_token} DO NOTHING`;
   } else {
@@ -881,7 +857,9 @@ Sql.prototype._handle_set_option = function (other_sql, set_operation_attr) {
   if (!this[set_operation_attr]) {
     this[set_operation_attr] = other_sql.statement();
   } else {
-    this[set_operation_attr] = `(${this[set_operation_attr]}) ${PG_SET_MAP[set_operation_attr]} (${other_sql.statement()})`;
+    this[set_operation_attr] = `(${this[set_operation_attr]}) ${
+      PG_SET_MAP[set_operation_attr]
+    } (${other_sql.statement()})`;
   }
   // if (this !== Sql) {
   //   this.statement = this._statement_for_set;

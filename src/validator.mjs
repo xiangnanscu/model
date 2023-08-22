@@ -287,7 +287,7 @@ function sfzh(v) {
   }
   v = v.toUpperCase();
   if (!/^\d{17}[\dX]$/.test(v)) {
-    throw new Error("身份证号前17位必须为数字, 第18位必须为数字或大写字母X");
+    throw new Error("身份证号前17位必须为数字，第18位必须为数字或大写字母X");
   }
   try {
     valid_date(Number(v.slice(6, 10)), Number(v.slice(10, 12)), Number(v.slice(12, 14)));

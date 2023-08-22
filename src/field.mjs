@@ -1,31 +1,15 @@
+import { clone, string_format, assert, next } from "./utils";
 import * as Validator from "./validator";
 import { Http } from "@/globals/Http";
-import { parseSize } from "@/lib/utils.mjs";
+import { parse_size } from "@/lib/utils.mjs";
+
 
 const TABLE_MAX_ROWS = 1;
 const CHOICES_ERROR_DISPLAY_COUNT = 30;
-const ERROR_MESSAGES = { required: "此项必填", choices: "无效选项" };
-const NULL = {};
-const FK_TYPE_NOT_DEFIEND = {};
-const PRIMITIVE_TYPES = {
-  string: true,
-  number: true,
-  boolean: true,
-  bigint: true,
-};
-
-// const repr = (e) => JSON.stringify(e);
-function assert(bool, errMsg) {
-  if (!bool) {
-    throw new Error(errMsg);
-  } else {
-    return bool;
-  }
-}
-function getLocalTime(d = new Date()) {
-  return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()} ${d.getHours()}:${d.getMinutes()}:${d.getSeconds()}`;
-}
-function cleanChoice(c) {
+const DEFAULT_ERROR_MESSAGES = { required: "此项必填", choices: "无效选项" };
+const NULL = {}
+const FK_TYPE_NOT_DEFIEND = [];
+function clean_choice(c) {
   let v;
   if (c.value !== undefined) {
     v = c.value;
@@ -43,14 +27,30 @@ function cleanChoice(c) {
   }
   return [v, l, c.hint || c[2]];
 }
-function getChoices(rawChoices) {
-  const choices = [];
-  for (let c of rawChoices) {
-    if (PRIMITIVE_TYPES[typeof c]) {
-      c = { value: c, label: c.toString(), text: c.toString() };
+function string_choices_to_array(s) {
+  const choices = lua_array([]);
+  for (let [_, line] of utils.split(s, "\n").entries()) {
+    line = assert(Validator.trim(line));
+    if (line !== "") {
+      choices.push(line);
+    }
+  }
+  return choices;
+}
+function get_choices(raw_choices) {
+  if (typeof raw_choices === "string") {
+    raw_choices = string_choices_to_array(raw_choices);
+  }
+  if (typeof raw_choices !== "object") {
+    throw new Error(`choices type must be table ,not ${typeof raw_choices}`);
+  }
+  const choices = lua_array([]);
+  for (let [i, c] of raw_choices.entries()) {
+    if (typeof c === "string" || typeof c === "number") {
+      c = { value: c, label: c };
     } else if (typeof c === "object") {
-      const [value, label, hint] = cleanChoice(c);
-      c = { value, label, hint, text: label };
+      const [value, label, hint] = clean_choice(c);
+      c = { value: value, label: label, hint: hint };
     } else {
       throw new Error("invalid choice type:" + typeof c);
     }
@@ -58,31 +58,31 @@ function getChoices(rawChoices) {
   }
   return choices;
 }
-function serializeChoice(choice) {
+function serialize_choice(choice) {
   return String(choice.value);
 }
-function getChoicesErrorMessage(choices) {
-  const validChoices = choices.map(serializeChoice).join("，");
-  return `限下列选项：${validChoices}`;
+function get_choices_error_message(choices) {
+  const valid_choices = utils.map(choices, serialize_choice).join("，");
+  return `限下列选项：${valid_choices}`;
 }
-function getChoicesValidator(choices, message) {
+function get_choices_validator(choices, message) {
   if (choices.length <= CHOICES_ERROR_DISPLAY_COUNT) {
-    message = `${message}，${getChoicesErrorMessage(choices)}`;
+    message = `${message}，${get_choices_error_message(choices)}`;
   }
-  const isChoice = [];
-  for (const c of choices) {
-    isChoice[c.value] = true;
+  const is_choice = [];
+  for (const [_, c] of choices.entries()) {
+    is_choice[c.value] = true;
   }
-  function choicesValidator(value) {
-    if (!isChoice[value]) {
+  function choices_validator(value) {
+    if (!is_choice[value]) {
       throw new Error(message);
     } else {
       return value;
     }
   }
-  return choicesValidator;
+  return choices_validator;
 }
-const baseOptionNames = [
+const base_option_names = [
   "primary_key",
   "null",
   "unique",
@@ -105,23 +105,30 @@ const baseOptionNames = [
   "tag",
   "attrs",
 ];
-
-class BaseField {
-  static getLocalTime = getLocalTime;
-  static FK_TYPE_NOT_DEFIEND = FK_TYPE_NOT_DEFIEND;
+class basefield {
   __is_field_class__ = true;
   required = false;
-  get optionNames() {
-    // define as getter so the subclass optionNames can be accessed in super call
-    return baseOptionNames;
+  option_names = base_option_names;
+  static __call(options) {
+    return this.create_field(options);
   }
-  static new(options) {
-    const self = new this(options);
-    self.validators = self.getValidators([]);
+  static create_field(options) {
+    const self = this.new([]);
+    self.init(options);
+    self.validators = self.get_validators([]);
     return self;
   }
-  constructor(options) {
-    Object.assign(this, this.getOptions(options));
+  static new(self) {
+    return setmetatable(self || [], this);
+  }
+  init(options) {
+    this.name = assert(options.name, "you must define a name for a field");
+    this.type = options.type;
+    for (const [_, name] of this.option_names.entries()) {
+      if (options[name] !== undefined) {
+        this[name] = options[name];
+      }
+    }
     if (this.db_type === undefined) {
       this.db_type = this.type;
     }
@@ -129,100 +136,59 @@ class BaseField {
       this.label = this.name;
     }
     if (this.null === undefined) {
-      if (!this.required && this.type !== "string") {
-        this.null = true;
-      } else {
+      if (this.required || this.db_type === "varchar" || this.db_type === "text") {
         this.null = false;
+      } else {
+        this.null = true;
       }
     }
-    if (Array.isArray(this.choices)) {
-      this.choices = getChoices(this.choices);
+    if (this.choices) {
+      if (this.strict === undefined) {
+        this.strict = true;
+      }
+      this.choices = get_choices(this.choices);
     }
-    if (this.choices && this.strict === undefined) {
-      this.strict = true;
-    }
-    this.error_messages = { ...ERROR_MESSAGES, ...this.error_messages };
     return this;
   }
-
-  getOptions(options) {
+  get_error_message(key) {
+    if (this.error_messages && this.error_messages[key]) {
+      return this.error_messages[key];
+    }
+    return DEFAULT_ERROR_MESSAGES[key];
+  }
+  get_validators(validators) {
+    if (this.required) {
+      validators.unshift(Validator.required(this.get_error_message("required")));
+    } else {
+      validators.unshift(Validator.not_required);
+    }
+    if (this.choices && this.strict) {
+      validators.push(get_choices_validator(this.choices, this.get_error_message("choices")));
+    }
+    return validators;
+  }
+  get_options(options) {
     if (!options) {
       options = this;
     }
-    const ret = {
-      name: options.name,
-      type: options.type,
-    };
-    for (const name of this.optionNames) {
+    const ret = { name: options.name, type: options.type };
+    for (const [_, name] of this.option_names.entries()) {
       if (options[name] !== undefined) {
         ret[name] = options[name];
       }
     }
-    if (!ret.attrs) {
-      ret.attrs = {};
-    } else {
-      ret.attrs = { ...ret.attrs };
+    if (ret.attrs) {
+      ret.attrs = clone(ret.attrs);
     }
     return ret;
   }
-  getValidators(validators) {
-    if (this.required) {
-      validators.unshift(Validator.required(this.error_messages.required));
-    } else {
-      validators.unshift(Validator.notRequired);
-    }
-    if (this.strict) {
-      if (this.choices_url) {
-        // dynamic choices, need to access this at runtime
-        // there's no need to check a disabled field
-        !this.disabled &&
-          validators.push((val) => {
-            for (const { value } of this.choices) {
-              if (val === value) {
-                return value;
-              }
-            }
-            throw new Error("无效选项, 请通过点击下拉框的形式输入");
-          });
-      } else if (Array.isArray(this.choices) && this.choices.length && this.type !== "array") {
-        // static choices
-        validators.push(getChoicesValidator(this.choices, this.error_messages.choices));
-      }
-    }
-    return validators;
-  }
-  toFormValue(value) {
-    // Fields like alioss* need this
-    // console.log("base toFormValue");
-    return value;
-  }
-  toPostValue(value) {
-    return value;
-  }
-  getAntdRule() {
-    const rule = {
-      whitespace: true,
-    };
-    rule.validator = async (_rule, value) => {
-      try {
-        return Promise.resolve(this.validate(value));
-      } catch (error) {
-        return Promise.reject(error);
-      }
-    };
-    return rule;
-  }
   json() {
-    const json = this.getOptions();
-    delete json.error_messages;
-    if (typeof json.default === "function") {
-      delete json.default;
-    }
-    if (typeof json.choices === "function") {
-      delete json.choices;
+    const json = this.get_options();
+    if (typeof json._js_default === "function") {
+      json._js_default = undefined;
     }
     if (!json.tag) {
-      if (json.choices && json.choices.length > 0 && !json.autocomplete) {
+      if (typeof json.choices === "object" && json.choices.length > 0 && !json.autocomplete) {
         json.tag = "select";
       } else {
         json.tag = "input";
@@ -234,872 +200,720 @@ class BaseField {
     if (json.preload === undefined && (json.choices_url || json.choices_url_admin)) {
       json.preload = false;
     }
-    if (!json.attrs) {
-      json.attrs = {};
-    }
     return json;
   }
-  widgetAttrs(extraAttrs) {
-    return { required: this.required, readonly: this.disabled, ...extraAttrs };
+  widget_attrs(extra_attrs) {
+    return utils.dict({ required: this.required, readonly: this.disabled }, extra_attrs);
   }
   validate(value, ctx) {
     if (typeof value === "function") {
       return value;
     }
-    for (const validator of this.validators) {
-      try {
-        value = validator(value, ctx);
-        if (value === undefined) {
-          return;
-        }
-      } catch (error) {
-        if (error instanceof Validator.SkipValidateError) {
+    let err;
+    for (const [_, validator] of this.validators.entries()) {
+      [value, err] = validator(value, ctx);
+      if (value !== undefined) {
+        if (err === undefined) {
+        } else if (value === err) {
           return value;
         } else {
-          throw error;
+          throw new Error(err);
         }
+      } else if (err !== undefined) {
+        throw new Error(err);
+      } else {
+        return undefined;
       }
     }
     return value;
   }
-  getDefault(ctx) {
-    if (typeof this.default !== "function") {
-      return this.default;
+  get_default(ctx) {
+    if (typeof this._js_default !== "function") {
+      return this._js_default;
     } else {
-      return this.default(ctx);
-    }
-  }
-  choicesCallback(choice) {
-    if (PRIMITIVE_TYPES[typeof choice]) {
-      return { value: choice, label: String(choice) };
-    } else if (typeof choice == "object") {
-      return { value: choice.value, label: choice.label, hint: choice.hint };
-    } else {
-      return { value: String(choice), label: String(choice) };
+      return this._js_default(ctx);
     }
   }
 }
-function getMaxChoiceLength(choices) {
+function get_max_choice_length(choices) {
   let n = 0;
-  for (const c of choices) {
+  for (const [_, c] of choices.entries()) {
     const value = c.value;
-    const n1 = value.length;
+    const n1 = utils.utf8len(value);
     if (n1 > n) {
       n = n1;
     }
   }
   return n;
 }
-const stringOptionNames = [...baseOptionNames, "compact", "trim", "pattern", "length", "minlength", "maxlength", "input_type"];
-const stringValidatorNames = ["pattern", "length", "minlength", "maxlength"];
-class StringField extends BaseField {
-  type = "string";
-  db_type = "varchar";
-  compact = true;
-  trim = true;
-  get optionNames() {
-    return stringOptionNames;
-  }
-  constructor(options) {
+const string_option_names = utils.list(basefield.option_names, [
+  "compact",
+  "trim",
+  "pattern",
+  "length",
+  "minlength",
+  "maxlength",
+  "input_type",
+]);
+const string = basefield._class({
+  type: "string",
+  db_type: "varchar",
+  compact: true,
+  trim: true,
+  option_names: string_option_names,
+  init: function (self, options) {
     if (!options.choices && !options.length && !options.maxlength) {
-      throw new Error(`field ${options.name} must define maxlength or choices or length`);
+      throw new Error(`field '${options.name}' must define maxlength or choices or length`);
     }
-    super(options);
-    if (this.compact === undefined) {
-      this.compact = true;
+    basefield.init(self, options);
+    if (self.compact === undefined) {
+      self.compact = true;
     }
-    if (this.default === undefined && !this.primary_key && !this.unique) {
-      this.default = "";
+    if (self._js_default === undefined && !self.primary_key && !self.unique) {
+      self._js_default = "";
     }
-    if (Array.isArray(this.choices) && this.choices.length > 0) {
-      const n = getMaxChoiceLength(this.choices);
-      assert(n > 0, "invalid string choices(empty choices or zero length value):" + this.name);
-      const m = this.length || this.maxlength;
+    if (self.choices && self.choices.length > 0) {
+      const n = get_max_choice_length(self.choices);
+      assert(n > 0, "invalid string choices(empty choices or zero length value):" + self.name);
+      const m = self.length || self.maxlength;
       if (!m || n > m) {
-        this.maxlength = n;
+        self.maxlength = n;
       }
     }
-    return this;
-  }
-  getValidators(validators) {
-    for (const e of stringValidatorNames) {
-      if (this[e]) {
-        validators.unshift(Validator[e](this[e], this.error_messages[e]));
+  },
+  get_validators: function (self, validators) {
+    for (const [_, e] of ["pattern", "length", "minlength", "maxlength"].entries()) {
+      if (self[e]) {
+        validators.unshift(Validator[e](self[e], self.get_error_message(e)));
       }
     }
-    if (this.compact) {
-      validators.unshift(Validator.deleteSpaces);
-    } else if (this.trim) {
+    if (self.compact) {
+      validators.unshift(Validator.delete_spaces);
+    } else if (self.trim) {
       validators.unshift(Validator.trim);
     }
     validators.unshift(Validator.string);
-    return super.getValidators(validators);
-  }
-  widgetAttrs(extraAttrs) {
-    const attrs = { minlength: this.minlength };
-    return { ...super.widgetAttrs(), ...attrs, ...extraAttrs };
-  }
-  toFormValue(value) {
-    if (!value) {
-      return "";
+    return basefield.get_validators(self, validators);
+  },
+  widget_attrs: function (self, extra_attrs) {
+    const attrs = { minlength: self.minlength };
+    return utils.dict(basefield.widget_attrs(self), attrs, extra_attrs);
+  },
+});
+const text_option_names = utils.list(basefield.option_names, ["trim", "pattern"]);
+const text = basefield._class({
+  type: "text",
+  db_type: "text",
+  option_names: text_option_names,
+  init: function (self, options) {
+    basefield.init(self, options);
+    if (self._js_default === undefined) {
+      self._js_default = "";
     }
-    return typeof value == "string" ? value : String(value);
-  }
-  toPostValue(value) {
-    return this.compact ? value?.replace(/\s/g, "") : value || "";
-  }
-}
-
-const textOptionNames = [...baseOptionNames];
-class TextField extends BaseField {
-  type = "text";
-  db_type = "text";
-  constructor(options) {
-    super(options);
-    if (!this.attrs.autoSize) {
-      this.attrs.autoSize = true;
-    }
-    return this;
-  }
-  get optionNames() {
-    return textOptionNames;
-  }
-}
-
-class SfzhField extends StringField {
-  type = "sfzh";
-  db_type = "varchar";
-  constructor(options) {
-    super({ ...options, length: 18 });
-    return this;
-  }
-  getValidators(validators) {
+  },
+});
+const sfzh_option_names = utils.list(string.option_names, []);
+const sfzh = string._class({
+  type: "sfzh",
+  db_type: "varchar",
+  option_names: sfzh_option_names,
+  init: function (self, options) {
+    string.init(self, utils.dict(options, { length: 18 }));
+  },
+  get_validators: function (self, validators) {
     validators.unshift(Validator.sfzh);
-    return super.getValidators(validators);
-  }
-}
-
-class EmailField extends StringField {
-  type = "email";
-  db_type = "varchar";
-  constructor(options) {
-    super({ maxlength: 255, ...options });
-    return this;
-  }
-}
-
-class PasswordField extends StringField {
-  type = "password";
-  db_type = "varchar";
-  constructor(options) {
-    super({ maxlength: 255, ...options });
-    return this;
-  }
-}
-
-class YearMonthField extends StringField {
-  type = "yearMonth";
-  db_type = "varchar";
-  constructor(options) {
-    super({ length: 7, ...options });
-    return this;
-  }
-  getValidators(validators) {
-    validators.unshift(Validator.yearMonth);
-    return super.getValidators(validators);
-  }
-}
-
-const integerOptionNames = [...baseOptionNames, "min", "max", "step", "serial"];
-const intergerValidatorNames = ["min", "max"];
-class IntegerField extends BaseField {
-  type = "integer";
-  db_type = "integer";
-  get optionNames() {
-    return integerOptionNames;
-  }
-  addMinOrMaxValidators(validators) {
-    for (const e of intergerValidatorNames) {
-      if (this[e]) {
-        validators.unshift(Validator[e](this[e], this.error_messages[e]));
-      }
+    return string.get_validators(self, validators);
+  },
+});
+const email = string._class({
+  type: "email",
+  db_type: "varchar",
+  init: function (self, options) {
+    string.init(self, utils.dict({ maxlength: 255 }, options));
+  },
+});
+const password = string._class({
+  type: "password",
+  db_type: "varchar",
+  init: function (self, options) {
+    string.init(self, utils.dict({ maxlength: 255 }, options));
+  },
+});
+const year_month = string._class({
+  type: "year_month",
+  db_type: "varchar",
+  init: function (self, options) {
+    string.init(self, utils.dict({ maxlength: 7 }, options));
+  },
+  get_validators: function (self, validators) {
+    validators.unshift(Validator.year_month);
+    return basefield.get_validators(self, validators);
+  },
+});
+const number_validator_names = ["min", "max"];
+function add_min_or_max_validators(self, validators) {
+  for (const [_, name] of number_validator_names.entries()) {
+    if (self[name]) {
+      validators.unshift(Validator[name](self[name], self.get_error_message(name)));
     }
   }
-  getValidators(validators) {
-    this.addMinOrMaxValidators(validators);
+}
+const integer_option_names = utils.list(basefield.option_names, ["min", "max", "step", "serial"]);
+const integer = basefield._class({
+  type: "integer",
+  db_type: "integer",
+  option_names: integer_option_names,
+  get_validators: function (self, validators) {
+    add_min_or_max_validators(self, validators);
     validators.unshift(Validator.integer);
-    return super.getValidators(validators);
-  }
-  json() {
-    const json = super.json();
+    return basefield.get_validators(self, validators);
+  },
+  json: function (self) {
+    const json = basefield.json(self);
     if (json.primary_key && json.disabled === undefined) {
       json.disabled = true;
     }
     return json;
-  }
-  prepareForDb(value) {
+  },
+  prepare_for_db: function (self, value, data) {
     if (value === "" || value === undefined) {
       return NULL;
     } else {
       return value;
     }
-  }
-}
-
-class YearField extends IntegerField {
-  type = "year";
-  db_type = "integer";
-  constructor(options) {
-    super({ min: 1000, max: 9999, ...options });
-    return this;
-  }
-}
-class MonthField extends IntegerField {
-  type = "month";
-  db_type = "integer";
-  constructor(options) {
-    super({ min: 1, max: 12, ...options });
-    return this;
-  }
-}
-
-const floatValidatorNames = ["min", "max"];
-const floatOptionNames = [...baseOptionNames, "min", "max", "step", "precision"];
-class FloatField extends BaseField {
-  type = "float";
-  db_type = "float";
-  get optionNames() {
-    return floatOptionNames;
-  }
-  addMinOrMaxValidators(validators) {
-    for (const e of floatValidatorNames) {
-      if (this[e]) {
-        validators.unshift(Validator[e](this[e], this.error_messages[e]));
-      }
-    }
-  }
-
-  getValidators(validators) {
-    this.addMinOrMaxValidators(validators);
+  },
+});
+const year = integer._class({
+  type: "year",
+  db_type: "integer",
+  init: function (self, options) {
+    integer.init(self, utils.dict({ min: 1000, max: 9999 }, options));
+  },
+});
+const month = integer._class({
+  type: "month",
+  db_type: "integer",
+  init: function (self, options) {
+    integer.init(self, utils.dict({ min: 1, max: 12 }, options));
+  },
+});
+const float_option_names = utils.list(basefield.option_names, ["min", "max", "step", "precision"]);
+const float = basefield._class({
+  type: "float",
+  db_type: "float",
+  option_names: float_option_names,
+  get_validators: function (self, validators) {
+    add_min_or_max_validators(self, validators);
     validators.unshift(Validator.number);
-    return super.getValidators(validators);
-  }
-  prepareForDb(value) {
+    return basefield.get_validators(self, validators);
+  },
+  prepare_for_db: function (self, value, data) {
     if (value === "" || value === undefined) {
       return NULL;
     } else {
       return value;
     }
-  }
-}
-
+  },
+});
 const DEFAULT_BOOLEAN_CHOICES = [
-  { label: "是", value: "true", text: "是" },
-  { label: "否", value: "false", text: "否" },
+  { label: "是", value: true },
+  { label: "否", value: false },
 ];
-const booleanOptionNames = [...baseOptionNames, "cn"];
-class BooleanField extends BaseField {
-  type = "boolean";
-  db_type = "boolean";
-  get optionNames() {
-    return booleanOptionNames;
-  }
-  constructor(options) {
-    super(options);
-    if (this.choices === undefined) {
-      this.choices = DEFAULT_BOOLEAN_CHOICES;
+const boolean_option_names = utils.list(basefield.option_names, ["cn"]);
+const boolean = basefield._class({
+  type: "boolean",
+  db_type: "boolean",
+  option_names: boolean_option_names,
+  init: function (self, options) {
+    basefield.init(self, options);
+    if (self.choices === undefined) {
+      self.choices = DEFAULT_BOOLEAN_CHOICES;
     }
-    return this;
-  }
-
-  getValidators(validators) {
-    if (this.cn) {
-      validators.unshift(Validator.booleanCn);
+  },
+  get_validators: function (self, validators) {
+    if (self.cn) {
+      validators.unshift(Validator.boolean_cn);
     } else {
       validators.unshift(Validator.boolean);
     }
-    return super.getValidators(validators);
-  }
-  prepareForDb(value) {
+    return basefield.get_validators(self, validators);
+  },
+  prepare_for_db: function (self, value, data) {
     if (value === "" || value === undefined) {
       return NULL;
     } else {
       return value;
     }
-  }
-}
-
-const jsonOptionNames = [...baseOptionNames];
-class JsonField extends BaseField {
-  type = "json";
-  db_type = "jsonb";
-  get optionNames() {
-    return jsonOptionNames;
-  }
-  json() {
-    const json = super.json();
-    json.tag = "textarea";
-    return json;
-  }
-  prepareForDb(value) {
-    if (value === "" || value === undefined) {
-      return NULL;
-    } else {
-      return Validator.encode(value);
+  },
+});
+const datetime_option_names = utils.list(basefield.option_names, ["auto_now_add", "auto_now", "precision", "timezone"]);
+const datetime = basefield._class({
+  type: "datetime",
+  db_type: "timestamp",
+  precision: 0,
+  timezone: true,
+  option_names: datetime_option_names,
+  init: function (self, options) {
+    basefield.init(self, options);
+    if (self.auto_now_add) {
+      self._js_default = ngx_localtime;
     }
-  }
-}
-function skipValidateWhenString(v) {
-  if (typeof v === "string") {
-    throw new Validator.SkipValidateError();
-  } else {
-    return v;
-  }
-}
-function checkArrayType(v) {
-  if (!(v instanceof Array)) {
-    throw new Error("value of array field must be a array");
-  } else {
-    return v;
-  }
-}
-function nonEmptyArrayRequired(message) {
-  message = message || "此项必填";
-  function arrayValidator(v) {
-    if (v.length === 0) {
-      throw new Error(message);
-    } else {
-      return v;
-    }
-  }
-  return arrayValidator;
-}
-const arrayOptionNames = [...baseOptionNames, "array_type", "min", "max", "maxlength", "minlength"];
-class BaseArrayField extends JsonField {
-  get optionNames() {
-    return arrayOptionNames;
-  }
-  getValidators(validators) {
-    if (this.required) {
-      validators.unshift(nonEmptyArrayRequired(this.error_messages.required));
-    }
-    validators.unshift(checkArrayType);
-    validators.unshift(skipValidateWhenString);
-    return super.getValidators(validators);
-  }
-  getEmptyValueToUpdate() {
-    return [];
-  }
-  toFormValue(value) {
-    if (Array.isArray(value)) {
-      // 拷贝, 避免弹出表格修改了值但没有提交
-      return [...value];
-    } else {
-      return [];
-    }
-  }
-}
-class ArrayField extends BaseArrayField {
-  type = "array";
-  db_type = "jsonb";
-  constructor(options) {
-    super(options);
-    const maps = {
-      BaseField,
-      StringField,
-      EmailField,
-      PasswordField,
-      YearMonthField,
-      YearField,
-      MonthField,
-      TextField,
-      IntegerField,
-      FloatField,
-      DatetimeField,
-      DateField,
-      TimeField,
-      JsonField,
-      // ArrayField,
-      // TableField,
-      ForeignkeyField,
-      BooleanField,
-      AliossField,
-      AliossImageField,
-      // AliossListField,
-      // AliossImageListField,
-      SfzhField,
-    };
-    const capitalize = (s) => s.charAt(0).toUpperCase() + s.slice(1);
-    const cls = maps[`${capitalize(this.array_type || "string")}Field`];
-    this.array_field = cls.new(options);
-  }
-  getValidators(validators) {
-    validators.unshift((v) =>
-      v.map((e) => {
-        return this.array_field.validate(e);
-      })
-    );
-    return super.getValidators(validators);
-  }
-}
-function makeEmptyArray() {
-  return [];
-}
-
-const tableOptionNames = [...baseOptionNames, "model", "max_rows", "uploadable", "columns"];
-class TableField extends BaseArrayField {
-  type = "table";
-  max_rows = TABLE_MAX_ROWS;
-  get optionNames() {
-    return tableOptionNames;
-  }
-  constructor(options) {
-    super(options);
-    if (!this.model?.__isModelClass__) {
-      throw new Error("please define model for a table field: " + this.name);
-    }
-    if (!this.default || this.default === "") {
-      this.default = makeEmptyArray;
-    }
-    if (!this.model.table_name) {
-      this.model.materializeWithTableName({
-        table_name: this.name,
-        label: this.label,
-      });
-    }
-    return this;
-  }
-  getValidators(validators) {
-    const model = this.model;
-    function validateByEachField(rows) {
-      for (let [i, row] of rows.entries()) {
-        assert(typeof row === "object", "elements of table field must be object");
-        try {
-          row = model.validateCreate(row);
-        } catch (err) {
-          err.index = i;
-          throw err;
-        }
-        rows[i] = row;
-      }
-      return rows;
-    }
-    validators.unshift(validateByEachField);
-    return super.getValidators(validators);
-  }
-  json() {
-    const ret = super.json();
-    const model = { field_names: [], fields: {} };
-    for (const name of this.model.field_names) {
-      const field = this.model.fields[name];
-      model.field_names.push(name);
-      model.fields[name] = field.json();
-    }
-    ret.model = model;
-    return ret;
-  }
-  load(rows) {
-    if (!(rows instanceof Array)) {
-      throw new Error("value of table field must be table, not " + typeof rows);
-    }
-    for (let i = 0; i < rows.length; i = i + 1) {
-      rows[i] = this.model.load(rows[i]);
-    }
-    return rows;
-  }
-}
-
-const datetimeOptionNames = [...baseOptionNames, "auto_now_add", "auto_now", "precision", "timezone"];
-class DatetimeField extends BaseField {
-  type = "datetime";
-  db_type = "timestamp";
-  precision = 0;
-  timezone = true;
-  get optionNames() {
-    return datetimeOptionNames;
-  }
-  constructor(options) {
-    super(options);
-    if (this.auto_now_add) {
-      this.default = getLocalTime;
-    }
-    return this;
-  }
-
-  getValidators(validators) {
+  },
+  get_validators: function (self, validators) {
     validators.unshift(Validator.datetime);
-    return super.getValidators(validators);
-  }
-  json() {
-    const ret = super.json();
+    return basefield.get_validators(self, validators);
+  },
+  json: function (self) {
+    const ret = basefield.json(self);
     if (ret.disabled === undefined && (ret.auto_now || ret.auto_now_add)) {
       ret.disabled = true;
     }
     return ret;
-  }
-  prepareForDb(value) {
-    if (this.auto_now) {
-      return getLocalTime();
+  },
+  prepare_for_db: function (self, value, data) {
+    if (self.auto_now) {
+      return ngx_localtime();
     } else if (value === "" || value === undefined) {
       return NULL;
     } else {
       return value;
     }
-  }
-}
-
-const dateOptionNames = [...baseOptionNames];
-class DateField extends BaseField {
-  type = "date";
-  db_type = "date";
-  get optionNames() {
-    return dateOptionNames;
-  }
-  getValidators(validators) {
+  },
+});
+const date_option_names = utils.list(basefield.option_names, []);
+const date = basefield._class({
+  type: "date",
+  db_type: "date",
+  option_names: date_option_names,
+  get_validators: function (self, validators) {
     validators.unshift(Validator.date);
-    return super.getValidators(validators);
-  }
-  prepareForDb(value) {
+    return basefield.get_validators(self, validators);
+  },
+  prepare_for_db: function (self, value, data) {
     if (value === "" || value === undefined) {
       return NULL;
     } else {
       return value;
     }
-  }
-}
-const timeOptionNames = [...baseOptionNames, "precision", "timezone"];
-class TimeField extends BaseField {
-  type = "time";
-  db_type = "time";
-  precision = 0;
-  timezone = true;
-  get optionNames() {
-    return timeOptionNames;
-  }
-  getValidators(validators) {
+  },
+});
+const time_option_names = utils.list(basefield.option_names, ["precision", "timezone"]);
+const time = basefield._class({
+  type: "time",
+  db_type: "time",
+  precision: 0,
+  timezone: true,
+  option_names: time_option_names,
+  get_validators: function (self, validators) {
     validators.unshift(Validator.time);
-    return super.getValidators(validators);
-  }
-  prepareForDb(value) {
+    return basefield.get_validators(self, validators);
+  },
+  prepare_for_db: function (self, value, data) {
     if (value === "" || value === undefined) {
       return NULL;
     } else {
       return value;
     }
-  }
-}
+  },
+});
 const VALID_FOREIGN_KEY_TYPES = {
-  foreignkey: String,
-  string: String,
-  sfzh: String,
+  foreignkey: tostring,
+  string: tostring,
+  sfzh: tostring,
   integer: Validator.integer,
-  float: Number,
+  float: tonumber,
   datetime: Validator.datetime,
   date: Validator.date,
   time: Validator.time,
 };
-const foreignkeyOptionNames = [
-  ...baseOptionNames,
+const foreignkey_option_names = utils.list(basefield.option_names, [
   "reference",
   "reference_column",
   "reference_label_column",
   "reference_url",
   "reference_url_admin",
-  "admin_url_name",
-  "modelUrlName",
-  "keyword_query_name",
-  "limit_query_name",
+  "on_delete",
+  "on_update",
   "autocomplete",
   "table_name",
-];
-class ForeignkeyField extends BaseField {
-  type = "foreignkey";
-  admin_url_name = "admin";
-  models_url_name = "model";
-  convert = String;
-  get optionNames() {
-    return foreignkeyOptionNames;
-  }
-  constructor(options) {
-    super({ db_type: FK_TYPE_NOT_DEFIEND, ...options });
-    const fkModel = this.reference;
-    if (fkModel === "self") {
-      return this;
+  "admin_url_name",
+  "models_url_name",
+  "keyword_query_name",
+  "limit_query_name",
+]);
+const foreignkey = basefield._class({
+  type: "foreignkey",
+  FK_TYPE_NOT_DEFIEND: FK_TYPE_NOT_DEFIEND,
+  on_delete: "CASCADE",
+  on_update: "CASCADE",
+  admin_url_name: "admin",
+  models_url_name: "model",
+  keyword_query_name: "keyword",
+  limit_query_name: "limit",
+  convert: tostring,
+  option_names: foreignkey_option_names,
+  init: function (self, options) {
+    basefield.init(self, utils.dict({ db_type: FK_TYPE_NOT_DEFIEND }, options));
+    const fk_model = self.reference;
+    if (fk_model === "self") {
+      return self;
     }
-    assert(fkModel.__isModelClass__, `a foreignkey must define reference model. not ${fkModel}(type: ${typeof fkModel})`);
-    const rc = this.reference_column || fkModel.primary_key || "id";
-    const fk = fkModel.fields[rc];
-    assert(fk, `invalid foreignkey name ${rc} for foreign model ${fkModel.table_name || "[TABLE NAME NOT DEFINED YET]"}`);
-    this.reference_column = rc;
-    const rlc = this.reference_label_column || this.reference_column;
-    assert(fkModel.fields[rlc], `invalid foreignkey label name ${rlc} for foreign model ${fkModel.table_name || "[TABLE NAME NOT DEFINED YET]"}`);
-    this.reference_label_column = rlc;
-    this.convert = assert(VALID_FOREIGN_KEY_TYPES[fk.type], `invalid foreignkey (name:${fk.name}, type:${fk.type})`);
+    self.setup_with_fk_model(fk_model);
+    return self;
+  },
+  setup_with_fk_model: function (self, fk_model) {
+    assert(
+      typeof fk_model === "object" && fk_model.__is_model_class__,
+      `a foreignkey must define a reference model. not ${fk_model}(type: ${typeof fk_model})`
+    );
+    const rc = self.reference_column || fk_model.primary_key || fk_model.DEFAULT_PRIMARY_KEY || "id";
+    const fk = fk_model.fields[rc];
+    assert(
+      fk,
+      `invalid foreignkey name ${rc} for foreign model ${fk_model.table_name || "[TABLE NAME NOT DEFINED YET]"}`
+    );
+    self.reference_column = rc;
+    const rlc = self.reference_label_column || rc;
+    assert(
+      fk_model.fields[rlc],
+      `invalid foreignkey label name ${rlc} for foreign model ${fk_model.table_name || "[TABLE NAME NOT DEFINED YET]"}`
+    );
+    self.reference_label_column = rlc;
+    self.convert = assert(VALID_FOREIGN_KEY_TYPES[fk.type], `invalid foreignkey (name:${fk.name}, type:${fk.type})`);
     assert(fk.primary_key || fk.unique, "foreignkey must be a primary key or unique key");
-    if (this.db_type === FK_TYPE_NOT_DEFIEND) {
-      this.db_type = fk.db_type || fk.type;
+    if (self.db_type === FK_TYPE_NOT_DEFIEND) {
+      self.db_type = fk.db_type || fk.type;
     }
-    return this;
-  }
-
-  getValidators(validators) {
-    const fkName = this.reference_column;
-    const foreignkeyValidator = (v) => {
+  },
+  get_validators: function (self, validators) {
+    const fk_name = self.reference_column;
+    function foreignkey_validator(v) {
+      let err;
       if (typeof v === "object") {
-        v = v[fkName];
+        v = v[fk_name];
       }
-      try {
-        v = this.convert(v);
-      } catch (error) {
-        throw new Error("error when converting foreign key:" + error.message);
+      [v, err] = self.convert(v);
+      if (err) {
+        throw new Error("error when converting foreign key:" + String(err));
       }
       return v;
-    };
-    validators.unshift(foreignkeyValidator);
-    return super.getValidators(validators);
-  }
-  toFormValue(value) {
-    if (typeof value == "object") {
-      return value[this.reference_column];
-    } else {
-      return value;
     }
-  }
-  load(value) {
-    //** todo 用Proxy改写
-    const fkName = this.reference_column;
-    const fkModel = this.reference;
-    // function __index(t, key) {
-    //   if (fkModel[key]) {
-    //     return fkModel[key];
-    //   } else if (fkModel.fields[key]) {
-    //     let pk = rawget(t, fkName);
-    //     if (!pk) {
-    //       return undefined;
-    //     }
-    //     let res = fkModel.get({ [fkName]: pk });
-    //     if (!res) {
-    //       return undefined;
-    //     }
-    //     for (let [k, v] of Object.entries(res)) {
-    //       rawset(t, k, v);
-    //     }
-    //     fkModel(t);
-    //     return t[key];
-    //   } else {
-    //     return undefined;
-    //   }
-    // }
-    // return setmetatable({ [fkName]: value }, { __index: __index });
-    return fkModel.newRecord({ [fkName]: value });
-  }
-  prepareForDb(value) {
+    validators.unshift(foreignkey_validator);
+    return basefield.get_validators(self, validators);
+  },
+  load: function (self, value) {
+    const fk_name = self.reference_column;
+    const fk_model = self.reference;
+    function __index(t, key) {
+      if (fk_model[key]) {
+        return fk_model[key];
+      } else if (fk_model.fields[key]) {
+        const pk = rawget(t, fk_name);
+        if (!pk) {
+          return undefined;
+        }
+        const res = fk_model.get({ [fk_name]: pk });
+        if (!res) {
+          return undefined;
+        }
+        for (const [k, v] of Object.entries(res)) {
+          rawset(t, k, v);
+        }
+        fk_model.create_record(t);
+        return t[key];
+      } else {
+        return undefined;
+      }
+    }
+    return setmetatable({ [fk_name]: value }, { __index: __index });
+  },
+  prepare_for_db: function (self, value, data) {
     if (value === "" || value === undefined) {
       return NULL;
     } else {
       return value;
     }
-  }
-  json() {
-    const ret = super.json();
-    ret.reference = this.reference.table_name;
-    ret.autocomplete = true;
+  },
+  json: function (self) {
+    const ret = basefield.json(self);
+    ret.reference = self.reference.table_name;
     if (ret.keyword_query_name === undefined) {
       ret.keyword_query_name = "keyword";
     }
     if (ret.limit_query_name === undefined) {
       ret.limit_query_name = "limit";
     }
+    ret.choices_url_admin = `/${ret.admin_url_name}/${ret.models_url_name}/${ret.table_name}/fk/${ret.name}/${ret.reference_label_column}`;
+    ret.reference_url_admin = `/${ret.admin_url_name}/${ret.models_url_name}/${ret.reference}`;
     if (ret.choices_url === undefined) {
-      ret.choices_url = `/${ret.admin_url_name}/${ret.models_url_name}/${ret.table_name}/fk/${ret.name}/${ret.reference_label_column}`;
+      ret.choices_url = `/${ret.reference}/choices?value=${ret.reference_column}&label=${ret.reference_label_column}`;
+    }
+    if (ret.reference_url === undefined) {
+      ret.reference_url = `/${ret.reference}/json`;
     }
     return ret;
+  },
+});
+const json = basefield._class({
+  type: "json",
+  db_type: "jsonb",
+  json: function (self) {
+    const json = basefield.json(self);
+    json.tag = "textarea";
+    return json;
+  },
+  prepare_for_db: function (self, value, data) {
+    if (value === "" || value === undefined) {
+      return NULL;
+    } else {
+      return Validator.encode(value);
+    }
+  },
+});
+function skip_validate_when_string(v) {
+  if (typeof v === "string") {
+    return [v, v];
+  } else {
+    return v;
   }
 }
-
-const ALIOSS_BUCKET = process.env.ALIOSS_BUCKET || "";
-const ALIOSS_REGION = process.env.ALIOSS_REGION || "";
-const ALIOSS_SIZE = process.env.ALIOSS_SIZE || "1MB";
-const ALIOSS_LIFETIME = Number(process.env.ALIOSS_LIFETIME) || 30;
-
-const aliossOptionNames = [
-  ...baseOptionNames,
+function check_array_type(v) {
+  if (typeof v !== "object") {
+    throw new Error("array field must be a table");
+  } else {
+    return v;
+  }
+}
+function non_empty_array_required(message) {
+  message = message || "此项必填";
+  function array_validator(v) {
+    if (v.length === 0) {
+      throw new Error(message);
+    } else {
+      return v;
+    }
+  }
+  return array_validator;
+}
+const basearray = json._class({
+  init: function (self, options) {
+    json.init(self, options);
+    if (typeof self._js_default === "string") {
+      self._js_default = string_choices_to_array(self._js_default);
+    }
+  },
+  get_validators: function (self, validators) {
+    if (self.required) {
+      validators.unshift(non_empty_array_required(self.get_error_message("required")));
+    }
+    validators.unshift(check_array_type);
+    validators.unshift(skip_validate_when_string);
+    validators.push(Validator.encode_as_array);
+    return json.get_validators(self, validators);
+  },
+  get_empty_value_to_update: function () {
+    return utils.array();
+  },
+});
+const array = basearray._class({
+  type: "array",
+  array_type: "string",
+  init: function (self, options) {
+    const fields = require("xodel.field");
+    const array_field_cls = fields[options.array_type || self.array_type || "string"];
+    if (!array_field_cls) {
+      throw new Error("invalid array_type: " + options.array_type);
+    }
+    self.option_names = utils.list(array_field_cls.option_names, ["array_type"]);
+    self.array_field = array_field_cls.create_field(options);
+    basearray.init(self, options);
+  },
+});
+function make_empty_array() {
+  return utils.array();
+}
+const table_option_names = utils.list(basearray.option_names, ["model", "max_rows", "uploadable", "columns"]);
+const table = basearray._class({
+  type: "table",
+  max_rows: TABLE_MAX_ROWS,
+  option_names: table_option_names,
+  init: function (self, options) {
+    basearray.init(self, options);
+    if (typeof self.model !== "object" || !self.model.__is_model_class__) {
+      throw new Error("please define model for a table field: " + self.name);
+    }
+    if (!self._js_default || self._js_default === "") {
+      self._js_default = make_empty_array;
+    }
+    if (!self.model.table_name) {
+      self.model.materialize_with_table_name({
+        table_name: self.name,
+        label: self.label,
+      });
+    }
+  },
+  get_validators: function (self, validators) {
+    function validate_by_each_field(rows) {
+      let err;
+      for (let [i, row] of rows.entries()) {
+        assert(typeof row === "object", "elements of table field must be table");
+        [row, err] = self.model.validate_create(row);
+        if (row === undefined) {
+          err.index = i;
+          throw new Error(err);
+        }
+        rows[i] = row;
+      }
+      return rows;
+    }
+    validators.unshift(validate_by_each_field);
+    return basearray.get_validators(self, validators);
+  },
+  json: function (self) {
+    const ret = basearray.json(self);
+    const model = {
+      field_names: lua_array([]),
+      fields: [],
+      table_name: self.model.table_name,
+      label: self.model.label,
+    };
+    for (const [_, name] of self.model.field_names.entries()) {
+      const field = self.model.fields[name];
+      model.field_names.push(name);
+      model.fields[name] = field.json();
+    }
+    ret.model = model;
+    return ret;
+  },
+  load: function (self, rows) {
+    if (typeof rows !== "object") {
+      throw new Error("value of table field must be table, not " + typeof rows);
+    }
+    for (let i = 0; i < rows.length; i = i + 1) {
+      rows[i] = self.model.load(rows[i]);
+    }
+    return lua_array(rows);
+  },
+});
+const ALIOSS_BUCKET = env("ALIOSS_BUCKET") || "";
+const ALIOSS_REGION = env("ALIOSS_REGION") || "";
+const ALIOSS_SIZE = env("ALIOSS_SIZE") || "1M";
+const alioss_option_names = utils.list(basefield.option_names, [
   "size",
-  "policy",
   "size_arg",
-  "times",
+  "policy",
   "payload",
-  "payload_url",
-  "upload_url",
-  "media_type",
-  "input_type",
+  "lifetime",
+  "key_secret",
+  "key_id",
+  "times",
+  "width",
+  "hash",
   "image",
   "maxlength",
-  "width",
   "prefix",
-  "hash",
+  "upload_url",
+  "payload_url",
+  "input_type",
   "limit",
-];
-const mapToAntdFileValue = (url = "") => {
-  const name = url.split("/").pop();
-  return typeof url == "object"
-    ? url
-    : {
-        name,
-        status: "done",
-        url: url,
-        extname: name.split(".")[1], // uni
-        ossUrl: url,
-      };
-};
-class AliossField extends StringField {
-  type = "alioss";
-  db_type = "varchar";
-  constructor(options) {
-    super({ maxlength: 255, ...options });
+  "media_type",
+]);
+const alioss = string._class({
+  type: "alioss",
+  db_type: "varchar",
+  option_names: alioss_option_names,
+  init: function (self, options) {
+    string.init(self, utils.dict({ maxlength: 255 }, options));
     const size = options.size || ALIOSS_SIZE;
-    this.size_arg = size;
-    this.size = parseSize(size);
-    this.lifetime = options.lifetime || ALIOSS_LIFETIME;
-    this.upload_url = process.env.ALIOSS_URL;
-    return this;
-  }
-  get optionNames() {
-    return aliossOptionNames;
-  }
-  async getPayload(options) {
-    const { data } = await Http.post(this.payload_url, {
-      ...options,
-      size: options.size || this.size,
-      lifetime: options.lifetime || this.lifetime,
-    });
-    return data;
-  }
-  getValidators(validators) {
-    // validators.unshift(Validator.url);
-    // return super.getValidators(validators);
-    return [];
-  }
-  getOptions(options) {
-    const json = super.getOptions(options);
-    if (json.size_arg) {
-      json.size = json.size_arg;
-      delete json.size_arg;
+    self.key_secret = options.key_secret;
+    self.key_id = options.key_id;
+    self.size_arg = size;
+    self.size = utils.byte_size_parser(size);
+    self.lifetime = options.lifetime;
+    self.upload_url = `//${options.bucket || ALIOSS_BUCKET}.${options.region || ALIOSS_REGION}.aliyuncs.com/`;
+  },
+  get_options: function (self, options) {
+    const ret = string.get_options(self, options);
+    if (ret.size_arg) {
+      ret.size = ret.size_arg;
+      ret.size_arg = undefined;
     }
-    return json;
-  }
-  toFormValue(url) {
-    // console.log("call AliossField.toFormValue", JSON.stringify(url));
-    if (this.attrs?.wxAvatar) {
-      return url || "";
-    }
-    if (typeof url == "string") {
-      return url ? [mapToAntdFileValue(url)] : [];
-    } else if (Array.isArray(url)) {
-      return [...url];
-    } else {
-      return [];
-    }
-  }
-  toPostValue(fileList) {
-    if (this.attrs?.wxAvatar) {
-      return fileList;
-    } else if (!Array.isArray(fileList) || !fileList[0]) {
-      return "";
-    } else {
-      return fileList[0].ossUrl || "";
-    }
-  }
-  json() {
-    const ret = super.json();
+    return ret;
+  },
+  get_payload: function (self, options) {
+    return get_payload(utils.dict(self, options));
+  },
+  get_validators: function (self, validators) {
+    validators.unshift(Validator.url);
+    return string.get_validators(self, validators);
+  },
+  json: function (self) {
+    const ret = string.json(self);
     if (ret.input_type === undefined) {
       ret.input_type = "file";
     }
+    ret.key_secret = undefined;
+    ret.key_id = undefined;
     return ret;
-  }
-}
-
-class AliossImageField extends AliossField {
-  type = "aliossImage";
-  db_type = "varchar";
-}
-class AliossListField extends AliossField {
-  type = "aliossList";
-  db_type = "jsonb";
-  getValidators(validators) {
-    return BaseArrayField.prototype.getValidators.call(this, validators);
-  }
-  getEmptyValueToUpdate() {
-    return [];
-  }
-  getOptions(options) {
-    return {
-      ...BaseArrayField.prototype.getOptions.call(this, options),
-      ...AliossField.prototype.getOptions.call(this, options),
-      type: this.type,
+  },
+});
+const alioss_image = alioss._class({
+  type: "alioss_image",
+  image: true,
+  media_type: "image",
+});
+const alioss_list = array._class({
+  type: "alioss_list",
+  array_type: "alioss",
+  option_names: alioss_option_names,
+  init: function (self, options) {
+    alioss.init(self, options);
+    array.init(self, options);
+  },
+  get_payload: function (self, options) {
+    return get_payload(utils.dict(self, options));
+  },
+  get_options: function (self, options) {
+    return utils.dict(array.get_options(self, options), alioss.get_options(self, options), {
+      type: self.type,
       db_type: "jsonb",
-    };
-  }
-  json() {
-    return {
-      ...BaseArrayField.prototype.json.call(this),
-      ...AliossField.prototype.json.call(this),
-    };
-  }
-  toFormValue(urls) {
-    // console.log("call toFormValue2", JSON.stringify(urls));
-    if (Array.isArray(urls)) {
-      return urls.map(mapToAntdFileValue);
-    } else {
-      return [];
-    }
-  }
-  toPostValue(fileList) {
-    if (!Array.isArray(fileList) || !fileList[0]) {
-      return [];
-    } else {
-      return fileList.map((e) => e.ossUrl);
-    }
-  }
-}
-
-class AliossImageListField extends AliossListField {
-  type = "aliossImageList";
-  db_type = "jsonb";
-  constructor(options) {
-    super(options);
-    this.image = true;
-  }
-  getOptions(options) {
-    return {
-      ...super.getOptions(options),
-      type: "aliossImageList",
-    };
-  }
-}
-export {
-  getChoices,
-  BaseField,
-  StringField,
-  EmailField,
-  PasswordField,
-  YearMonthField,
-  YearField,
-  MonthField,
-  TextField,
-  IntegerField,
-  FloatField,
-  DatetimeField,
-  DateField,
-  TimeField,
-  JsonField,
-  ArrayField,
-  TableField,
-  ForeignkeyField,
-  BooleanField,
-  AliossField,
-  AliossImageField,
-  AliossListField,
-  AliossImageListField,
-  SfzhField,
+    });
+  },
+  json: function (self) {
+    return utils.dict(array.json(self), alioss.json(self), {
+      type: self.type,
+      db_type: "jsonb",
+    });
+  },
+});
+const alioss_image_list = alioss_list._class({
+  type: "alioss_image_list",
+  array_type: "alioss_image",
+  image: true,
+  media_type: "image",
+});
+export default {
+  basefield: basefield,
+  string: string,
+  sfzh: sfzh,
+  email: email,
+  password: password,
+  text: text,
+  integer: integer,
+  float: float,
+  datetime: datetime,
+  date: date,
+  year_month: year_month,
+  year: year,
+  month: month,
+  time: time,
+  json: json,
+  array: array,
+  table: table,
+  foreignkey: foreignkey,
+  boolean: boolean,
+  alioss: alioss,
+  alioss_image: alioss_image,
+  alioss_list: alioss_list,
+  alioss_image_list: alioss_image_list,
 };

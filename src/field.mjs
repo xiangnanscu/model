@@ -1,8 +1,6 @@
 // get_options 和后端不同, attrs必存在
-import { clone, assert, NULL, FK_TYPE_NOT_DEFIEND, get_localtime } from "./utils";
-import * as Validator from "./validator";
-import { Http } from "@/globals/Http";
-import { parse_size } from "@/lib/utils.mjs";
+import { clone, assert, NULL, FK_TYPE_NOT_DEFIEND, get_localtime, parse_size, Http } from "./utils.mjs";
+import * as Validator from "./validator.mjs";
 
 const TABLE_MAX_ROWS = 1;
 const CHOICES_ERROR_DISPLAY_COUNT = 30;
@@ -57,7 +55,7 @@ function get_choices(raw_choices) {
       c = { value: c, label: String(c) };
     } else if (typeof c === "object") {
       const [value, label, hint] = clean_choice(c);
-      c = { value: value, label: label, hint: hint };
+      c = { value, label, hint };
     } else {
       throw new Error("invalid choice type:" + typeof c);
     }
@@ -152,7 +150,12 @@ class basefield {
     return this;
   }
   get option_names() {
-    return [...base_option_names, ...(super.constructor.option_names || []), ...this.constructor.option_names];
+    return [
+      ...base_option_names,
+      ...(super.constructor.option_names || []),
+      ...this.constructor.option_names,
+      ...(this.instance_option_names || []),
+    ];
   }
   get_error_message(key) {
     if (this.error_messages && this.error_messages[key]) {
@@ -255,6 +258,15 @@ class basefield {
     } else {
       return this.default(ctx);
     }
+  }
+  make_error(err, index) {
+    return {
+      type: "field_error",
+      message: err,
+      index,
+      name: this.name,
+      label: this.label,
+    };
   }
   to_form_value(value) {
     // Fields like alioss* need this
@@ -742,14 +754,14 @@ function check_array_type(v) {
 }
 function non_empty_array_required(message) {
   message = message || "此项必填";
-  function array_validator(v) {
+  function array_required_validator(v) {
     if (v.length === 0) {
       throw new Error(message);
     } else {
       return v;
     }
   }
-  return array_validator;
+  return array_required_validator;
 }
 
 class basearray extends json {
@@ -787,27 +799,27 @@ class array extends basearray {
   constructor(options) {
     super(options);
     const fields = {
-      basefield: basefield,
-      string: string,
-      sfzh: sfzh,
-      email: email,
-      password: password,
-      text: text,
-      integer: integer,
-      float: float,
-      datetime: datetime,
-      date: date,
-      year_month: year_month,
-      year: year,
-      month: month,
-      time: time,
-      json: json,
+      // basefield,
+      string,
+      sfzh,
+      email,
+      password,
+      text,
+      integer,
+      float,
+      datetime,
+      date,
+      year_month,
+      year,
+      month,
+      time,
+      // json,
       // array: array,
       // table: table,
-      foreignkey: foreignkey,
-      boolean: boolean,
-      alioss: alioss,
-      alioss_image: alioss_image,
+      foreignkey,
+      boolean,
+      alioss,
+      alioss_image,
       // alioss_list: alioss_list,
       // alioss_image_list: alioss_image_list,
     };
@@ -815,23 +827,33 @@ class array extends basearray {
     if (!array_field_cls) {
       throw new Error("invalid array_type: " + options.array_type);
     }
-    this.option_names = [
-      ...base_option_names,
-      ...array_field_cls.option_names,
-      "min",
-      "max",
-      "maxlength",
-      "minlength",
-      "array_type",
-    ];
+    this.instance_option_names = [...array_field_cls.option_names, "array_type"];
     this.array_field = array_field_cls.create_field(options);
   }
   get_validators(validators) {
-    validators.unshift((v) =>
-      v.map((e) => {
-        return this.array_field.validate(e);
-      })
-    );
+    // const array_validator = (value) => value.map((e) => this.array_field.validate(e));
+    const array_validator = (value) => {
+      const res = [];
+      const field = this.array_field;
+      for (const [i, e] of value.entries()) {
+        try {
+          let val = field.validate(e);
+          if (field.default && (val === undefined || val === "")) {
+            if (typeof field.default !== "function") {
+              val = field.default;
+            } else {
+              val = field.default();
+            }
+          }
+          res[i] = val;
+        } catch (error) {
+          error.index = i;
+          throw error;
+        }
+      }
+      return res;
+    };
+    validators.unshift(array_validator);
     return super.get_validators(validators);
   }
 }
@@ -904,10 +926,10 @@ class table extends basearray {
   }
 }
 
-const ALIOSS_BUCKET = process.env.ALIOSS_BUCKET || "";
-const ALIOSS_REGION = process.env.ALIOSS_REGION || "";
-const ALIOSS_SIZE = process.env.ALIOSS_SIZE || "1MB";
-const ALIOSS_LIFETIME = Number(process.env.ALIOSS_LIFETIME) || 30;
+const ALIOSS_BUCKET = process?.env?.ALIOSS_BUCKET || "";
+const ALIOSS_REGION = process?.env?.ALIOSS_REGION || "";
+const ALIOSS_SIZE = process?.env?.ALIOSS_SIZE || "1MB";
+const ALIOSS_LIFETIME = Number(process?.env?.ALIOSS_LIFETIME) || 30;
 const map_to_antd_file_value = (url = "") => {
   const name = url.split("/").pop();
   return typeof url == "object"
@@ -915,7 +937,7 @@ const map_to_antd_file_value = (url = "") => {
     : {
         name,
         status: "done",
-        url: url,
+        url,
         extname: name.split(".")[1], // uni
         oss_url: url,
       };
@@ -1015,20 +1037,8 @@ class alioss_image extends alioss {
 class alioss_list extends array {
   type = "alioss_list";
   array_type = "alioss";
-  constructor(options) {
-    // todo解决重复调用的问题
-    super(options);
-    alioss.prototype.constructor.call(this, options);
-    // array在后确保default为数组
-    array.prototype.constructor.call(this, options);
-  }
   async get_payload(options) {
-    const { data } = await Http.post(this.payload_url, {
-      ...options,
-      size: options.size || this.size,
-      lifetime: options.lifetime || this.lifetime,
-    });
-    return data;
+    return alioss.prototype.get_payload.call(this, options);
   }
   get_options(options) {
     return {
@@ -1069,28 +1079,28 @@ class alioss_image_list extends alioss_list {
   media_type = "image";
 }
 
-export default {
-  basefield: basefield,
-  string: string,
-  sfzh: sfzh,
-  email: email,
-  password: password,
-  text: text,
-  integer: integer,
-  float: float,
-  datetime: datetime,
-  date: date,
-  year_month: year_month,
-  year: year,
-  month: month,
-  time: time,
-  json: json,
-  array: array,
-  table: table,
-  foreignkey: foreignkey,
-  boolean: boolean,
-  alioss: alioss,
-  alioss_image: alioss_image,
-  alioss_list: alioss_list,
-  alioss_image_list: alioss_image_list,
+export {
+  basefield,
+  string,
+  sfzh,
+  email,
+  password,
+  text,
+  integer,
+  float,
+  datetime,
+  date,
+  year_month,
+  year,
+  month,
+  time,
+  json,
+  array,
+  table,
+  foreignkey,
+  boolean,
+  alioss,
+  alioss_image,
+  alioss_list,
+  alioss_image_list,
 };

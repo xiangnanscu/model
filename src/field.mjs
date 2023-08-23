@@ -113,8 +113,7 @@ const base_option_names = [
 class basefield {
   static base_option_names = base_option_names;
   static option_names = [];
-  __is_field_class__ = true;
-  required = false;
+  static __is_field_class__ = true;
   static new(options) {
     return this.create_field(options);
   }
@@ -125,11 +124,14 @@ class basefield {
   }
   constructor(options) {
     this.name = assert(options.name, "you must define a name for a field");
-    this.type = options.type;
+    this.type = options.type || this.constructor.name;
     for (const name of this.option_names) {
       if (options[name] !== undefined) {
         this[name] = options[name];
       }
+    }
+    if (this.required === undefined) {
+      this.required = false;
     }
     if (this.db_type === undefined) {
       this.db_type = this.type;
@@ -314,15 +316,11 @@ function get_max_choice_length(choices) {
 
 class string extends basefield {
   static option_names = ["compact", "trim", "pattern", "length", "minlength", "maxlength", "input_type"];
-  type = "string";
-  db_type = "varchar";
-  compact = true;
-  trim = true;
   constructor(options) {
     if (!options.choices && !options.length && !options.maxlength) {
       throw new Error(`field '${options.name}' must define maxlength or choices or length`);
     }
-    super(options);
+    super({ type: "string", db_type: "varchar", compact: true, trim: true, ...options });
     if (this.compact === undefined) {
       this.compact = true;
     }
@@ -369,10 +367,8 @@ class string extends basefield {
 
 class text extends basefield {
   static option_names = ["trim", "pattern"];
-  type = "text";
-  db_type = "text";
   constructor(options) {
-    super(options);
+    super({ type: "text", ...options });
     if (this.default === undefined) {
       this.default = "";
     }
@@ -383,10 +379,8 @@ class text extends basefield {
 }
 
 class sfzh extends string {
-  type = "sfzh";
-  db_type = "varchar";
   constructor(options) {
-    super({ ...options, length: 18 });
+    super({ type: "sfzh", db_type: "varchar", ...options, length: 18 });
   }
   get_validators(validators) {
     validators.unshift(Validator.sfzh);
@@ -395,26 +389,20 @@ class sfzh extends string {
 }
 
 class email extends string {
-  type = "email";
-  db_type = "varchar";
   constructor(options) {
-    super({ maxlength: 255, ...options });
+    super({ type: "email", db_type: "varchar", maxlength: 255, ...options });
   }
 }
 
 class password extends string {
-  type = "password";
-  db_type = "varchar";
   constructor(options) {
-    super({ maxlength: 255, ...options });
+    super({ type: "password", db_type: "varchar", maxlength: 255, ...options });
   }
 }
 
 class year_month extends string {
-  type = "year_month";
-  db_type = "varchar";
   constructor(options) {
-    super({ length: 7, ...options });
+    super({ type: "year_month", db_type: "varchar", length: 7, ...options });
   }
   get_validators(validators) {
     validators.unshift(Validator.year_month);
@@ -423,10 +411,11 @@ class year_month extends string {
 }
 
 const number_validator_names = ["min", "max"];
-class integer {
+class integer extends basefield {
   static option_names = ["min", "max", "step", "serial"];
-  type = "integer";
-  db_type = "integer";
+  constructor(options) {
+    super({ type: "integer", length: 7, ...options });
+  }
   get_validators(validators) {
     this.add_min_or_max_validators(validators);
     validators.unshift(Validator.integer);
@@ -456,25 +445,22 @@ class integer {
 }
 
 class year extends integer {
-  type = "year";
-  db_type = "integer";
   constructor(options) {
-    super({ min: 1000, max: 9999, ...options });
+    super({ type: "year", db_type: "integer", min: 1000, max: 9999, ...options });
   }
 }
 
 class month extends integer {
-  type = "month";
-  db_type = "integer";
   constructor(options) {
-    super({ min: 1, max: 12, ...options });
+    super({ type: "month", db_type: "integer", min: 1, max: 12, ...options });
   }
 }
 
 class float extends basefield {
   static option_names = ["min", "max", "step", "precision"];
-  type = "float";
-  db_type = "float";
+  constructor(options) {
+    super({ type: "float", db_type: "float", min: 1, max: 12, ...options });
+  }
   get_validators(validators) {
     this.add_min_or_max_validators(validators);
     validators.unshift(Validator.number);
@@ -502,10 +488,8 @@ const DEFAULT_BOOLEAN_CHOICES = [
 ];
 class boolean extends basefield {
   static option_names = ["cn"];
-  type = "boolean";
-  db_type = "boolean";
   constructor(options) {
-    super(options);
+    super({ type: "boolean", ...options });
     if (this.choices === undefined) {
       this.choices = clone(DEFAULT_BOOLEAN_CHOICES);
     }
@@ -530,13 +514,9 @@ class boolean extends basefield {
 
 class datetime extends basefield {
   static option_names = ["auto_now_add", "auto_now", "precision", "timezone"];
-  type = "datetime";
-  db_type = "timestamp";
-  precision = 0;
-  timezone = true;
 
   constructor(options) {
-    super(options);
+    super({ type: "datetime", db_type: "timestamp", precision: 0, timezone: true, ...options });
     if (this.auto_now_add) {
       this.default = get_localtime;
     }
@@ -566,8 +546,9 @@ class datetime extends basefield {
 }
 
 class date extends basefield {
-  type = "date";
-  db_type = "date";
+  constructor(options) {
+    super({ type: "date", ...options });
+  }
   get_validators(validators) {
     validators.unshift(Validator.date);
     return super.get_validators(validators);
@@ -583,11 +564,9 @@ class date extends basefield {
 
 class time extends basefield {
   static option_names = ["precision", "timezone"];
-  type = "time";
-  db_type = "time";
-  precision = 0;
-  timezone = true;
-
+  constructor(options) {
+    super({ type: "time", precision: 0, timezone: true, ...options });
+  }
   get_validators(validators) {
     validators.unshift(Validator.time);
     return super.get_validators(validators);
@@ -627,18 +606,20 @@ class foreignkey extends basefield {
     "keyword_query_name",
     "limit_query_name",
   ];
-  type = "foreignkey";
-  FK_TYPE_NOT_DEFIEND = FK_TYPE_NOT_DEFIEND;
-  on_delete = "CASCADE";
-  on_update = "CASCADE";
-  admin_url_name = "admin";
-  models_url_name = "model";
-  keyword_query_name = "keyword";
-  limit_query_name = "limit";
-  convert = String;
-
+  static FK_TYPE_NOT_DEFIEND = FK_TYPE_NOT_DEFIEND;
   constructor(options) {
-    super({ db_type: FK_TYPE_NOT_DEFIEND, ...options });
+    super({
+      type: "foreignkey",
+      db_type: FK_TYPE_NOT_DEFIEND,
+      on_delete: "CASCADE",
+      on_update: "CASCADE",
+      admin_url_name: "admin",
+      models_url_name: "model",
+      keyword_query_name: "keyword",
+      limit_query_name: "limit",
+      convert: String,
+      ...options,
+    });
     const fk_model = this.reference;
     if (fk_model === "self") {
       return this;
@@ -722,8 +703,9 @@ class foreignkey extends basefield {
 }
 
 class json extends basefield {
-  type = "json";
-  db_type = "jsonb";
+  constructor(options) {
+    super({ type: "json", db_type: "jsonb", ...options });
+  }
   json() {
     const json = super.json();
     json.tag = "textarea";
@@ -794,10 +776,8 @@ class basearray extends json {
 }
 
 class array extends basearray {
-  type = "array";
-  array_type = "string";
   constructor(options) {
-    super(options);
+    super({ type: "array", array_type: "string", ...options });
     const fields = {
       // basefield,
       string,
@@ -864,10 +844,8 @@ function make_empty_array() {
 
 class table extends basearray {
   static option_names = ["model", "max_rows", "uploadable", "columns"];
-  type = "table";
-  max_rows = TABLE_MAX_ROWS;
   constructor(options) {
-    super(options);
+    super({ type: "table", max_rows: TABLE_MAX_ROWS, ...options });
     if (!this.model?.__is_model_class__) {
       throw new Error("please define model for a table field: " + this.name);
     }
@@ -963,10 +941,8 @@ class alioss extends string {
     "limit",
     "media_type",
   ];
-  type = "alioss";
-  db_type = "varchar";
   constructor(options) {
-    super({ maxlength: 255, ...options });
+    super({ type: "alioss", db_type: "varchar", maxlength: 255, ...options });
     const size = options.size || ALIOSS_SIZE;
     this.key_secret = options.key_secret;
     this.key_id = options.key_id;

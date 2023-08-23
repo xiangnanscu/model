@@ -39,7 +39,7 @@ class C extends B {
     super();
     // console.log(this.constructor.foo);
     // console.log(super.constructor.foo);
-    console.log("C constuctor end...");
+    console.log("C constuctor end..." + this.constructor.name);
   }
 }
 

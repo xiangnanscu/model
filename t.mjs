@@ -1,8 +1,10 @@
-import { alioss_list } from "./src/field.mjs";
+import { alioss_list, alioss } from "./src/field.mjs";
 
-// const al = alioss_list.new({ name: "pics", size: "2m", key_id: "foo" });
-
-// console.log(al.json());
+const al = alioss_list.new({ name: "pics", size: "2m", key_id: "key_id", key_secret: "key_secret" });
+// const bl = alioss.new({ name: "pics", size: "2m", key_id: "foo" });
+console.log(al.json());
+console.log(al.get_options());
+// console.log(bl.get_options());
 
 class A {
   ins = console.log("A.ins") || "A";
@@ -43,4 +45,4 @@ class C extends B {
   }
 }
 
-new C();
+// new C();

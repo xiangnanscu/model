@@ -114,9 +114,6 @@ class basefield {
   static base_option_names = base_option_names;
   static option_names = [];
   static __is_field_class__ = true;
-  static new(options) {
-    return this.create_field(options);
-  }
   static create_field(options) {
     const self = new this(options);
     self.validators = self.get_validators([]);
@@ -152,12 +149,7 @@ class basefield {
     return this;
   }
   get option_names() {
-    return [
-      ...base_option_names,
-      ...(super.constructor.option_names || []),
-      ...this.constructor.option_names,
-      ...(this.instance_option_names || []),
-    ];
+    return [...base_option_names, ...(super.constructor.option_names || []), ...this.constructor.option_names];
   }
   get_error_message(key) {
     if (this.error_messages && this.error_messages[key]) {
@@ -193,14 +185,11 @@ class basefield {
     }
     return validators;
   }
-  get_options(options) {
-    if (!options) {
-      options = this;
-    }
-    const ret = { name: options.name, type: options.type };
+  get_options() {
+    const ret = { name: this.name, type: this.type };
     for (const name of this.option_names) {
-      if (options[name] !== undefined) {
-        ret[name] = options[name];
+      if (this[name] !== undefined) {
+        ret[name] = this[name];
       }
     }
     if (ret.attrs) {
@@ -210,29 +199,29 @@ class basefield {
     }
     return ret;
   }
-  json() {
-    const json = this.get_options();
-    delete json.error_messages;
-    if (typeof json.default === "function") {
-      delete json.default;
+  json(data = {}) {
+    const res = { ...this.get_options(), ...data };
+    delete res.error_messages;
+    if (typeof res.default === "function") {
+      delete res.default;
     }
-    if (typeof json.choices === "function") {
-      delete json.choices;
+    if (typeof res.choices === "function") {
+      delete res.choices;
     }
-    if (!json.tag) {
-      if (Array.isArray(json.choices) && json.choices.length > 0 && !json.autocomplete) {
-        json.tag = "select";
+    if (!res.tag) {
+      if (Array.isArray(res.choices) && res.choices.length > 0 && !res.autocomplete) {
+        res.tag = "select";
       } else {
-        json.tag = "input";
+        res.tag = "input";
       }
     }
-    if (json.tag === "input" && json.lazy === undefined) {
-      json.lazy = true;
+    if (res.tag === "input" && res.lazy === undefined) {
+      res.lazy = true;
     }
-    if (json.preload === undefined && (json.choices_url || json.choices_url_admin)) {
-      json.preload = false;
+    if (res.preload === undefined && (res.choices_url || res.choices_url_admin)) {
+      res.preload = false;
     }
-    return json;
+    return res;
   }
   widget_attrs(extra_attrs) {
     return { required: this.required, readonly: this.disabled, ...extra_attrs };
@@ -776,6 +765,7 @@ class basearray extends json {
 }
 
 class array extends basearray {
+  static option_names = ["array_type"];
   constructor(options) {
     super({ type: "array", array_type: "string", ...options });
     const fields = {
@@ -807,8 +797,17 @@ class array extends basearray {
     if (!array_field_cls) {
       throw new Error("invalid array_type: " + options.array_type);
     }
-    this.instance_option_names = [...array_field_cls.option_names, "array_type"];
+    // this.instance_option_names = [...array_field_cls.option_names, "array_type"];
     this.array_field = array_field_cls.create_field(options);
+  }
+  get_options() {
+    return {
+      ...super.get_options(),
+      ...this.array_field.get_options(),
+    };
+  }
+  json() {
+    return this.array_field.json(super.json());
   }
   get_validators(validators) {
     // const array_validator = (value) => value.map((e) => this.array_field.validate(e));
@@ -943,6 +942,9 @@ class alioss extends string {
   ];
   constructor(options) {
     super({ type: "alioss", db_type: "varchar", maxlength: 255, ...options });
+    this.setup(options);
+  }
+  setup(options) {
     const size = options.size || ALIOSS_SIZE;
     this.key_secret = options.key_secret;
     this.key_id = options.key_id;
@@ -951,12 +953,10 @@ class alioss extends string {
     this.lifetime = options.lifetime || ALIOSS_LIFETIME;
     this.upload_url = `//${options.bucket || ALIOSS_BUCKET}.${options.region || ALIOSS_REGION}.aliyuncs.com/`;
   }
-  get_options(options) {
-    const ret = super.get_options(options);
-    if (ret.size_arg) {
-      ret.size = ret.size_arg;
-      delete ret.size_arg;
-    }
+  get_options() {
+    const ret = super.get_options();
+    ret.size = ret.size_arg;
+    delete ret.size_arg;
     return ret;
   }
   async get_payload(options) {
@@ -1011,29 +1011,13 @@ class alioss_image extends alioss {
 
 class alioss_list extends array {
   constructor(options) {
-    super({ type: "alioss_list", array_type: "alioss", ...options });
+    super({ type: "alioss_list", db_type: "jsonb", array_type: "alioss", ...options });
+    alioss.prototype.setup.call(this, options);
   }
   async get_payload(options) {
-    return alioss.prototype.get_payload.call(this, options);
-  }
-  get_options(options) {
-    return {
-      ...array.prototype.get_options.call(this, options),
-      ...alioss.prototype.get_options.call(this, options),
-      type: this.type,
-      db_type: "jsonb",
-    };
-  }
-  json() {
-    return {
-      ...array.prototype.json.call(this),
-      ...alioss.prototype.json.call(this),
-      type: this.type,
-      db_type: "jsonb",
-    };
+    return await alioss.prototype.get_payload.call(this, options);
   }
   to_form_value(urls) {
-    // console.log("call to_form_value2", JSON.stringify(urls));
     if (Array.isArray(urls)) {
       return urls.map(map_to_antd_file_value);
     } else {

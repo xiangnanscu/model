@@ -1004,15 +1004,15 @@ class alioss extends string {
 }
 
 class alioss_image extends alioss {
-  type = "alioss_image";
-  db_type = "varchar";
-  media_type = "image";
-  image = true;
+  constructor(options) {
+    super({ type: "alioss_image", db_type: "varchar", media_type: "image", image: true, ...options });
+  }
 }
 
 class alioss_list extends array {
-  type = "alioss_list";
-  array_type = "alioss";
+  constructor(options) {
+    super({ type: "alioss_list", array_type: "alioss", ...options });
+  }
   async get_payload(options) {
     return alioss.prototype.get_payload.call(this, options);
   }
@@ -1049,10 +1049,9 @@ class alioss_list extends array {
   }
 }
 class alioss_image_list extends alioss_list {
-  type = "alioss_image_list";
-  array_type = "alioss_image";
-  image = true;
-  media_type = "image";
+  constructor(options) {
+    super({ type: "alioss_image_list", array_type: "alioss_image", media_type: "image", image: true, ...options });
+  }
 }
 
 export {

@@ -110,6 +110,19 @@ export const IS_PG_KEYWORDS = {
   WINDOW: true,
   WITH: true,
 };
+export function _prefix_with_V(column) {
+  return "V." + column;
+}
+export function dict(t1, t2) {
+  const res = clone(t1);
+  if (t2) {
+    for (const [key, value] of Object.entries(t2)) {
+      res[key] = value;
+    }
+  }
+  return res;
+}
+export const capitalize = (s) => s.charAt(0).toUpperCase() + s.slice(1);
 export const unique = (arr) => {
   return arr.filter((e, i) => arr.indexOf(e) === i);
 };

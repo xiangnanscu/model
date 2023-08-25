@@ -14,7 +14,7 @@
 // match(key, ...) => key.match
 // lua循环起始值为2时js的处理, 例如:parse_where_exp
 // lua: type(obj)=='table', js要考虑是不是Array.isArray(obj)
-import { clone, string_format, assert, next, make_token, NULL, DEFAULT } from "./utils";
+import { clone, string_format, assert, next, make_token, NULL, DEFAULT, _prefix_with_V } from "./utils";
 
 const PG_SET_MAP = {
   _union: "UNION",
@@ -33,9 +33,6 @@ const COMPARE_OPERATORS = {
   eq: "=",
 };
 
-function _prefix_with_V(column) {
-  return "V." + column;
-}
 function _escape_factory(is_literal, is_bracket) {
   function as_sql_token(value) {
     const value_type = typeof value;
@@ -45,7 +42,7 @@ function _escape_factory(is_literal, is_bracket) {
       } else {
         return value;
       }
-    } else if ("number" === value_type) {
+    } else if ("number" === value_type || "bigint" === value_type) {
       return String(value);
     } else if ("boolean" === value_type) {
       return (value && "TRUE") || "FALSE";
@@ -216,13 +213,13 @@ Sql.prototype._base_merge = function (rows, key, columns) {
   const vals_columns = columns.map(_prefix_with_V);
   const insert_subquery = Sql.new({ table_name: "V" })
     ._base_select(vals_columns)
-    ._base_left_join("U AS T", join_cond)
+    ._base_join("LEFT", "U AS T", join_cond)
     ._base_where_null("T." + (Array.is_array(key) ? key[0] : key));
   let updated_subquery;
   if ((typeof key === "object" && key.length === columns.length) || columns.length === 1) {
     updated_subquery = Sql.new({ table_name: "V" })
       ._base_select(vals_columns)
-      ._base_join(this.table_name + " AS T", join_cond);
+      ._base_join("INNER", this.table_name + " AS T", join_cond);
   } else {
     updated_subquery = Sql.new({ table_name: this.table_name, _as: "T" })
       ._base_update(this._get_update_token_with_prefix(columns, key, "V"))
@@ -293,23 +290,8 @@ Sql.prototype._base_from = function (a, ...varargs) {
   }
   return this;
 };
-Sql.prototype._base_join = function (right_table, key, op, val) {
-  const join_token = this._get_join_token("INNER", right_table, key, op, val);
-  this._from = `${this._from || this.get_table()} ${join_token}`;
-  return this;
-};
-Sql.prototype._base_left_join = function (right_table, key, op, val) {
-  const join_token = this._get_join_token("LEFT", right_table, key, op, val);
-  this._from = `${this._from || this.get_table()} ${join_token}`;
-  return this;
-};
-Sql.prototype._base_right_join = function (right_table, key, op, val) {
-  const join_token = this._get_join_token("RIGHT", right_table, key, op, val);
-  this._from = `${this._from || this.get_table()} ${join_token}`;
-  return this;
-};
-Sql.prototype._base_full_join = function (right_table, key, op, val) {
-  const join_token = this._get_join_token("FULL", right_table, key, op, val);
+Sql.prototype._base_join = function (join_type, right_table, key, op, val) {
+  const join_token = this._get_join_token(join_type || "INNER", right_table, key, op, val);
   this._from = `${this._from || this.get_table()} ${join_token}`;
   return this;
 };
@@ -728,14 +710,8 @@ Sql.prototype._handle_join = function (join_type, join_table, join_cond) {
   } else if (this._delete) {
     this._using = join_table;
     this._base_where(join_cond);
-  } else if (join_type === "INNER") {
-    this._base_join(join_table, join_cond);
-  } else if (join_type === "LEFT") {
-    this._base_left_join(join_table, join_cond);
-  } else if (join_type === "RIGHT") {
-    this._base_right_join(join_table, join_cond);
   } else {
-    this._base_full_join(join_table, join_cond);
+    this._base_join(join_type, join_table, join_cond);
   }
 };
 Sql.prototype._parse_column = function (key, as_select, strict, disable_alias) {
@@ -884,7 +860,7 @@ Sql.prototype._statement_for_set = function () {
 Sql.prototype.statement = function () {
   const table_name = this.get_table();
   const statement = assemble_sql({
-    table_name: table_name,
+    table_name,
     with: this._with,
     join: this._join,
     distinct: this._distinct,
@@ -980,7 +956,7 @@ Sql.prototype.get_merge = function (rows, key) {
   const join_cond = this._get_join_conditions(key, "V", this._as || this.table_name);
   const cte_name = `V(${columns.join(", ")})`;
   const cte_values = `(VALUES ${as_token(rows)})`;
-  this._base_select("V.*").with(cte_name, cte_values)._base_right_join("V", join_cond);
+  this._base_select("V.*").with(cte_name, cte_values)._base_join("RIGHT", "V", join_cond);
   return this;
 };
 Sql.prototype.copy = function () {
@@ -1137,24 +1113,19 @@ Sql.prototype.get_table = function () {
   return (this._as === undefined && this.table_name) || this.table_name + (" AS " + this._as);
 };
 Sql.prototype.join = function (join_args, key, op, val) {
-  this._base_join(join_args, key, op, val);
-  return this;
+  return this._base_join("INNER", join_args, key, op, val);
 };
 Sql.prototype.inner_join = function (join_args, key, op, val) {
-  this._base_join(join_args, key, op, val);
-  return this;
+  return this._base_join("INNER", join_args, key, op, val);
 };
 Sql.prototype.left_join = function (join_args, key, op, val) {
-  this._base_left_join(join_args, key, op, val);
-  return this;
+  return this._base_join("LEFT", join_args, key, op, val);
 };
 Sql.prototype.right_join = function (join_args, key, op, val) {
-  this._base_right_join(join_args, key, op, val);
-  return this;
+  return this._base_join("RIGHT", join_args, key, op, val);
 };
 Sql.prototype.full_join = function (join_args, key, op, val) {
-  this._base_full_join(join_args, key, op, val);
-  return this;
+  return this._base_join("FULL", join_args, key, op, val);
 };
 Sql.prototype.limit = function (n) {
   this._limit = n;

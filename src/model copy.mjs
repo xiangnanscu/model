@@ -2,140 +2,18 @@ import * as Field from "./field";
 import * as utils from "./utils";
 import { Http } from "@/globals/Http";
 
-const DEFAULT_STRING_MAXLENGTH = 256;
-const FOREIGN_KEY = 2;
-const NON_FOREIGN_KEY = 3;
-const END = 4;
-const COMPARE_OPERATORS = {
-  lt: "<",
-  lte: "<=",
-  gt: ">",
-  gte: ">=",
-  ne: "<>",
-  eq: "=",
-};
-const IS_PG_KEYWORDS = {};
-const NON_MERGE_NAMES = {
-  sql: true,
-  fields: true,
-  field_names: true,
-  extend: true,
-  mixins: true,
-  admin: true,
-};
-const isEmptyObject = (obj) => {
-  for (var i in obj) {
-    return false;
-  }
-  return true;
-};
-const getLocalTime = Field.BaseField.getLocalTime;
-const stringFormat = (s, ...varargs) => {
-  let status = 0;
-  const res = [];
-  let j = -1;
-  for (let i = 0; i < s.length; i++) {
-    const c = s[i];
-    if (c === "%") {
-      if (status === 0) {
-        status = 1;
-      } else if (status === 1) {
-        status = 0;
-        res.push("%");
-      }
-    } else if (c === "s" && status === 1) {
-      j = j + 1;
-      res.push(varargs[j]);
-      status = 0;
-    } else {
-      res.push(c);
-    }
-  }
-  return res.join("");
-};
-const capitalize = (s) => s.charAt(0).toUpperCase() + s.slice(1);
-const baseModel = {
-  abstract: true,
-  field_names: ["id", "ctime", "utime"],
-  fields: {
-    id: { type: "integer", primary_key: true, serial: true },
-    ctime: { label: "创建时间", type: "datetime", auto_now_add: true },
-    utime: { label: "更新时间", type: "datetime", auto_now: true },
-  },
-};
-const unique = (arr) => {
-  return arr.filter((e, i) => arr.indexOf(e) === i);
-};
-const clone = (o) => JSON.parse(JSON.stringify(o));
-function _prefixWith_V(column) {
-  return "V." + column;
-}
-function map(tbl, func) {
-  const res = [];
-  for (let i = 0; i < tbl.length; i = i + 1) {
-    res[i] = func(tbl[i]);
-  }
-  return res;
-}
-function checkReserved(name) {
-  assert(typeof name === "string", `name must by string, not ${typeof name} (${name})`);
-  assert(!name.includes("__"), "don't use __ in a field name");
-  assert(!IS_PG_KEYWORDS[name.toUpperCase()], `${name} is a postgresql reserved word`);
-}
-function normalizeArrayAndHashFields(fields) {
-  assert(typeof fields === "object", "you must provide fields for a model");
-  const alignedFields = [];
-  const field_names = [];
-  if (Array.isArray(fields)) {
-    for (const field of fields) {
-      alignedFields[field.name] = field;
-      field_names.push(field.name);
-    }
-  } else {
-    for (const [name, field] of Object.entries(fields)) {
-      if (typeof name === "number") {
-        assert(field.name, "you must define name for a field when using array fields");
-        alignedFields[field.name] = field;
-        field_names.push(field.name);
-      } else {
-        alignedFields[name] = field;
-        field_names.push(name);
-      }
-    }
-  }
-
-  return [alignedFields, field_names];
-}
-function normalizeFieldNames(field_names) {
-  assert(typeof field_names === "object", "you must provide field_names for a model");
-  for (const name of field_names) {
-    assert(typeof name === "string", "element of field_names must be string");
-  }
-  return field_names;
-}
-function getForeignObject(attrs, prefix) {
-  const fk = {};
-  const n = prefix.length;
-  for (const [k, v] of Object.entries(attrs)) {
-    if (k.slice(0, n) === prefix) {
-      fk[k.slice(n)] = v;
-      delete attrs[k];
-    }
-  }
-  return fk;
-}
-function makeRecordClass(model) {
+function make_record_class(model) {
   class Record {
     constructor(attrs) {
       Object.assign(this, attrs);
     }
     async delete(key) {
-      key = model.checkUniqueKey(key || model.primary_key);
+      key = model.check_unique_key(key || model.primary_key);
       if (this[key] === undefined) {
         throw new Error("empty value for delete key:" + key);
       }
       return await model
-        .newSql()
+        .new_sql()
         .delete({ [key]: this[key] })
         .returning(key)
         .exec();
@@ -143,87 +21,46 @@ function makeRecordClass(model) {
     async save(names, key) {
       return await model.save(this, names, key);
     }
-    async saveCreate(names, key) {
-      return await model.saveCreate(this, names, key);
+    async save_create(names, key) {
+      return await model.save_create(this, names, key);
     }
-    async saveUpdate(names, key) {
-      return await model.saveUpdate(this, names, key);
+    async save_update(names, key) {
+      return await model.save_update(this, names, key);
     }
     validate(names, key) {
       return model.validate(this, names, key);
     }
-    validateUpdate(names) {
-      return model.validateUpdate(this, names);
+    validate_update(names) {
+      return model.validate_update(this, names);
     }
-    validateCreate(names) {
-      return model.validateCreate(this, names);
+    validate_create(names) {
+      return model.validate_create(this, names);
     }
   }
   return Record;
 }
-function assert(bool, errMsg) {
-  if (!bool) {
-    throw new Error(errMsg);
-  } else {
-    return bool;
-  }
-}
-class ValidateError extends Error {
-  constructor({ name, message, label }) {
-    super(message);
-    Object.assign(this, { name, label, message });
-  }
-  String() {
-    return `MODEL FIELD ERROR: ${this.name}(${this.label})+${this.message}`;
-  }
-}
-class ValidateBatchError extends ValidateError {
-  constructor({ name, message, label, index }) {
-    super({ name, message, label });
-    this.index = index;
-  }
-}
-function makeFieldFromJson(json, kwargs) {
-  const options = { ...json, ...kwargs };
-  if (!options.type) {
-    if (options.reference) {
-      options.type = "foreignkey";
-    } else if (options.model) {
-      options.type = "table";
-    } else {
-      options.type = "string";
-    }
-  }
-  if ((options.type === "string" || options.type === "alioss") && !options.maxlength) {
-    options.maxlength = DEFAULT_STRING_MAXLENGTH;
-  }
-  const fcls = Field[`${capitalize(utils.snakeToCamel(options.type))}Field`];
-  if (!fcls) {
-    throw new Error("invalid field type:" + String(options.type));
-  }
-  return fcls.new(options);
-}
-function makeToken(s) {
-  function rawToken() {
+
+function make_token(s) {
+  function raw_token() {
     return s;
   }
-  return rawToken;
+  return raw_token;
 }
-const DEFAULT = makeToken("DEFAULT");
-const NULL = makeToken("NULL");
+const DEFAULT = make_token("DEFAULT");
+const NULL = make_token("NULL");
 const PG_SET_MAP = {
   _union: "UNION",
-  _unionAll: "UNION ALL",
+  _union_all: "UNION ALL",
   _except: "EXCEPT",
-  _exceptAll: "EXCEPT ALL",
+  _except_all: "EXCEPT ALL",
   _intersect: "INTERSECT",
-  _intersectAll: "INTERSECT ALL",
+  _intersect_all: "INTERSECT ALL",
 };
-function _escapeFactory(isLiteral, isBracket) {
-  function asSqlToken(value) {
+function _escape_factory(is_literal, is_bracket) {
+  function as_sql_token(value) {
     if ("string" === typeof value) {
-      if (isLiteral) {
-        return "'" + value.replaceAll("'", "''") + "'";
+      if (is_literal) {
+        return "'" + value.replace_all("'", "''") + "'";
       } else {
         return value;
       }
@@ -241,8 +78,8 @@ function _escapeFactory(isLiteral, isBracket) {
       if (value.length === 0) {
         throw new Error("empty array as Sql value is not allowed");
       }
-      const token = value.map(asSqlToken).join(", ");
-      if (isBracket) {
+      const token = value.map(as_sql_token).join(", ");
+      if (is_bracket) {
         return "(" + token + ")";
       } else {
         return token;
@@ -251,45 +88,45 @@ function _escapeFactory(isLiteral, isBracket) {
       throw new Error(`don't know how to escape value: ${value} (${typeof value})`);
     }
   }
-  return asSqlToken;
+  return as_sql_token;
 }
-const asLiteral = _escapeFactory(true, true);
-const asToken = _escapeFactory(false, false);
-function getCteReturningValues(columns, literals) {
+const as_literal = _escape_factory(true, true);
+const as_token = _escape_factory(false, false);
+function get_cte_returning_values(columns, literals) {
   const values = [];
   for (const col of columns) {
-    values.push(asToken(col));
+    values.push(as_token(col));
   }
   if (literals) {
     for (const e of literals) {
-      values.push(asLiteral(e));
+      values.push(as_literal(e));
     }
   }
   return values;
 }
-function getReturningToken(opts) {
-  if (opts.cteReturning) {
-    return " RETURNING " + asToken(getCteReturningValues(opts.cteReturning.columns, opts.cteReturning.literals));
+function get_returning_token(opts) {
+  if (opts.cte_returning) {
+    return " RETURNING " + as_token(get_cte_returning_values(opts.cte_returning.columns, opts.cte_returning.literals));
   } else if (opts.returning) {
     return " RETURNING " + opts.returning;
   } else {
     return "";
   }
 }
-function assembleSql(opts) {
+function assemble_sql(opts) {
   let statement;
   if (opts.update) {
     const from = (opts.from && " FROM " + opts.from) || "";
     const where = (opts.where && " WHERE " + opts.where) || "";
-    const returning = getReturningToken(opts);
+    const returning = get_returning_token(opts);
     statement = `UPDATE ${opts.table_name} SET ${opts.update}${from}${where}${returning}`;
   } else if (opts.insert) {
-    const returning = getReturningToken(opts);
+    const returning = get_returning_token(opts);
     statement = `INSERT INTO ${opts.table_name} ${opts.insert}${returning}`;
   } else if (opts.delete) {
     const using = (opts.using && " USING " + opts.using) || "";
     const where = (opts.where && " WHERE " + opts.where) || "";
-    const returning = getReturningToken(opts);
+    const returning = get_returning_token(opts);
     statement = `DELETE FROM ${opts.table_name}${using}${where}${returning}`;
   } else {
     const from = opts.from || opts.table_name;
@@ -306,14 +143,14 @@ function assembleSql(opts) {
   return (opts.with && `WITH ${opts.with} ${statement}`) || statement;
 }
 
-class ModelProxy {
-  static createProxy(modelclass) {
+class Model_proxy {
+  static create_proxy(modelclass) {
     return new Proxy(modelclass, {
       get(obj, prop) {
         if (prop in obj) {
           return obj[prop];
         } else if (prop in obj.prototype) {
-          return obj.newSql()[prop];
+          return obj.new_sql()[prop];
         } else {
           return;
         }
@@ -327,84 +164,84 @@ class ModelProxy {
 }
 
 class Model {
-  static ValidateError = ValidateError;
-  static ValidateBatchError = ValidateBatchError;
-  static baseModel = baseModel;
-  static makeFieldFromJson = makeFieldFromJson;
-  static token = makeToken;
+  static Validate_error = Validate_error;
+  static Validate_batch_error = Validate_batch_error;
+  static base_model = base_model;
+  static make_field_from_json = make_field_from_json;
+  static token = make_token;
   static NULL = NULL;
   static DEFAULT = DEFAULT;
-  static asToken = asToken;
-  static asLiteral = asLiteral;
-  static httpModelCache = {};
+  static as_token = as_token;
+  static as_literal = as_literal;
+  static http_model_cache = {};
   constructor(attrs) {
     Object.assign(this, attrs);
   }
-  toString() {
+  to_string() {
     return this.statement();
   }
   static new(self) {
     return new this(self);
   }
-  static async createModelAsync(options) {
-    // 目前主要是异步获取referenceUrl和choicesUrl资源
+  static async create_model_async(options) {
+    // 目前主要是异步获取reference_url和choices_url资源
     for (const name of options.field_names || Object.keys(options.fields)) {
       const field = options.fields[name];
       if (field.choices_url) {
-        const fetchChoices = async () => {
-          const choices_url = options.isAdminMode
-            ? field.choices_url_admin || field.choices_url // 如果不是fk,那么choicesUrlAdmin不会定义
+        const fetch_choices = async () => {
+          const choices_url = options.is_admin_mode
+            ? field.choices_url_admin || field.choices_url // 如果不是fk,那么choices_url_admin不会定义
             : field.choices_url;
           const { data: choices } = await Http[field.choices_url_method || "post"](choices_url);
-          const res = options.choicesCallback ? options.choicesCallback(choices, field) : choices;
+          const res = options.choices_callback ? options.choices_callback(choices, field) : choices;
           return res;
         };
         if (field.preload) {
-          field.choices = await fetchChoices();
+          field.choices = await fetch_choices();
         } else {
-          field.choices = fetchChoices;
+          field.choices = fetch_choices;
         }
       }
       if (typeof field.reference == "string") {
         if (field.reference == field.table_name) {
           field.reference = "self";
         } else {
-          const modelUrl = options.isAdminMode ? field.reference_url_admin : field.reference_url || field.reference;
-          field.reference = await this.getHttpModel(modelUrl, options.isAdminMode);
+          const model_url = options.is_admin_mode ? field.reference_url_admin : field.reference_url || field.reference;
+          field.reference = await this.get_http_model(model_url, options.is_admin_mode);
         }
       }
-      if (field.type == "table" && !field.model?.__isModelClass__) {
-        const modelKey = field.model.table_name;
-        if (!this.httpModelCache[modelKey]) {
-          this.httpModelCache[modelKey] = await Model.createModelAsync({
+      if (field.type == "table" && !field.model?.__is_model_class__) {
+        const model_key = field.model.table_name;
+        if (!this.http_model_cache[model_key]) {
+          this.http_model_cache[model_key] = await Model.create_model_async({
             ...field.model,
-            isAdminMode: options.isAdminMode,
+            is_admin_mode: options.is_admin_mode,
           });
         }
-        field.model = this.httpModelCache[modelKey];
+        field.model = this.http_model_cache[model_key];
       }
     }
-    return Model.createModel(options);
+    return Model.create_model(options);
   }
-  static async getHttpModel(modelKey, isAdminMode) {
-    if (!this.httpModelCache[modelKey]) {
-      const modelUrl = modelKey.match(/^https?:/) || modelKey.match(/^\//) ? modelKey : `/admin/model/${modelKey}`;
-      const { data } = await Http.get(modelUrl);
-      // isAdminMode具有传染性
-      this.httpModelCache[modelKey] = await Model.createModelAsync({
+  static async get_http_model(model_key, is_admin_mode) {
+    if (!this.http_model_cache[model_key]) {
+      const model_url = model_key.match(/^https?:/) || model_key.match(/^\//) ? model_key : `/admin/model/${model_key}`;
+      const { data } = await Http.get(model_url);
+      // is_admin_mode具有传染性
+      this.http_model_cache[model_key] = await Model.create_model_async({
         ...data,
-        isAdminMode,
+        is_admin_mode,
       });
     } else {
-      console.log("cached:" + modelKey);
+      console.log("cached:" + model_key);
     }
-    return this.httpModelCache[modelKey];
+    return this.http_model_cache[model_key];
   }
-  static createModel(options) {
-    const XodelClass = this.makeModelClass(this.normalize(options));
-    return ModelProxy.createProxy(XodelClass);
+  static create_model(options) {
+    const Xodel_class = this.make_model_class(this.normalize(options));
+    return Model_proxy.create_proxy(Xodel_class);
   }
-  static setLabelNameDict() {
+  static set_label_name_dict() {
     this.label_to_name = {};
     this.name_to_label = {};
     for (const [name, field] of Object.entries(this.fields)) {
@@ -412,15 +249,15 @@ class Model {
       this.name_to_label[name] = field.label;
     }
   }
-  static setClassName(table_name) {
-    const className = {
+  static set_class_name(table_name) {
+    const class_name = {
       value: `${capitalize(table_name)}Model`,
     };
-    Object.defineProperty(this, "name", className);
+    Object.define_property(this, "name", class_name);
   }
-  static makeModelClass(opts) {
-    class ConcreteModel extends this {
-      static sqlQuery = opts.sqlQuery ? opts.sqlQuery : this.sqlQuery;
+  static make_model_class(opts) {
+    class Concrete_model extends this {
+      static sql_query = opts.sql_query ? opts.sql_query : this.sql_query;
       static table_name = opts.table_name;
       static admin = opts.admin || {};
       static label = opts.label || opts.table_name;
@@ -434,97 +271,97 @@ class Model {
       static name_to_label = opts.name_to_label;
       static label_to_name = opts.label_to_name;
       static disable_auto_primary_key = opts.disable_auto_primary_key == undefined ? true : false;
-      cls = ConcreteModel;
+      cls = Concrete_model;
     }
-    let pkDefined = false;
-    ConcreteModel.foreignKeys = {};
-    ConcreteModel.names = [];
-    for (const [name, field] of Object.entries(ConcreteModel.fields)) {
-      let fkModel = field.reference;
-      if (fkModel === "self") {
-        fkModel = ConcreteModel;
-        field.reference = ConcreteModel;
+    let pk_defined = false;
+    Concrete_model.foreign_keys = {};
+    Concrete_model.names = [];
+    for (const [name, field] of Object.entries(Concrete_model.fields)) {
+      let fk_model = field.reference;
+      if (fk_model === "self") {
+        fk_model = Concrete_model;
+        field.reference = Concrete_model;
       }
-      if (fkModel) {
-        ConcreteModel.foreignKeys[name] = field;
+      if (fk_model) {
+        Concrete_model.foreign_keys[name] = field;
       }
       if (field.primary_key) {
-        const pkName = field.name;
-        assert(!pkDefined, `duplicated primary key: "${pkName}" and "${pkDefined}"`);
-        pkDefined = pkName;
-        ConcreteModel.primary_key = pkName;
+        const pk_name = field.name;
+        assert(!pk_defined, `duplicated primary key: "${pk_name}" and "${pk_defined}"`);
+        pk_defined = pk_name;
+        Concrete_model.primary_key = pk_name;
       } else if (field.auto_now) {
-        ConcreteModel.autoNowName = field.name;
+        Concrete_model.auto_now_name = field.name;
       } else if (field.auto_now_add) {
-        ConcreteModel.autoNowAddName = field.name;
+        Concrete_model.auto_now_add_name = field.name;
       } else {
-        ConcreteModel.names.push(name);
+        Concrete_model.names.push(name);
       }
     }
-    for (const [_, field] of Object.entries(ConcreteModel.fields)) {
-      if (field.db_type === Field.BaseField.FK_TYPE_NOT_DEFIEND) {
-        field.db_type = ConcreteModel.fields[field.reference_column].db_type;
+    for (const [_, field] of Object.entries(Concrete_model.fields)) {
+      if (field.db_type === Field.Base_field.FK_TYPE_NOT_DEFIEND) {
+        field.db_type = Concrete_model.fields[field.reference_column].db_type;
       }
     }
-    ConcreteModel.__isModelClass__ = true;
-    if (ConcreteModel.table_name) {
-      ConcreteModel.materializeWithTableName({
-        table_name: ConcreteModel.table_name,
+    Concrete_model.__is_model_class__ = true;
+    if (Concrete_model.table_name) {
+      Concrete_model.materialize_with_table_name({
+        table_name: Concrete_model.table_name,
       });
     } else {
-      ConcreteModel.setClassName("Abstract");
+      Concrete_model.set_class_name("Abstract");
     }
-    ConcreteModel.setLabelNameDict();
-    return ConcreteModel;
+    Concrete_model.set_label_name_dict();
+    return Concrete_model;
   }
 
-  static materializeWithTableName({ table_name, label }) {
+  static materialize_with_table_name({ table_name, label }) {
     if (!table_name) {
-      const namesHint = (this.field_names && this.field_names.join(",")) || "no field_names";
-      throw new Error(`you must define table_name for a non-abstract model (${namesHint})`);
+      const names_hint = (this.field_names && this.field_names.join(",")) || "no field_names";
+      throw new Error(`you must define table_name for a non-abstract model (${names_hint})`);
     }
-    checkReserved(table_name);
-    this.setClassName(table_name);
+    check_reserved(table_name);
+    this.set_class_name(table_name);
     this.table_name = table_name;
     this.label = this.label || label || table_name;
     this.abstract = false;
     if (!this.primary_key && !this.disable_auto_primary_key) {
-      const pkName = this.default_primary_key || "id";
-      this.primary_key = pkName;
-      this.fields[pkName] = Field.IntegerField.new({
-        name: pkName,
+      const pk_name = this.default_primary_key || "id";
+      this.primary_key = pk_name;
+      this.fields[pk_name] = Field.Integer_field.new({
+        name: pk_name,
         primary_key: true,
         serial: true,
       });
-      this.field_names.unshift(pkName);
+      this.field_names.unshift(pk_name);
     }
-    this.nameCache = {};
+    this.name_cache = {};
     for (const [name, field] of Object.entries(this.fields)) {
-      this.nameCache[name] = this.table_name + ("." + name);
+      this.name_cache[name] = this.table_name + ("." + name);
       if (field.reference) {
         field.table_name = table_name;
       }
     }
-    this.RecordClass = makeRecordClass(this);
+    this.Record_class = make_record_class(this);
     return this;
   }
-  static getDefaults() {
-    return Object.fromEntries(this.names.map((k) => [k, this.fields[k].default]));
+  static get_defaults() {
+    return Object.from_entries(this.names.map((k) => [k, this.fields[k].default]));
   }
-  static toFormValue(values, names) {
+  static to_form_value(values, names) {
     const res = {};
     for (const name of names || this.field_names) {
       const field = this.fields[name];
-      const value = field.toFormValue(values[name]);
+      const value = field.to_form_value(values[name]);
       res[name] = value;
     }
     return res;
   }
-  static toPostValue(values, names) {
+  static to_post_value(values, names) {
     const data = {};
     for (const name of names || this.field_names) {
       const field = this.fields[name];
-      data[name] = field.toPostValue(values[name]);
+      data[name] = field.to_post_value(values[name]);
     }
     return data;
   }
@@ -533,25 +370,25 @@ class Model {
     const model = {
       admin: options.admin || {},
       table_name: options.table_name || extend?.table_name,
-      sqlQuery: options.sqlQuery,
+      sql_query: options.sql_query,
     };
-    const [optsFields, optsFieldNames] = normalizeArrayAndHashFields(options.fields || []);
-    let optsNames = options.field_names;
-    if (!optsNames) {
+    const [opts_fields, opts_field_names] = normalize_array_and_hash_fields(options.fields || []);
+    let opts_names = options.field_names;
+    if (!opts_names) {
       if (extend) {
-        optsNames = unique([...extend.field_names, ...optsFieldNames]);
+        opts_names = unique([...extend.field_names, ...opts_field_names]);
       } else {
-        optsNames = optsFieldNames;
+        opts_names = opts_field_names;
       }
     }
-    model.field_names = normalizeFieldNames(clone(optsNames));
+    model.field_names = normalize_field_names(clone(opts_names));
     model.fields = {};
-    for (const name of optsNames) {
-      checkReserved(name);
+    for (const name of opts_names) {
+      check_reserved(name);
       if (name !== "name" && name !== "apply" && name !== "call" && this[name] !== undefined) {
         throw new Error(`field name "${name}" conflicts with model class attributes`);
       }
-      let field = optsFields[name];
+      let field = opts_fields[name];
       if (!field) {
         const tname = options.table_name || "[abstract model]";
         if (extend) {
@@ -562,13 +399,13 @@ class Model {
         } else {
           throw new Error(`'${tname}' field name '${name}' is not in fields`);
         }
-      } else if (!(field instanceof Field.BaseField)) {
+      } else if (!(field instanceof Field.Base_field)) {
         if (extend) {
           const pfield = extend.fields[name];
           if (pfield) {
-            field = { ...pfield.getOptions(), ...field };
+            field = { ...pfield.get_options(), ...field };
             if (pfield.model && field.model) {
-              field.model = this.createModel({
+              field.model = this.create_model({
                 abstract: true,
                 extend: pfield.model,
                 fields: field.model.fields,
@@ -578,10 +415,10 @@ class Model {
           }
         }
       }
-      if (!(field instanceof Field.BaseField)) {
-        model.fields[name] = makeFieldFromJson(field, { name });
+      if (!(field instanceof Field.Base_field)) {
+        model.fields[name] = make_field_from_json(field, { name });
       } else {
-        model.fields[name] = makeFieldFromJson(field.getOptions(), {
+        model.fields[name] = make_field_from_json(field.get_options(), {
           name,
           type: field.type,
         });
@@ -601,31 +438,31 @@ class Model {
     model.abstract = abstract;
     model.__normalized__ = true;
     if (options.mixins) {
-      return this.mergeModels([...options.mixins, model]);
+      return this.merge_models([...options.mixins, model]);
     } else {
       return model;
     }
   }
-  static mixWithBase(...varargs) {
-    return this.mix(baseModel, ...varargs);
+  static mix_with_base(...varargs) {
+    return this.mix(base_model, ...varargs);
   }
   static mix(...varargs) {
-    return ModelProxy.createProxy(this.makeModelClass(this.mergeModels([...varargs])));
+    return Model_proxy.create_proxy(this.make_model_class(this.merge_models([...varargs])));
   }
-  static mergeModels(models) {
+  static merge_models(models) {
     if (models.length < 2) {
       throw new Error("provide at least two models to merge");
     } else if (models.length === 2) {
-      return this.mergeModel(...models);
+      return this.merge_model(...models);
     } else {
       let merged = models[0];
       for (let i = 2; i <= models.length; i = i + 1) {
-        merged = this.mergeModel(merged, models[i]);
+        merged = this.merge_model(merged, models[i]);
       }
       return merged;
     }
   }
-  static mergeModel(a, b) {
+  static merge_model(a, b) {
     const A = (a.__normalized__ && a) || this.normalize(a);
     const B = (b.__normalized__ && b) || this.normalize(b);
     const C = {};
@@ -635,7 +472,7 @@ class Model {
       const af = A.fields[name];
       const bf = B.fields[name];
       if (af && bf) {
-        fields[name] = Model.mergeField(af, bf);
+        fields[name] = Model.merge_field(af, bf);
       } else if (af) {
         fields[name] = af;
       } else {
@@ -653,20 +490,20 @@ class Model {
     C.fields = fields;
     return this.normalize(C);
   }
-  static mergeField(a, b) {
-    const aopts = a instanceof Field ? a.getOptions() : clone(a);
-    const bopts = b instanceof Field ? b.getOptions() : clone(b);
+  static merge_field(a, b) {
+    const aopts = a instanceof Field ? a.get_options() : clone(a);
+    const bopts = b instanceof Field ? b.get_options() : clone(b);
     const options = { ...aopts, ...bopts };
     if (aopts.model && bopts.model) {
-      options.model = this.mergeModel(aopts.model, bopts.model);
+      options.model = this.merge_model(aopts.model, bopts.model);
     }
-    return makeFieldFromJson(options);
+    return make_field_from_json(options);
   }
   static async filter(kwargs) {
-    return await this.newSql().where(kwargs).exec();
+    return await this.new_sql().where(kwargs).exec();
   }
   static async all() {
-    const records = await this.sqlQuery("SELECT * FROM " + this.table_name);
+    const records = await this.sql_query("SELECT * FROM " + this.table_name);
     for (let i = 0; i < records.length; i = i + 1) {
       records[i] = this.load(records[i]);
     }
@@ -675,12 +512,12 @@ class Model {
   static async save(input, names, key) {
     key = key || this.primary_key;
     if (input[key] !== undefined) {
-      return await this.saveUpdate(input, names, key);
+      return await this.save_update(input, names, key);
     } else {
-      return await this.saveCreate(input, names, key);
+      return await this.save_create(input, names, key);
     }
   }
-  static checkUniqueKey(key) {
+  static check_unique_key(key) {
     const pkf = this.fields[key];
     if (!pkf) {
       throw new Error("invalid field name: " + key);
@@ -690,63 +527,65 @@ class Model {
     }
     return key;
   }
-  static async saveCreate(input, names, key) {
-    const data = this.validateCreate(input, names);
+  static async save_create(input, names, key) {
+    const data = this.validate_create(input, names);
     key = key || this.primary_key;
-    const prepared = this.prepareForDb(data);
-    const created = await this.newSql()._baseInsert(prepared)._baseReturning(key).execr();
+    const prepared = this.prepare_for_db(data);
+    const created = await this.new_sql()._base_insert(prepared)._base_returning(key).execr();
     data[key] = created[0][key];
-    return this.newRecord(data);
+    return this.new_record(data);
   }
-  static async saveUpdate(input, names, key) {
-    const data = this.validateUpdate(input, names);
+  static async save_update(input, names, key) {
+    const data = this.validate_update(input, names);
     if (!key) {
       key = this.primary_key;
     } else {
-      key = this.checkUniqueKey(key);
+      key = this.check_unique_key(key);
     }
-    const lookValue = input[key];
-    if (lookValue === undefined) {
+    const look_value = input[key];
+    if (look_value === undefined) {
       throw new Error("no primary or unique key value for save_update");
     }
-    const prepared = this.prepareForDb(data, names, true);
-    const updated = await this.newSql()
-      ._baseUpdate(prepared)
-      .where({ [key]: lookValue })
-      ._baseReturning(key)
+    const prepared = this.prepare_for_db(data, names, true);
+    const updated = await this.new_sql()
+      ._base_update(prepared)
+      .where({ [key]: look_value })
+      ._base_returning(key)
       .execr();
     if (updated.length === 1) {
       data[key] = updated[0][key];
-      return this.newRecord(data);
+      return this.new_record(data);
     } else if (updated.length === 0) {
-      throw new Error(`update failed, record does not exist(model:${this.table_name}, key:${key}, value:${lookValue})`);
+      throw new Error(
+        `update failed, record does not exist(model:${this.table_name}, key:${key}, value:${look_value})`
+      );
     } else {
       throw new Error(
-        `expect 1 but ${updated.affectedRows} records are updated(model:${this.table_name}, key:${key}, value:${lookValue})`
+        `expect 1 but ${updated.affected_rows} records are updated(model:${this.table_name}, key:${key}, value:${look_value})`
       );
     }
   }
-  static newRecord(data) {
-    return new this.RecordClass(data);
+  static new_record(data) {
+    return new this.Record_class(data);
   }
-  static newSql() {
+  static new_sql() {
     return new this({ table_name: this.table_name });
   }
-  static throwFieldError({ name, message, index }) {
+  static throw_field_error({ name, message, index }) {
     const label = this.fields[name].label;
     if (index !== undefined) {
-      throw new ValidateBatchError({ name, message, label, index });
+      throw new Validate_batch_error({ name, message, label, index });
     } else {
-      throw new ValidateError({ name, message, label });
+      throw new Validate_error({ name, message, label });
     }
   }
-  static checkUpsertKey(rows, key) {
+  static check_upsert_key(rows, key) {
     assert(key, "no key for upsert");
     if (rows instanceof Array) {
       if (typeof key === "string") {
         for (const [i, row] of rows.entries()) {
           if (row[key] === undefined || row[key] === "") {
-            return this.throwFieldError({
+            return this.throw_field_error({
               message: "不能为空",
               index: i,
               name: key,
@@ -757,7 +596,7 @@ class Model {
         for (const [i, row] of rows.entries()) {
           for (const k of key) {
             if (row[k] === undefined || row[k] === "") {
-              return this.throwFieldError({
+              return this.throw_field_error({
                 message: "不能为空",
                 index: i,
                 name: k,
@@ -768,7 +607,7 @@ class Model {
       }
     } else if (typeof key === "string") {
       if (rows[key] === undefined || rows[key] === "") {
-        return this.throwFieldError({
+        return this.throw_field_error({
           message: "不能为空",
           name: key,
         });
@@ -776,7 +615,7 @@ class Model {
     } else {
       for (const k of key) {
         if (rows[k] === undefined || rows[k] === "") {
-          return this.throwFieldError({
+          return this.throw_field_error({
             message: "不能为空",
             name: k,
           });
@@ -787,12 +626,12 @@ class Model {
   }
   static validate(input, names, key) {
     if (input[key || this.primary_key] !== undefined) {
-      return this.validateUpdate(input, names);
+      return this.validate_update(input, names);
     } else {
-      return this.validateCreate(input, names);
+      return this.validate_create(input, names);
     }
   }
-  static validateCreate(input, names) {
+  static validate_create(input, names) {
     const data = {};
     let value;
     for (const name of names || this.names) {
@@ -803,7 +642,7 @@ class Model {
       try {
         value = field.validate(input[name], input);
       } catch (error) {
-        return this.throwFieldError({
+        return this.throw_field_error({
           name,
           message: error.message,
         });
@@ -815,7 +654,7 @@ class Model {
           try {
             value = field.default(input);
           } catch (error) {
-            return this.throwFieldError({
+            return this.throw_field_error({
               name,
               message: error.message,
             });
@@ -830,7 +669,7 @@ class Model {
       return this.clean(data);
     }
   }
-  static validateUpdate(input, names) {
+  static validate_update(input, names) {
     const data = {};
     let value;
     for (const name of names || this.names) {
@@ -848,7 +687,7 @@ class Model {
             data[name] = value;
           }
         } catch (error) {
-          return this.throwFieldError({
+          return this.throw_field_error({
             name,
             message: error.message,
           });
@@ -861,7 +700,7 @@ class Model {
       return this.clean(data);
     }
   }
-  static parseErrorMessage(err) {
+  static parse_error_message(err) {
     if (typeof err === "object") {
       return err;
     }
@@ -886,19 +725,19 @@ class Model {
         }
       }
     }
-    return this.newRecord(data);
+    return this.new_record(data);
   }
-  static validateCreateData(rows, columns) {
+  static validate_create_data(rows, columns) {
     let cleaned;
-    columns = columns || this.getKeys(rows);
+    columns = columns || this.get_keys(rows);
     if (rows instanceof Array) {
       cleaned = [];
       for (const [index, row] of rows.entries()) {
         try {
-          cleaned[index] = this.validateCreate(row, columns);
+          cleaned[index] = this.validate_create(row, columns);
         } catch (error) {
-          if (error instanceof ValidateError) {
-            return this.throwFieldError({
+          if (error instanceof Validate_error) {
+            return this.throw_field_error({
               index,
               name: error.name,
               message: error.message,
@@ -909,21 +748,21 @@ class Model {
         }
       }
     } else {
-      cleaned = this.validateCreate(rows, columns);
+      cleaned = this.validate_create(rows, columns);
     }
     return [cleaned, columns];
   }
-  static validateUpdateData(rows, columns) {
+  static validate_update_data(rows, columns) {
     let cleaned;
-    columns = columns || this.getKeys(rows);
+    columns = columns || this.get_keys(rows);
     if (rows instanceof Array) {
       cleaned = [];
       for (const [index, row] of rows.entries()) {
         try {
-          cleaned[index] = this.validateUpdate(row, columns);
+          cleaned[index] = this.validate_update(row, columns);
         } catch (error) {
-          if (error instanceof ValidateError) {
-            return this.throwFieldError({
+          if (error instanceof Validate_error) {
+            return this.throw_field_error({
               index,
               name: error.name,
               message: error.message,
@@ -934,33 +773,33 @@ class Model {
         }
       }
     } else {
-      cleaned = this.validateUpdate(rows, columns);
+      cleaned = this.validate_update(rows, columns);
     }
     return [cleaned, columns];
   }
-  static validateCreateRows(rows, key, columns) {
-    const [checkedRows, checkedKey] = this.checkUpsertKey(rows, key || this.primary_key);
-    const [cleanedRows, cleanedColumns] = this.validateCreateData(checkedRows, columns);
-    return [cleanedRows, checkedKey, cleanedColumns];
+  static validate_create_rows(rows, key, columns) {
+    const [checked_rows, checked_key] = this.check_upsert_key(rows, key || this.primary_key);
+    const [cleaned_rows, cleaned_columns] = this.validate_create_data(checked_rows, columns);
+    return [cleaned_rows, checked_key, cleaned_columns];
   }
-  static validateUpdateRows(rows, key, columns) {
-    const [checkedRows, checkedKey] = this.checkUpsertKey(rows, key || this.primary_key);
-    const [cleanedRows, cleanedColumns] = this.validateUpdateData(checkedRows, columns);
-    return [cleanedRows, checkedKey, cleanedColumns];
+  static validate_update_rows(rows, key, columns) {
+    const [checked_rows, checked_key] = this.check_upsert_key(rows, key || this.primary_key);
+    const [cleaned_rows, cleaned_columns] = this.validate_update_data(checked_rows, columns);
+    return [cleaned_rows, checked_key, cleaned_columns];
   }
-  static prepareDbRows(rows, columns, isUpdate) {
+  static prepare_db_rows(rows, columns, is_update) {
     let cleaned;
-    columns = columns || this.getKeys(rows);
+    columns = columns || this.get_keys(rows);
     if (rows instanceof Array) {
       cleaned = [];
       for (const [i, row] of rows.entries()) {
-        cleaned[i] = this.prepareForDb(row, columns, isUpdate);
+        cleaned[i] = this.prepare_for_db(row, columns, is_update);
       }
     } else {
-      cleaned = this.prepareForDb(rows, columns, isUpdate);
+      cleaned = this.prepare_for_db(rows, columns, is_update);
     }
-    if (isUpdate) {
-      const utime = this.autoNowName;
+    if (is_update) {
+      const utime = this.auto_now_name;
       if (utime && !columns.includes(utime)) {
         columns.push(utime);
       }
@@ -969,7 +808,7 @@ class Model {
       return [cleaned, columns];
     }
   }
-  static prepareForDb(data, columns, isUpdate) {
+  static prepare_for_db(data, columns, is_update) {
     const prepared = {};
     for (const name of columns || this.names) {
       const field = this.fields[name];
@@ -977,12 +816,12 @@ class Model {
         throw new Error(`invalid field name '${name}' for model '${this.table_name}'`);
       }
       const value = data[name];
-      if (field.prepareForDb && value !== undefined) {
+      if (field.prepare_for_db && value !== undefined) {
         try {
-          const val = field.prepareForDb(value, data);
+          const val = field.prepare_for_db(value, data);
           prepared[name] = val;
         } catch (error) {
-          return this.throwFieldError({
+          return this.throw_field_error({
             name,
             message: error.message,
           });
@@ -991,12 +830,12 @@ class Model {
         prepared[name] = value;
       }
     }
-    if (isUpdate && this.autoNowName) {
-      prepared[this.autoNowName] = getLocalTime();
+    if (is_update && this.auto_now_name) {
+      prepared[this.auto_now_name] = get_localtime();
     }
     return prepared;
   }
-  static getKeys(rows) {
+  static get_keys(rows) {
     const columns = [];
     if (rows instanceof Array) {
       const d = [];
@@ -1015,8 +854,8 @@ class Model {
     }
     return columns;
   }
-  _baseSelect(a, b, ...varargs) {
-    const s = this._baseGetSelectToken(a, b, ...varargs);
+  _base_select(a, b, ...varargs) {
+    const s = this._base_get_select_token(a, b, ...varargs);
     if (!this._select) {
       this._select = s;
     } else if (s !== undefined && s !== "") {
@@ -1024,33 +863,33 @@ class Model {
     }
     return this;
   }
-  _baseGetSelectToken(a, b, ...varargs) {
+  _base_get_select_token(a, b, ...varargs) {
     if (b === undefined) {
       if (typeof a === "object") {
-        return this._baseGetSelectToken(...a);
+        return this._base_get_select_token(...a);
       } else {
-        return asToken(a);
+        return as_token(a);
       }
     } else {
-      let s = asToken(a) + ", " + asToken(b);
+      let s = as_token(a) + ", " + as_token(b);
       for (let i = 0; i < varargs.length; i = i + 1) {
-        s = s + ", " + asToken(varargs[i]);
+        s = s + ", " + as_token(varargs[i]);
       }
       return s;
     }
   }
-  _baseInsert(rows, columns) {
+  _base_insert(rows, columns) {
     if (typeof rows === "object") {
       if (rows instanceof Model) {
         if (rows._select) {
-          this._setSelectSubqueryInsertToken(rows, columns);
+          this._set_select_subquery_insert_token(rows, columns);
         } else {
-          this._setCudSubqueryInsertToken(rows);
+          this._set_cud_subquery_insert_token(rows);
         }
       } else if (rows instanceof Array) {
-        this._insert = this._getBulkInsertToken(rows, columns);
+        this._insert = this._get_bulk_insert_token(rows, columns);
       } else if (Object.keys(rows).length) {
-        this._insert = this._getInsertToken(rows, columns);
+        this._insert = this._get_insert_token(rows, columns);
       } else {
         throw new Error("can't pass empty table to Xodel._base_insert");
       }
@@ -1061,84 +900,84 @@ class Model {
     }
     return this;
   }
-  _baseUpdate(row, columns) {
+  _base_update(row, columns) {
     if (row instanceof Model) {
-      this._update = this._baseGetUpdateQueryToken(row, columns);
+      this._update = this._base_get_update_query_token(row, columns);
     } else if (typeof row === "object") {
-      this._update = this._getUpdateToken(row, columns);
+      this._update = this._get_update_token(row, columns);
     } else {
       this._update = row;
     }
     return this;
   }
-  _baseMerge(rows, key, columns) {
-    [rows, columns] = this._getCteValuesLiteral(rows, columns, false);
-    const cteName = `V(${columns.join(", ")})`;
-    const cteValues = `(VALUES ${asToken(rows)})`;
-    const joinCond = this._getJoinConditions(key, "V", "T");
-    const valsColumns = columns.map(_prefixWith_V);
-    const insertSubquery = Model.new({ table_name: "V" })
-      ._baseSelect(valsColumns)
-      ._baseLeftJoin("U AS T", joinCond)
-      ._baseWhereNull("T." + (Array.isArray(key) ? key[0] : key));
-    let updatedSubquery;
+  _base_merge(rows, key, columns) {
+    [rows, columns] = this._get_cte_values_literal(rows, columns, false);
+    const cte_name = `V(${columns.join(", ")})`;
+    const cte_values = `(VALUES ${as_token(rows)})`;
+    const join_cond = this._get_join_conditions(key, "V", "T");
+    const vals_columns = columns.map(_prefix_with_V);
+    const insert_subquery = Model.new({ table_name: "V" })
+      ._base_select(vals_columns)
+      ._base_left_join("U AS T", join_cond)
+      ._base_where_null("T." + (Array.isArray(key) ? key[0] : key));
+    let updated_subquery;
     if ((typeof key === "object" && key.length === columns.length) || columns.length === 1) {
-      updatedSubquery = Model.new({ table_name: "V" })
-        ._baseSelect(valsColumns)
-        ._baseJoin(this.table_name + " AS T", joinCond);
+      updated_subquery = Model.new({ table_name: "V" })
+        ._base_select(vals_columns)
+        ._base_join(this.table_name + " AS T", join_cond);
     } else {
-      updatedSubquery = Model.new({ table_name: this.table_name, _as: "T" })
-        ._baseUpdate(this._getUpdateTokenWithPrefix(columns, key, "V"))
-        ._baseFrom("V")
-        ._baseWhere(joinCond)
-        ._baseReturning(valsColumns);
+      updated_subquery = Model.new({ table_name: this.table_name, _as: "T" })
+        ._base_update(this._get_update_token_with_prefix(columns, key, "V"))
+        ._base_from("V")
+        ._base_where(join_cond)
+        ._base_returning(vals_columns);
     }
-    this.with(cteName, cteValues).with("U", updatedSubquery);
-    return this._baseInsert(insertSubquery, columns);
+    this.with(cte_name, cte_values).with("U", updated_subquery);
+    return this._base_insert(insert_subquery, columns);
   }
-  _baseUpsert(rows, key, columns) {
+  _base_upsert(rows, key, columns) {
     assert(key, "you must provide key for upsert(string or table)");
     if (rows instanceof Model) {
       assert(columns !== undefined, "you must specify columns when use subquery as values of upsert");
-      this._insert = this._getUpsertQueryToken(rows, key, columns);
+      this._insert = this._get_upsert_query_token(rows, key, columns);
     } else if (Array.isArray(rows)) {
-      this._insert = this._getBulkUpsertToken(rows, key, columns);
+      this._insert = this._get_bulk_upsert_token(rows, key, columns);
     } else {
-      this._insert = this._getUpsertToken(rows, key, columns);
+      this._insert = this._get_upsert_token(rows, key, columns);
     }
     return this;
   }
-  _baseUpdates(rows, key, columns) {
+  _base_updates(rows, key, columns) {
     if (rows instanceof Model) {
-      columns = columns || rows._returningArgs.flat();
-      const cteName = `V(${columns.join(", ")})`;
-      const joinCond = this._getJoinConditions(key, "V", this._as || this.table_name);
-      this.with(cteName, rows);
-      return this._baseUpdate(this._getUpdateTokenWithPrefix(columns, key, "V")).from("V").where(joinCond);
+      columns = columns || rows._returning_args.flat();
+      const cte_name = `V(${columns.join(", ")})`;
+      const join_cond = this._get_join_conditions(key, "V", this._as || this.table_name);
+      this.with(cte_name, rows);
+      return this._base_update(this._get_update_token_with_prefix(columns, key, "V")).from("V").where(join_cond);
     } else if (rows.length === 0) {
       throw new Error("empty rows passed to updates");
     } else {
-      [rows, columns] = this._getCteValuesLiteral(rows, columns, false);
-      const cteName = `V(${columns.join(", ")})`;
-      const cteValues = `(VALUES ${asToken(rows)})`;
-      const joinCond = this._getJoinConditions(key, "V", this._as || this.table_name);
-      this.with(cteName, cteValues);
-      return this._baseUpdate(this._getUpdateTokenWithPrefix(columns, key, "V")).from("V").where(joinCond);
+      [rows, columns] = this._get_cte_values_literal(rows, columns, false);
+      const cte_name = `V(${columns.join(", ")})`;
+      const cte_values = `(VALUES ${as_token(rows)})`;
+      const join_cond = this._get_join_conditions(key, "V", this._as || this.table_name);
+      this.with(cte_name, cte_values);
+      return this._base_update(this._get_update_token_with_prefix(columns, key, "V")).from("V").where(join_cond);
     }
   }
-  _baseGetMultiple(keys, columns) {
+  _base_get_multiple(keys, columns) {
     if (keys.length === 0) {
       throw new Error("empty keys passed to get_multiple");
     }
-    columns = columns || this.cls.getKeys(keys[0]);
-    [keys, columns] = this._getCteValuesLiteral(keys, columns, false);
-    const joinCond = this._getJoinConditions(columns, "V", this._as || this.table_name);
-    const cteName = `V(${columns.join(", ")})`;
-    const cteValues = `(VALUES ${asToken(keys)})`;
-    return this.with(cteName, cteValues).rightJoin("V", joinCond);
+    columns = columns || this.cls.get_keys(keys[0]);
+    [keys, columns] = this._get_cte_values_literal(keys, columns, false);
+    const join_cond = this._get_join_conditions(columns, "V", this._as || this.table_name);
+    const cte_name = `V(${columns.join(", ")})`;
+    const cte_values = `(VALUES ${as_token(keys)})`;
+    return this.with(cte_name, cte_values).right_join("V", join_cond);
   }
-  _baseReturning(a, b, ...varargs) {
-    const s = this._baseGetSelectToken(a, b, ...varargs);
+  _base_returning(a, b, ...varargs) {
+    const s = this._base_get_select_token(a, b, ...varargs);
     if (!this._returning) {
       this._returning = s;
     } else if (s !== undefined && s !== "") {
@@ -1146,57 +985,57 @@ class Model {
     } else {
       return this;
     }
-    if (this._returningArgs) {
-      this._returningArgs = [this._returningArgs, ...varargs];
+    if (this._returning_args) {
+      this._returning_args = [this._returning_args, ...varargs];
     } else {
-      this._returningArgs = [...varargs];
+      this._returning_args = [...varargs];
     }
     return this;
   }
-  _baseFrom(a, ...varargs) {
+  _base_from(a, ...varargs) {
     if (!this._from) {
-      this._from = this._baseGetSelectToken(a, ...varargs);
+      this._from = this._base_get_select_token(a, ...varargs);
     } else {
-      this._from = this._from + ", " + this._baseGetSelectToken(a, ...varargs);
+      this._from = this._from + ", " + this._base_get_select_token(a, ...varargs);
     }
     return this;
   }
-  _baseJoin(rightTable, key, op, val) {
-    const joinToken = this._getJoinToken("INNER", rightTable, key, op, val);
-    this._from = `${this._from || this.getTable()} ${joinToken}`;
+  _base_join(right_table, key, op, val) {
+    const join_token = this._get_join_token("INNER", right_table, key, op, val);
+    this._from = `${this._from || this.get_table()} ${join_token}`;
     return this;
   }
-  _baseLeftJoin(rightTable, key, op, val) {
-    const joinToken = this._getJoinToken("LEFT", rightTable, key, op, val);
-    this._from = `${this._from || this.getTable()} ${joinToken}`;
+  _base_left_join(right_table, key, op, val) {
+    const join_token = this._get_join_token("LEFT", right_table, key, op, val);
+    this._from = `${this._from || this.get_table()} ${join_token}`;
     return this;
   }
-  _baseRightJoin(rightTable, key, op, val) {
-    const joinToken = this._getJoinToken("RIGHT", rightTable, key, op, val);
-    this._from = `${this._from || this.getTable()} ${joinToken}`;
+  _base_right_join(right_table, key, op, val) {
+    const join_token = this._get_join_token("RIGHT", right_table, key, op, val);
+    this._from = `${this._from || this.get_table()} ${join_token}`;
     return this;
   }
-  _baseFullJoin(rightTable, key, op, val) {
-    const joinToken = this._getJoinToken("FULL", rightTable, key, op, val);
-    this._from = `${this._from || this.getTable()} ${joinToken}`;
+  _base_full_join(right_table, key, op, val) {
+    const join_token = this._get_join_token("FULL", right_table, key, op, val);
+    this._from = `${this._from || this.get_table()} ${join_token}`;
     return this;
   }
-  _baseWhere(cond, op, dval) {
-    const whereToken = this._baseGetConditionToken(cond, op, dval);
-    return this._handleWhereToken(whereToken, "(%s) AND (%s)");
+  _base_where(cond, op, dval) {
+    const where_token = this._base_get_condition_token(cond, op, dval);
+    return this._handle_where_token(where_token, "(%s) AND (%s)");
   }
-  _baseGetConditionTokenFromTable(kwargs, logic) {
+  _base_get_condition_token_from_table(kwargs, logic) {
     const tokens = [];
     if (Array.isArray(kwargs)) {
       for (const value of kwargs) {
-        const token = this._baseGetConditionToken(value);
+        const token = this._base_get_condition_token(value);
         if (token !== undefined && token !== "") {
           tokens.push("(" + token + ")");
         }
       }
     } else {
       for (const [k, value] of Object.entries(kwargs)) {
-        tokens.push(`${k} = ${asLiteral(value)}`);
+        tokens.push(`${k} = ${as_literal(value)}`);
       }
     }
     if (logic === undefined) {
@@ -1205,57 +1044,57 @@ class Model {
       return tokens.join(" " + logic + " ");
     }
   }
-  _baseGetConditionToken(cond, op, dval) {
+  _base_get_condition_token(cond, op, dval) {
     if (op === undefined) {
       const argtype = typeof cond;
       if (argtype === "object") {
-        return this._baseGetConditionTokenFromTable(cond);
+        return this._base_get_condition_token_from_table(cond);
       } else if (argtype === "string") {
         return cond;
       } else if (argtype === "function") {
-        const oldWhere = this._where;
+        const old_where = this._where;
         delete this._where;
         const res = cond.call(this);
         if (res === this) {
-          const groupWhere = this._where;
-          if (groupWhere === undefined) {
+          const group_where = this._where;
+          if (group_where === undefined) {
             throw new Error("no where token generate after calling condition function");
           } else {
-            this._where = oldWhere;
-            return groupWhere;
+            this._where = old_where;
+            return group_where;
           }
         } else {
-          this._where = oldWhere;
+          this._where = old_where;
           return res;
         }
       } else {
         throw new Error("invalid condition type: " + argtype);
       }
     } else if (dval === undefined) {
-      return `${cond} = ${asLiteral(op)}`;
+      return `${cond} = ${as_literal(op)}`;
     } else {
-      return `${cond} ${op} ${asLiteral(dval)}`;
+      return `${cond} ${op} ${as_literal(dval)}`;
     }
   }
-  _baseWhereIn(cols, range) {
-    const inToken = this._getInToken(cols, range);
+  _base_where_in(cols, range) {
+    const in_token = this._get_in_token(cols, range);
     if (this._where) {
-      this._where = `(${this._where}) AND ${inToken}`;
+      this._where = `(${this._where}) AND ${in_token}`;
     } else {
-      this._where = inToken;
+      this._where = in_token;
     }
     return this;
   }
-  _baseWhereNotIn(cols, range) {
-    const notInToken = this._getInToken(cols, range, "NOT IN");
+  _base_where_not_in(cols, range) {
+    const not_in_token = this._get_in_token(cols, range, "NOT IN");
     if (this._where) {
-      this._where = `(${this._where}) AND ${notInToken}`;
+      this._where = `(${this._where}) AND ${not_in_token}`;
     } else {
-      this._where = notInToken;
+      this._where = not_in_token;
     }
     return this;
   }
-  _baseWhereNull(col) {
+  _base_where_null(col) {
     if (this._where) {
       this._where = `(${this._where}) AND ${col} IS NULL`;
     } else {
@@ -1263,7 +1102,7 @@ class Model {
     }
     return this;
   }
-  _baseWhereNotNull(col) {
+  _base_where_not_null(col) {
     if (this._where) {
       this._where = `(${this._where}) AND ${col} IS NOT NULL`;
     } else {
@@ -1271,7 +1110,7 @@ class Model {
     }
     return this;
   }
-  _baseWhereBetween(col, low, high) {
+  _base_where_between(col, low, high) {
     if (this._where) {
       this._where = `(${this._where}) AND (${col} BETWEEN ${low} AND ${high})`;
     } else {
@@ -1279,7 +1118,7 @@ class Model {
     }
     return this;
   }
-  _baseWhereNotBetween(col, low, high) {
+  _base_where_not_between(col, low, high) {
     if (this._where) {
       this._where = `(${this._where}) AND (${col} NOT BETWEEN ${low} AND ${high})`;
     } else {
@@ -1287,25 +1126,25 @@ class Model {
     }
     return this;
   }
-  _baseOrWhereIn(cols, range) {
-    const inToken = this._getInToken(cols, range);
+  _base_or_where_in(cols, range) {
+    const in_token = this._get_in_token(cols, range);
     if (this._where) {
-      this._where = `${this._where} OR ${inToken}`;
+      this._where = `${this._where} OR ${in_token}`;
     } else {
-      this._where = inToken;
+      this._where = in_token;
     }
     return this;
   }
-  _baseOrWhereNotIn(cols, range) {
-    const notInToken = this._getInToken(cols, range, "NOT IN");
+  _base_or_where_not_in(cols, range) {
+    const not_in_token = this._get_in_token(cols, range, "NOT IN");
     if (this._where) {
-      this._where = `${this._where} OR ${notInToken}`;
+      this._where = `${this._where} OR ${not_in_token}`;
     } else {
-      this._where = notInToken;
+      this._where = not_in_token;
     }
     return this;
   }
-  _baseOrWhereNull(col) {
+  _base_or_where_null(col) {
     if (this._where) {
       this._where = `${this._where} OR ${col} IS NULL`;
     } else {
@@ -1313,7 +1152,7 @@ class Model {
     }
     return this;
   }
-  _baseOrWhereNotNull(col) {
+  _base_or_where_not_null(col) {
     if (this._where) {
       this._where = `${this._where} OR ${col} IS NOT NULL`;
     } else {
@@ -1321,7 +1160,7 @@ class Model {
     }
     return this;
   }
-  _baseOrWhereBetween(col, low, high) {
+  _base_or_where_between(col, low, high) {
     if (this._where) {
       this._where = `${this._where} OR (${col} BETWEEN ${low} AND ${high})`;
     } else {
@@ -1329,7 +1168,7 @@ class Model {
     }
     return this;
   }
-  _baseOrWhereNotBetween(col, low, high) {
+  _base_or_where_not_between(col, low, high) {
     if (this._where) {
       this._where = `${this._where} OR (${col} NOT BETWEEN ${low} AND ${high})`;
     } else {
@@ -1337,7 +1176,7 @@ class Model {
     }
     return this;
   }
-  _rowsToArray(rows, columns) {
+  _rows_to_array(rows, columns) {
     const c = columns.length;
     const n = rows.length;
     const res = new Array(n);
@@ -1353,7 +1192,7 @@ class Model {
         } else if (fields[col]) {
           const dft = fields[col].default;
           if (dft !== undefined) {
-            res[j][i] = fields[col].getDefault(rows[j]);
+            res[j][i] = fields[col].get_default(rows[j]);
           } else {
             res[j][i] = NULL;
           }
@@ -1364,32 +1203,32 @@ class Model {
     }
     return res;
   }
-  _getInsertValuesToken(row, columns) {
-    const valueList = [];
+  _get_insert_values_token(row, columns) {
+    const value_list = [];
     if (!columns) {
       columns = [];
       for (const [k, v] of Object.entries(row)) {
         columns.push(k);
-        valueList.push(v);
+        value_list.push(v);
       }
     } else {
       for (const col of columns) {
         const v = row[col];
         if (v !== undefined) {
-          valueList.push(v);
+          value_list.push(v);
         } else {
-          valueList.push(DEFAULT);
+          value_list.push(DEFAULT);
         }
       }
     }
-    return [asLiteral(valueList), columns];
+    return [as_literal(value_list), columns];
   }
-  _getBulkInsertValuesToken(rows, columns) {
-    columns = columns || this.cls.getKeys(rows);
-    rows = this._rowsToArray(rows, columns);
-    return [map(rows, asLiteral), columns];
+  _get_bulk_insert_values_token(rows, columns) {
+    columns = columns || this.cls.get_keys(rows);
+    rows = this._rows_to_array(rows, columns);
+    return [map(rows, as_literal), columns];
   }
-  _getUpdateTokenWithPrefix(columns, key, table_name) {
+  _get_update_token_with_prefix(columns, key, table_name) {
     const tokens = [];
     if (typeof key === "string") {
       for (const col of columns) {
@@ -1410,57 +1249,57 @@ class Model {
     }
     return tokens.join(", ");
   }
-  _getSelectToken(a, b, ...varargs) {
+  _get_select_token(a, b, ...varargs) {
     if (b === undefined) {
       if (Array.isArray(a)) {
-        const tokens = a.map((e) => this._getSelectColumn(e));
-        return asToken(tokens);
+        const tokens = a.map((e) => this._get_select_column(e));
+        return as_token(tokens);
       } else if (typeof a === "string") {
-        return this._getSelectColumn(a);
+        return this._get_select_column(a);
       } else {
-        return asToken(a);
+        return as_token(a);
       }
     } else {
-      a = this._getSelectColumn(a);
-      b = this._getSelectColumn(b);
-      let s = asToken(a) + ", " + asToken(b);
+      a = this._get_select_column(a);
+      b = this._get_select_column(b);
+      let s = as_token(a) + ", " + as_token(b);
       for (const name of varargs) {
-        s = s + ", " + asToken(this._getSelectColumn(name));
+        s = s + ", " + as_token(this._get_select_column(name));
       }
       return s;
     }
   }
-  _getSelectTokenLiteral(a, b, ...varargs) {
+  _get_select_token_literal(a, b, ...varargs) {
     if (b === undefined) {
       if (Array.isArray(a)) {
-        const tokens = a.map(asLiteral);
-        return asToken(tokens);
+        const tokens = a.map(as_literal);
+        return as_token(tokens);
       } else {
-        return asLiteral(a);
+        return as_literal(a);
       }
     } else {
-      let s = asLiteral(a) + ", " + asLiteral(b);
+      let s = as_literal(a) + ", " + as_literal(b);
       for (const name of varargs) {
-        s = s + ", " + asLiteral(name);
+        s = s + ", " + as_literal(name);
       }
       return s;
     }
   }
-  _getUpdateToken(row, columns) {
+  _get_update_token(row, columns) {
     const kv = [];
     if (!columns) {
       for (const [k, v] of Object.entries(row)) {
-        kv.push(`${k} = ${asLiteral(v)}`);
+        kv.push(`${k} = ${as_literal(v)}`);
       }
     } else {
       for (const k of columns) {
         const v = row[k];
-        kv.push(`${k} = ${(v !== undefined && asLiteral(v)) || "DEFAULT"}`);
+        kv.push(`${k} = ${(v !== undefined && as_literal(v)) || "DEFAULT"}`);
       }
     }
     return kv.join(", ");
   }
-  _getWithToken(name, token) {
+  _get_with_token(name, token) {
     if (token === undefined) {
       return name;
     } else if (token instanceof Model) {
@@ -1469,65 +1308,69 @@ class Model {
       return `${name} AS ${token}`;
     }
   }
-  _getInsertToken(row, columns) {
-    const [valuesToken, insertColumns] = this._getInsertValuesToken(row, columns);
-    return `(${asToken(insertColumns)}) VALUES ${valuesToken}`;
+  _get_insert_token(row, columns) {
+    const [values_token, insert_columns] = this._get_insert_values_token(row, columns);
+    return `(${as_token(insert_columns)}) VALUES ${values_token}`;
   }
-  _getBulkInsertToken(rows, columns) {
-    [rows, columns] = this._getBulkInsertValuesToken(rows, columns);
-    return `(${asToken(columns)}) VALUES ${asToken(rows)}`;
+  _get_bulk_insert_token(rows, columns) {
+    [rows, columns] = this._get_bulk_insert_values_token(rows, columns);
+    return `(${as_token(columns)}) VALUES ${as_token(rows)}`;
   }
-  _setSelectSubqueryInsertToken(subQuery, columns) {
-    const columnsToken = asToken(columns || subQuery._select || "");
-    if (columnsToken !== "") {
-      this._insert = `(${columnsToken}) ${subQuery.statement()}`;
+  _set_select_subquery_insert_token(sub_query, columns) {
+    const columns_token = as_token(columns || sub_query._select || "");
+    if (columns_token !== "") {
+      this._insert = `(${columns_token}) ${sub_query.statement()}`;
     } else {
-      this._insert = subQuery.statement();
+      this._insert = sub_query.statement();
     }
   }
-  _setCudSubqueryInsertToken(subQuery) {
-    const cteReturn = subQuery._cteReturning;
-    if (cteReturn) {
-      const cteColumns = cteReturn.columns;
-      const insertColumns = [...cteColumns, ...cteReturn.literalColumns];
-      const cudSelectQuery = Model.new({ table_name: "d" })._baseSelect(insertColumns);
-      this.with(`d(${asToken(insertColumns)})`, subQuery);
-      this._insert = `(${asToken(insertColumns)}) ${cudSelectQuery.statement()}`;
-    } else if (subQuery._returningArgs) {
-      const insertColumns = subQuery._returningArgs.flat();
-      const cudSelectQuery = Model.new({ table_name: "d" })._baseSelect(insertColumns);
-      this.with(`d(${asToken(insertColumns)})`, subQuery);
-      this._insert = `(${asToken(insertColumns)}) ${cudSelectQuery.statement()}`;
+  _set_cud_subquery_insert_token(sub_query) {
+    const cte_return = sub_query._cte_returning;
+    if (cte_return) {
+      const cte_columns = cte_return.columns;
+      const insert_columns = [...cte_columns, ...cte_return.literal_columns];
+      const cud_select_query = Model.new({ table_name: "d" })._base_select(insert_columns);
+      this.with(`d(${as_token(insert_columns)})`, sub_query);
+      this._insert = `(${as_token(insert_columns)}) ${cud_select_query.statement()}`;
+    } else if (sub_query._returning_args) {
+      const insert_columns = sub_query._returning_args.flat();
+      const cud_select_query = Model.new({ table_name: "d" })._base_select(insert_columns);
+      this.with(`d(${as_token(insert_columns)})`, sub_query);
+      this._insert = `(${as_token(insert_columns)}) ${cud_select_query.statement()}`;
     }
   }
-  _getUpsertToken(row, key, columns) {
-    const [valuesToken, insertColumns] = this._getInsertValuesToken(row, columns);
-    const insertToken = `(${asToken(insertColumns)}) VALUES ${valuesToken} ON CONFLICT (${this._getSelectToken(key)})`;
-    if ((Array.isArray(key) && key.length === insertColumns.length) || insertColumns.length === 1) {
-      return `${insertToken} DO NOTHING`;
+  _get_upsert_token(row, key, columns) {
+    const [values_token, insert_columns] = this._get_insert_values_token(row, columns);
+    const insert_token = `(${as_token(insert_columns)}) VALUES ${values_token} ON CONFLICT (${this._get_select_token(
+      key
+    )})`;
+    if ((Array.isArray(key) && key.length === insert_columns.length) || insert_columns.length === 1) {
+      return `${insert_token} DO NOTHING`;
     } else {
-      return `${insertToken} DO UPDATE SET ${this._getUpdateTokenWithPrefix(insertColumns, key, "EXCLUDED")}`;
+      return `${insert_token} DO UPDATE SET ${this._get_update_token_with_prefix(insert_columns, key, "EXCLUDED")}`;
     }
   }
-  _getBulkUpsertToken(rows, key, columns) {
-    [rows, columns] = this._getBulkInsertValuesToken(rows, columns);
-    const insertToken = `(${asToken(columns)}) VALUES ${asToken(rows)} ON CONFLICT (${this._baseGetSelectToken(key)})`;
+  _get_bulk_upsert_token(rows, key, columns) {
+    [rows, columns] = this._get_bulk_insert_values_token(rows, columns);
+    const insert_token = `(${as_token(columns)}) VALUES ${as_token(rows)} ON CONFLICT (${this._base_get_select_token(
+      key
+    )})`;
     if ((Array.isArray(key) && key.length === columns.length) || columns.length === 1) {
-      return `${insertToken} DO NOTHING`;
+      return `${insert_token} DO NOTHING`;
     } else {
-      return `${insertToken} DO UPDATE SET ${this._getUpdateTokenWithPrefix(columns, key, "EXCLUDED")}`;
+      return `${insert_token} DO UPDATE SET ${this._get_update_token_with_prefix(columns, key, "EXCLUDED")}`;
     }
   }
-  _getUpsertQueryToken(rows, key, columns) {
-    const columnsToken = this._getSelectToken(columns);
-    const insertToken = `(${columnsToken}) ${rows.statement()} ON CONFLICT (${this._getSelectToken(key)})`;
+  _get_upsert_query_token(rows, key, columns) {
+    const columns_token = this._get_select_token(columns);
+    const insert_token = `(${columns_token}) ${rows.statement()} ON CONFLICT (${this._get_select_token(key)})`;
     if ((Array.isArray(key) && key.length === columns.length) || columns.length === 1) {
-      return `${insertToken} DO NOTHING`;
+      return `${insert_token} DO NOTHING`;
     } else {
-      return `${insertToken} DO UPDATE SET ${this._getUpdateTokenWithPrefix(columns, key, "EXCLUDED")}`;
+      return `${insert_token} DO UPDATE SET ${this._get_update_token_with_prefix(columns, key, "EXCLUDED")}`;
     }
   }
-  _getJoinExpr(key, op, val) {
+  _get_join_expr(key, op, val) {
     if (op === undefined) {
       return key;
     } else if (val === undefined) {
@@ -1536,151 +1379,151 @@ class Model {
       return `${key} ${op} ${val}`;
     }
   }
-  _getJoinToken(joinType, rightTable, key, op, val) {
+  _get_join_token(join_type, right_table, key, op, val) {
     if (key !== undefined) {
-      return `${joinType} JOIN ${rightTable} ON (${this._getJoinExpr(key, op, val)})`;
+      return `${join_type} JOIN ${right_table} ON (${this._get_join_expr(key, op, val)})`;
     } else {
-      return `${joinType} JOIN ${rightTable}`;
+      return `${join_type} JOIN ${right_table}`;
     }
   }
-  _getInToken(cols, range, op) {
-    cols = asToken(cols);
+  _get_in_token(cols, range, op) {
+    cols = as_token(cols);
     op = op || "IN";
     if (typeof range === "object") {
       if (range instanceof Model) {
         return `(${cols}) ${op} (${range.statement()})`;
       } else {
-        return `(${cols}) ${op} ${asLiteral(range)}`;
+        return `(${cols}) ${op} ${as_literal(range)}`;
       }
     } else {
       return `(${cols}) ${op} ${range}`;
     }
   }
-  _getUpdateQueryToken(subSelect, columns) {
-    const columnsToken = (columns && this._getSelectToken(columns)) || subSelect._select;
-    return `(${columnsToken}) = (${subSelect.statement()})`;
+  _get_update_query_token(sub_select, columns) {
+    const columns_token = (columns && this._get_select_token(columns)) || sub_select._select;
+    return `(${columns_token}) = (${sub_select.statement()})`;
   }
-  _baseGetUpdateQueryToken(subSelect, columns) {
-    const columnsToken = (columns && this._baseGetSelectToken(columns)) || subSelect._select;
-    return `(${columnsToken}) = (${subSelect.statement()})`;
+  _base_get_update_query_token(sub_select, columns) {
+    const columns_token = (columns && this._base_get_select_token(columns)) || sub_select._select;
+    return `(${columns_token}) = (${sub_select.statement()})`;
   }
-  _getJoinConditions(key, leftTable, rightTable) {
+  _get_join_conditions(key, left_table, right_table) {
     if (typeof key === "string") {
-      return `${leftTable}.${key} = ${rightTable}.${key}`;
+      return `${left_table}.${key} = ${right_table}.${key}`;
     }
     const res = [];
     for (const k of key) {
-      res.push(`${leftTable}.${k} = ${rightTable}.${k}`);
+      res.push(`${left_table}.${k} = ${right_table}.${k}`);
     }
     return res.join(" AND ");
   }
-  _getCteValuesLiteral(rows, columns, noCheck) {
-    columns = columns || this.cls.getKeys(rows);
-    rows = this._rowsToArray(rows, columns);
-    const firstRow = rows[0];
+  _get_cte_values_literal(rows, columns, no_check) {
+    columns = columns || this.cls.get_keys(rows);
+    rows = this._rows_to_array(rows, columns);
+    const first_row = rows[0];
     for (const [i, col] of columns.entries()) {
-      const [field] = this._findFieldModel(col);
+      const [field] = this._find_field_model(col);
       if (field) {
-        firstRow[i] = `${asLiteral(firstRow[i])}::${field.db_type}`;
-      } else if (noCheck) {
-        firstRow[i] = asLiteral(firstRow[i]);
+        first_row[i] = `${as_literal(first_row[i])}::${field.db_type}`;
+      } else if (no_check) {
+        first_row[i] = as_literal(first_row[i]);
       } else {
         throw new Error("invalid field name for _get_cte_values_literal: " + col);
       }
     }
     const res = [];
-    res[0] = "(" + asToken(firstRow) + ")";
+    res[0] = "(" + as_token(first_row) + ")";
     for (let i = 1; i < rows.length; i = i + 1) {
-      res[i] = asLiteral(rows[i]);
+      res[i] = as_literal(rows[i]);
     }
     return [res, columns];
   }
-  _handleJoin(joinType, joinTable, joinCond) {
+  _handle_join(join_type, join_table, join_cond) {
     if (this._update) {
-      this.from(joinTable);
-      this.where(joinCond);
+      this.from(join_table);
+      this.where(join_cond);
     } else if (this._delete) {
-      this.using(joinTable);
-      this.where(joinCond);
-    } else if (joinType === "INNER") {
-      this._baseJoin(joinTable, joinCond);
-    } else if (joinType === "LEFT") {
-      this._baseLeftJoin(joinTable, joinCond);
-    } else if (joinType === "RIGHT") {
-      this._baseRightJoin(joinTable, joinCond);
+      this.using(join_table);
+      this.where(join_cond);
+    } else if (join_type === "INNER") {
+      this._base_join(join_table, join_cond);
+    } else if (join_type === "LEFT") {
+      this._base_left_join(join_table, join_cond);
+    } else if (join_type === "RIGHT") {
+      this._base_right_join(join_table, join_cond);
     } else {
-      this._baseFullJoin(joinTable, joinCond);
+      this._base_full_join(join_table, join_cond);
     }
   }
-  _registerJoinModel(joinArgs, joinType) {
-    joinType = joinType || joinArgs.joinType || "INNER";
+  _register_join_model(join_args, join_type) {
+    join_type = join_type || join_args.join_type || "INNER";
     // let find = true;
-    const model = joinArgs.model || this;
-    const fkModel = joinArgs.fkModel;
-    const column = joinArgs.column;
-    const fkColumn = joinArgs.fkColumn;
-    let joinKey;
-    if (joinArgs.joinKey === undefined) {
+    const model = join_args.model || this;
+    const fk_model = join_args.fk_model;
+    const column = join_args.column;
+    const fk_column = join_args.fk_column;
+    let join_key;
+    if (join_args.join_key === undefined) {
       if (this.table_name === model.table_name) {
-        joinKey = column + "__" + fkModel.table_name;
+        join_key = column + "__" + fk_model.table_name;
       } else {
-        joinKey = `${joinType}__${model.table_name}__${column}__${fkModel.table_name}__${fkColumn}`;
+        join_key = `${join_type}__${model.table_name}__${column}__${fk_model.table_name}__${fk_column}`;
       }
     } else {
-      joinKey = joinArgs.joinKey;
+      join_key = join_args.join_key;
     }
-    if (!this._joinKeys) {
-      this._joinKeys = {};
+    if (!this._join_keys) {
+      this._join_keys = {};
     }
-    let joinObj = this._joinKeys[joinKey];
-    if (!joinObj) {
+    let join_obj = this._join_keys[join_key];
+    if (!join_obj) {
       // find = false;
-      joinObj = {
-        joinType,
+      join_obj = {
+        join_type,
         model,
         column,
-        alias: joinArgs.alias || model.table_name,
-        fkModel,
-        fkColumn,
-        fkAlias: "T" + this._getJoinNumber(),
+        alias: join_args.alias || model.table_name,
+        fk_model,
+        fk_column,
+        fk_alias: "T" + this._get_join_number(),
       };
-      const joinTable = `${fkModel.table_name} ${joinObj.fkAlias}`;
-      const joinCond = `${joinObj.alias}.${joinObj.column} = ${joinObj.fkAlias}.${joinObj.fkColumn}`;
-      this._handleJoin(joinType, joinTable, joinCond);
-      this._joinKeys[joinKey] = joinObj;
+      const join_table = `${fk_model.table_name} ${join_obj.fk_alias}`;
+      const join_cond = `${join_obj.alias}.${join_obj.column} = ${join_obj.fk_alias}.${join_obj.fk_column}`;
+      this._handle_join(join_type, join_table, join_cond);
+      this._join_keys[join_key] = join_obj;
     }
-    return joinObj; // [joinObj, find];
+    return join_obj; // [join_obj, find];
   }
-  _findFieldModel(col) {
+  _find_field_model(col) {
     const field = this.cls.fields[col];
     if (field) {
       return [field, this, this._as || this.cls.table_name];
     }
-    if (!this._joinKeys) {
+    if (!this._join_keys) {
       return [false];
     }
-    for (const joinObj of Object.values(this._joinKeys)) {
-      const fkField = joinObj.fkModel.fields[col];
-      if (joinObj.model.table_name === this.cls.table_name && fkField) {
-        return [fkField, joinObj.fkModel, joinObj.fkAlias || joinObj.fkModel.table_name];
+    for (const join_obj of Object.values(this._join_keys)) {
+      const fk_field = join_obj.fk_model.fields[col];
+      if (join_obj.model.table_name === this.cls.table_name && fk_field) {
+        return [fk_field, join_obj.fk_model, join_obj.fk_alias || join_obj.fk_model.table_name];
       }
     }
   }
-  _getWhereKey(key) {
-    let a = key.indexOf("__");
+  _parse_column(key) {
+    let a = key.index_of("__");
     if (a === -1) {
-      return [this._getColumn(key), "eq"];
+      return [this._get_column(key), "eq"];
     }
-    let e = key.slice(0, a);
-    let [field, model, prefix] = this._findFieldModel(e);
+    let token = key.slice(0, a);
+    let [field, model, prefix] = this._find_field_model(token);
     if (!field) {
-      throw new Error(`${e} is not a valid field name for ${this.table_name}`);
+      throw new Error(`${token} is not a valid field name for ${this.table_name}`);
     }
-    let i, state, fkModel, rc, joinKey;
+    let i, state, fk_model, rc, join_key;
     let op = "eq";
-    let fieldName = e;
+    let field_name = token;
     if (field.reference) {
-      fkModel = field.reference;
+      fk_model = field.reference;
       rc = field.reference_column;
       state = FOREIGN_KEY;
     } else {
@@ -1689,83 +1532,83 @@ class Model {
     // eslint-disable-next-line no-constant-condition
     while (true) {
       i = a + 2;
-      a = key.indexOf("__", i);
+      a = key.index_of("__", i);
       if (a === -1) {
-        e = key.slice(i);
+        token = key.slice(i);
       } else {
-        e = key.slice(i, a);
+        token = key.slice(i, a);
       }
       if (state === NON_FOREIGN_KEY) {
-        op = e;
+        op = token;
         state = END;
       } else if (state === FOREIGN_KEY) {
-        const fieldOfFk = fkModel.fields[e];
-        if (fieldOfFk) {
-          if (!joinKey) {
-            joinKey = fieldName + "__" + fkModel.table_name;
+        const field_of_fk = fk_model.fields[token];
+        if (field_of_fk) {
+          if (!join_key) {
+            join_key = field_name + "__" + fk_model.table_name;
           } else {
-            joinKey = joinKey + "__" + fieldName;
+            join_key = join_key + "__" + field_name;
           }
-          const joinObj = this._registerJoinModel({
-            joinKey,
+          const join_obj = this._register_join_model({
+            join_key,
             model,
-            column: fieldName,
+            column: field_name,
             alias: prefix || model.table_name,
-            fkModel,
-            fkColumn: rc,
+            fk_model,
+            fk_column: rc,
           });
-          prefix = joinObj.fkAlias;
-          if (fieldOfFk.reference) {
-            model = fkModel;
-            fkModel = fieldOfFk.reference;
-            rc = fieldOfFk.reference_column;
+          prefix = join_obj.fk_alias;
+          if (field_of_fk.reference) {
+            model = fk_model;
+            fk_model = field_of_fk.reference;
+            rc = field_of_fk.reference_column;
           } else {
             state = NON_FOREIGN_KEY;
           }
-          fieldName = e;
+          field_name = token;
         } else {
-          op = e;
+          op = token;
           state = END;
         }
       } else {
-        throw new Error(`invalid cond table key parsing state ${state} with token ${e}`);
+        throw new Error(`invalid cond table key parsing state ${state} with token ${token}`);
       }
       if (a == -1) {
         break;
       }
     }
-    return [prefix + "." + fieldName, op];
+    return [prefix + "." + field_name, op];
   }
-  _getColumn(key) {
+  _get_column(key) {
     if (this.cls.fields[key]) {
-      return (this._as && this._as + "." + key) || this.cls.nameCache[key];
+      return (this._as && this._as + "." + key) || this.cls.name_cache[key];
     }
-    if (!this._joinKeys) {
+    if (!this._join_keys) {
       return key;
     }
-    for (const joinObj of Object.values(this._joinKeys)) {
-      if (joinObj.model.table_name === this.table_name && joinObj.fkModel.fields[key]) {
-        return joinObj.fkAlias + "." + key;
+    for (const join_obj of Object.values(this._join_keys)) {
+      if (join_obj.model.table_name === this.table_name && join_obj.fk_model.fields[key]) {
+        return join_obj.fk_alias + "." + key;
       }
     }
     return key;
   }
-  _getSelectColumn(key) {
+  _get_select_column(key) {
     if (typeof key !== "string") {
       return key;
     } else {
-      return this._getColumn(key);
+      return this._get_column(key);
     }
   }
-  _getExprToken(value, key, op) {
+  _get_expr_token(value, key, op) {
     if (op === "eq") {
-      return `${key} = ${asLiteral(value)}`;
+      return `${key} = ${as_literal(value)}`;
     } else if (op === "in") {
-      return `${key} IN ${asLiteral(value)}`;
+      return `${key} IN ${as_literal(value)}`;
     } else if (op === "notin") {
-      return `${key} NOT IN ${asLiteral(value)}`;
+      return `${key} NOT IN ${as_literal(value)}`;
     } else if (COMPARE_OPERATORS[op]) {
-      return `${key} ${COMPARE_OPERATORS[op]} ${asLiteral(value)}`;
+      return `${key} ${COMPARE_OPERATORS[op]} ${as_literal(value)}`;
     } else if (op === "contains") {
       return `${key} LIKE '%${value.gsub("'", "''")}%'`;
     } else if (op === "startswith") {
@@ -1782,35 +1625,35 @@ class Model {
       throw new Error("invalid sql op: " + String(op));
     }
   }
-  _getJoinNumber() {
-    if (this._joinKeys) {
-      return Object.keys(this._joinKeys).length + 1;
+  _get_join_number() {
+    if (this._join_keys) {
+      return Object.keys(this._join_keys).length + 1;
     } else {
       return 1;
     }
   }
-  _handleWhereToken(whereToken, tpl) {
-    if (whereToken === "") {
+  _handle_where_token(where_token, tpl) {
+    if (where_token === "") {
       return this;
     } else if (this._where === undefined) {
-      this._where = whereToken;
+      this._where = where_token;
     } else {
-      this._where = stringFormat(tpl, this._where, whereToken);
+      this._where = string_format(tpl, this._where, where_token);
     }
     return this;
   }
-  _getConditionTokenFromTable(kwargs, logic) {
+  _get_condition_token_from_table(kwargs, logic) {
     const tokens = [];
     if (Array.isArray(kwargs)) {
       for (const value of kwargs) {
-        const token = this._getConditionToken(value);
+        const token = this._get_condition_token(value);
         if (token !== undefined && token !== "") {
           tokens.push("(" + token + ")");
         }
       }
     } else {
       for (const [k, value] of Object.entries(kwargs)) {
-        tokens.push(this._getExprToken(value, ...this._getWhereKey(k)));
+        tokens.push(this._get_expr_token(value, ...this._parse_column(k)));
       }
     }
     if (logic === undefined) {
@@ -1819,70 +1662,70 @@ class Model {
       return tokens.join(" " + logic + " ");
     }
   }
-  _getConditionToken(cond, op, dval) {
+  _get_condition_token(cond, op, dval) {
     if (op === undefined) {
       if (typeof cond === "object") {
-        return this._getConditionTokenFromTable(cond);
+        return this._get_condition_token_from_table(cond);
       } else {
-        return this._baseGetConditionToken(cond);
+        return this._base_get_condition_token(cond);
       }
     } else if (dval === undefined) {
-      return `${this._getColumn(cond)} = ${asLiteral(op)}`;
+      return `${this._get_column(cond)} = ${as_literal(op)}`;
     } else {
-      return `${this._getColumn(cond)} ${op} ${asLiteral(dval)}`;
+      return `${this._get_column(cond)} ${op} ${as_literal(dval)}`;
     }
   }
-  _getConditionTokenOr(cond, op, dval) {
+  _get_condition_token_or(cond, op, dval) {
     if (typeof cond === "object") {
-      return this._getConditionTokenFromTable(cond, "OR");
+      return this._get_condition_token_from_table(cond, "OR");
     } else {
-      return this._getConditionToken(cond, op, dval);
+      return this._get_condition_token(cond, op, dval);
     }
   }
-  _getConditionTokenNot(cond, op, dval) {
+  _get_condition_token_not(cond, op, dval) {
     let token;
     if (typeof cond === "object") {
-      token = this._getConditionTokenFromTable(cond, "OR");
+      token = this._get_condition_token_from_table(cond, "OR");
     } else {
-      token = this._getConditionToken(cond, op, dval);
+      token = this._get_condition_token(cond, op, dval);
     }
     return (token !== "" && `NOT (${token})`) || "";
   }
-  _handleSetOption(otherSql, innerAttr) {
-    if (!this[innerAttr]) {
-      this[innerAttr] = otherSql.statement();
+  _handle_set_option(other_sql, inner_attr) {
+    if (!this[inner_attr]) {
+      this[inner_attr] = other_sql.statement();
     } else {
-      this[innerAttr] = `(${this[innerAttr]}) ${PG_SET_MAP[innerAttr]} (${otherSql.statement()})`;
+      this[inner_attr] = `(${this[inner_attr]}) ${PG_SET_MAP[inner_attr]} (${other_sql.statement()})`;
     }
-    this.statement = this._statementForSet;
+    this.statement = this._statement_for_set;
     return this;
   }
-  _statementForSet() {
+  _statement_for_set() {
     let statement = this.statement();
     if (this._intersect) {
       statement = `(${statement}) INTERSECT (${this._intersect})`;
-    } else if (this._intersectAll) {
-      statement = `(${statement}) INTERSECT ALL (${this._intersectAll})`;
+    } else if (this._intersect_all) {
+      statement = `(${statement}) INTERSECT ALL (${this._intersect_all})`;
     } else if (this._union) {
       statement = `(${statement}) UNION (${this._union})`;
-    } else if (this._unionAll) {
-      statement = `(${statement}) UNION ALL (${this._unionAll})`;
+    } else if (this._union_all) {
+      statement = `(${statement}) UNION ALL (${this._union_all})`;
     } else if (this._except) {
       statement = `(${statement}) EXCEPT (${this._except})`;
-    } else if (this._exceptAll) {
-      statement = `(${statement}) EXCEPT ALL (${this._exceptAll})`;
+    } else if (this._except_all) {
+      statement = `(${statement}) EXCEPT ALL (${this._except_all})`;
     }
     return statement;
   }
   statement() {
-    const table_name = this.getTable();
-    const statement = assembleSql({
+    const table_name = this.get_table();
+    const statement = assemble_sql({
       table_name,
       with: this._with,
       join: this._join,
       distinct: this._distinct,
       returning: this._returning,
-      cteReturning: this._cteReturning,
+      cte_returning: this._cte_returning,
       insert: this._insert,
       update: this._update,
       delete: this._delete,
@@ -1899,79 +1742,79 @@ class Model {
     return statement;
   }
   with(name, token) {
-    const withToken = this._getWithToken(name, token);
+    const with_token = this._get_with_token(name, token);
     if (this._with) {
-      this._with = `${this._with}, ${withToken}`;
+      this._with = `${this._with}, ${with_token}`;
     } else {
-      this._with = withToken;
+      this._with = with_token;
     }
     return this;
   }
-  union(otherSql) {
-    return this._handleSetOption(otherSql, "_union");
+  union(other_sql) {
+    return this._handle_set_option(other_sql, "_union");
   }
-  unionAll(otherSql) {
-    return this._handleSetOption(otherSql, "_union_all");
+  union_all(other_sql) {
+    return this._handle_set_option(other_sql, "_union_all");
   }
-  except(otherSql) {
-    return this._handleSetOption(otherSql, "_except");
+  except(other_sql) {
+    return this._handle_set_option(other_sql, "_except");
   }
-  exceptAll(otherSql) {
-    return this._handleSetOption(otherSql, "_except_all");
+  except_all(other_sql) {
+    return this._handle_set_option(other_sql, "_except_all");
   }
-  intersect(otherSql) {
-    return this._handleSetOption(otherSql, "_intersect");
+  intersect(other_sql) {
+    return this._handle_set_option(other_sql, "_intersect");
   }
-  intersectAll(otherSql) {
-    return this._handleSetOption(otherSql, "_intersect_all");
+  intersect_all(other_sql) {
+    return this._handle_set_option(other_sql, "_intersect_all");
   }
-  as(tableAlias) {
-    this._as = tableAlias;
+  as(table_alias) {
+    this._as = table_alias;
     return this;
   }
-  withValues(name, rows) {
-    let columns = this.cls.getKeys(rows[0]);
-    [rows, columns] = this._getCteValuesLiteral(rows, columns, true);
-    const cteName = `${name}(${columns.join(", ")})`;
-    const cteValues = `(VALUES ${asToken(rows)})`;
-    return this.with(cteName, cteValues);
+  with_values(name, rows) {
+    let columns = this.cls.get_keys(rows[0]);
+    [rows, columns] = this._get_cte_values_literal(rows, columns, true);
+    const cte_name = `${name}(${columns.join(", ")})`;
+    const cte_values = `(VALUES ${as_token(rows)})`;
+    return this.with(cte_name, cte_values);
   }
   insert(rows, columns) {
     if (!(rows instanceof Model)) {
-      if (!this._skipValidate) {
-        [rows, columns] = this.cls.validateCreateData(rows, columns);
+      if (!this._skip_validate) {
+        [rows, columns] = this.cls.validate_create_data(rows, columns);
       }
-      [rows, columns] = this.cls.prepareDbRows(rows, columns);
+      [rows, columns] = this.cls.prepare_db_rows(rows, columns);
     }
-    return this._baseInsert(rows, columns);
+    return this._base_insert(rows, columns);
   }
   update(row, columns) {
     if (typeof row === "string") {
-      return this._baseUpdate(row);
+      return this._base_update(row);
     } else if (!(row instanceof Model)) {
-      if (!this._skipValidate) {
-        row = this.cls.validateUpdate(row, columns);
+      if (!this._skip_validate) {
+        row = this.cls.validate_update(row, columns);
       }
-      [row, columns] = this.cls.prepareDbRows(row, columns, true);
+      [row, columns] = this.cls.prepare_db_rows(row, columns, true);
     }
-    return this._baseUpdate(row, columns);
+    return this._base_update(row, columns);
   }
-  async getMultiple(keys, columns) {
+  async get_multiple(keys, columns) {
     if (this._commit === undefined || this._commit) {
-      return await this._baseGetMultiple(keys, columns).exec();
+      return await this._base_get_multiple(keys, columns).exec();
     } else {
-      return this._baseGetMultiple(keys, columns);
+      return this._base_get_multiple(keys, columns);
     }
   }
   async merge(rows, key, columns) {
     if (rows.length === 0) {
       throw new Error("empty rows passed to merge");
     }
-    if (!this._skipValidate) {
-      [rows, key, columns] = this.cls.validateCreateRows(rows, key, columns);
+    if (!this._skip_validate) {
+      [rows, key, columns] = this.cls.validate_create_rows(rows, key, columns);
     }
-    [rows, columns] = this.cls.prepareDbRows(rows, columns, false);
-    this._baseMerge(rows, key, columns).compact();
+    [rows, columns] = this.cls.prepare_db_rows(rows, columns, false);
+    this._base_merge(rows, key, columns).compact();
     if (!this._returning) {
       this.returning(key);
     }
@@ -1985,11 +1828,11 @@ class Model {
     if (rows.length === 0) {
       throw new Error("empty rows passed to merge");
     }
-    if (!this._skipValidate) {
-      [rows, key, columns] = this.cls.validateCreateRows(rows, key, columns);
+    if (!this._skip_validate) {
+      [rows, key, columns] = this.cls.validate_create_rows(rows, key, columns);
     }
-    [rows, columns] = this.cls.prepareDbRows(rows, columns, false);
-    this._baseUpsert(rows, key, columns).compact();
+    [rows, columns] = this.cls.prepare_db_rows(rows, columns, false);
+    this._base_upsert(rows, key, columns).compact();
     if (!this._returning) {
       this.returning(key);
     }
@@ -2003,11 +1846,11 @@ class Model {
     if (rows.length === 0) {
       throw new Error("empty rows passed to merge");
     }
-    if (!this._skipValidate) {
-      [rows, key, columns] = this.cls.validateUpdateRows(rows, key, columns);
+    if (!this._skip_validate) {
+      [rows, key, columns] = this.cls.validate_update_rows(rows, key, columns);
     }
-    [rows, columns] = this.cls.prepareDbRows(rows, columns, true);
-    this._baseUpdates(rows, key, columns).compact();
+    [rows, columns] = this.cls.prepare_db_rows(rows, columns, true);
+    this._base_updates(rows, key, columns).compact();
     if (!this._returning) {
       this.returning(key);
     }
@@ -2017,13 +1860,13 @@ class Model {
       return this;
     }
   }
-  async getMerge(rows, key) {
-    let columns = this.cls.getKeys(rows[0]);
-    [rows, columns] = this._getCteValuesLiteral(rows, columns, true);
-    const joinCond = this._getJoinConditions(key, "V", this._as || this.table_name);
-    const cteName = `V(${columns.join(", ")})`;
-    const cteValues = `(VALUES ${asToken(rows)})`;
-    this._baseSelect("V.*").with(cteName, cteValues)._baseRightJoin("V", joinCond);
+  async get_merge(rows, key) {
+    let columns = this.cls.get_keys(rows[0]);
+    [rows, columns] = this._get_cte_values_literal(rows, columns, true);
+    const join_cond = this._get_join_conditions(key, "V", this._as || this.table_name);
+    const cte_name = `V(${columns.join(", ")})`;
+    const cte_values = `(VALUES ${as_token(rows)})`;
+    this._base_select("V.*").with(cte_name, cte_values)._base_right_join("V", join_cond);
     if (this._commit === undefined || this._commit) {
       return await this.execr();
     } else {
@@ -2031,15 +1874,15 @@ class Model {
     }
   }
   copy() {
-    const copySql = {};
+    const copy_sql = {};
     for (const [key, value] of Object.entries(this)) {
       if (typeof value === "object") {
-        copySql[key] = clone(value);
+        copy_sql[key] = clone(value);
       } else {
-        copySql[key] = value;
+        copy_sql[key] = value;
       }
     }
-    return Model.new(copySql);
+    return Model.new(copy_sql);
   }
   delete(cond, op, dval) {
     this._delete = true;
@@ -2053,7 +1896,7 @@ class Model {
     return this;
   }
   select(a, b, ...varargs) {
-    const s = this._getSelectToken(a, b, ...varargs);
+    const s = this._get_select_token(a, b, ...varargs);
     if (!this._select) {
       this._select = s;
     } else if (s !== undefined && s !== "") {
@@ -2061,8 +1904,8 @@ class Model {
     }
     return this;
   }
-  selectLiteral(a, b, ...varargs) {
-    const s = this._getSelectTokenLiteral(a, b, ...varargs);
+  select_literal(a, b, ...varargs) {
+    const s = this._get_select_token_literal(a, b, ...varargs);
     if (!this._select) {
       this._select = s;
     } else if (s !== undefined && s !== "") {
@@ -2071,7 +1914,7 @@ class Model {
     return this;
   }
   returning(a, b, ...varargs) {
-    const s = this._getSelectToken(a, b, ...varargs);
+    const s = this._get_select_token(a, b, ...varargs);
     if (!this._returning) {
       this._returning = s;
     } else if (s !== undefined && s !== "") {
@@ -2079,106 +1922,106 @@ class Model {
     } else {
       return this;
     }
-    if (this._returningArgs) {
-      this._returningArgs = [this._returningArgs, a, b, ...varargs];
+    if (this._returning_args) {
+      this._returning_args = [this._returning_args, a, b, ...varargs];
     } else {
-      this._returningArgs = [a, b, ...varargs];
+      this._returning_args = [a, b, ...varargs];
     }
     return this;
   }
-  returningLiteral(a, b, ...varargs) {
-    const s = this._getSelectTokenLiteral(a, b, ...varargs);
+  returning_literal(a, b, ...varargs) {
+    const s = this._get_select_token_literal(a, b, ...varargs);
     if (!this._returning) {
       this._returning = s;
     } else if (s !== undefined && s !== "") {
       this._returning = this._returning + ", " + s;
     }
-    if (this._returningArgs) {
-      this._returningArgs = [this._returningArgs, a, b, ...varargs];
+    if (this._returning_args) {
+      this._returning_args = [this._returning_args, a, b, ...varargs];
     } else {
-      this._returningArgs = [a, b, ...varargs];
+      this._returning_args = [a, b, ...varargs];
     }
     return this;
   }
-  cteReturning(opts) {
-    this._cteReturning = opts;
+  cte_returning(opts) {
+    this._cte_returning = opts;
     return this;
   }
   group(...varargs) {
     if (!this._group) {
-      this._group = this._getSelectToken(...varargs);
+      this._group = this._get_select_token(...varargs);
     } else {
-      this._group = this._group + ", " + this._getSelectToken(...varargs);
+      this._group = this._group + ", " + this._get_select_token(...varargs);
     }
     return this;
   }
-  groupBy(...varargs) {
+  group_by(...varargs) {
     return this.group(...varargs);
   }
   order(...varargs) {
     if (!this._order) {
-      this._order = this._getSelectToken(...varargs);
+      this._order = this._get_select_token(...varargs);
     } else {
-      this._order = this._order + ", " + this._getSelectToken(...varargs);
+      this._order = this._order + ", " + this._get_select_token(...varargs);
     }
     return this;
   }
-  orderBy(...varargs) {
+  order_by(...varargs) {
     return this.order(...varargs);
   }
   using(a, ...varargs) {
     this._delete = true;
-    this._using = this._getSelectToken(a, ...varargs);
+    this._using = this._get_select_token(a, ...varargs);
     return this;
   }
   from(a, ...varargs) {
     if (!this._from) {
-      this._from = this._getSelectToken(a, ...varargs);
+      this._from = this._get_select_token(a, ...varargs);
     } else {
-      this._from = this._from + ", " + this._getSelectToken(a, ...varargs);
+      this._from = this._from + ", " + this._get_select_token(a, ...varargs);
     }
     return this;
   }
-  getTable() {
+  get_table() {
     return (this._as === undefined && this.table_name) || this.table_name + " AS " + this._as;
   }
-  join(joinArgs, key, op, val) {
-    if (typeof joinArgs === "object") {
-      this._registerJoinModel(joinArgs, "INNER");
+  join(join_args, key, op, val) {
+    if (typeof join_args === "object") {
+      this._register_join_model(join_args, "INNER");
     } else {
-      this._baseJoin(joinArgs, key, op, val);
+      this._base_join(join_args, key, op, val);
     }
     return this;
   }
-  innerJoin(joinArgs, key, op, val) {
-    if (typeof joinArgs === "object") {
-      this._registerJoinModel(joinArgs, "INNER");
+  inner_join(join_args, key, op, val) {
+    if (typeof join_args === "object") {
+      this._register_join_model(join_args, "INNER");
     } else {
-      this._baseJoin(joinArgs, key, op, val);
+      this._base_join(join_args, key, op, val);
     }
     return this;
   }
-  leftJoin(joinArgs, key, op, val) {
-    if (typeof joinArgs === "object") {
-      this._registerJoinModel(joinArgs, "LEFT");
+  left_join(join_args, key, op, val) {
+    if (typeof join_args === "object") {
+      this._register_join_model(join_args, "LEFT");
     } else {
-      this._baseLeftJoin(joinArgs, key, op, val);
+      this._base_left_join(join_args, key, op, val);
     }
     return this;
   }
-  rightJoin(joinArgs, key, op, val) {
-    if (typeof joinArgs === "object") {
-      this._registerJoinModel(joinArgs, "RIGHT");
+  right_join(join_args, key, op, val) {
+    if (typeof join_args === "object") {
+      this._register_join_model(join_args, "RIGHT");
     } else {
-      this._baseRightJoin(joinArgs, key, op, val);
+      this._base_right_join(join_args, key, op, val);
     }
     return this;
   }
-  fullJoin(joinArgs, key, op, val) {
-    if (typeof joinArgs === "object") {
-      this._registerJoinModel(joinArgs, "FULL");
+  full_join(join_args, key, op, val) {
+    if (typeof join_args === "object") {
+      this._register_join_model(join_args, "FULL");
     } else {
-      this._baseFullJoin(joinArgs, key, op, val);
+      this._base_full_join(join_args, key, op, val);
     }
     return this;
   }
@@ -2191,30 +2034,30 @@ class Model {
     return this;
   }
   where(cond, op, dval) {
-    const whereToken = this._getConditionToken(cond, op, dval);
-    return this._handleWhereToken(whereToken, "(%s) AND (%s)");
+    const where_token = this._get_condition_token(cond, op, dval);
+    return this._handle_where_token(where_token, "(%s) AND (%s)");
   }
-  whereOr(cond, op, dval) {
-    const whereToken = this._getConditionTokenOr(cond, op, dval);
-    return this._handleWhereToken(whereToken, "(%s) AND (%s)");
+  where_or(cond, op, dval) {
+    const where_token = this._get_condition_token_or(cond, op, dval);
+    return this._handle_where_token(where_token, "(%s) AND (%s)");
   }
-  orWhereOr(cond, op, dval) {
-    const whereToken = this._getConditionTokenOr(cond, op, dval);
-    return this._handleWhereToken(whereToken, "%s OR %s");
+  or_where_or(cond, op, dval) {
+    const where_token = this._get_condition_token_or(cond, op, dval);
+    return this._handle_where_token(where_token, "%s OR %s");
   }
-  whereNot(cond, op, dval) {
-    const whereToken = this._getConditionTokenNot(cond, op, dval);
-    return this._handleWhereToken(whereToken, "(%s) AND (%s)");
+  where_not(cond, op, dval) {
+    const where_token = this._get_condition_token_not(cond, op, dval);
+    return this._handle_where_token(where_token, "(%s) AND (%s)");
   }
-  orWhere(cond, op, dval) {
-    const whereToken = this._getConditionToken(cond, op, dval);
-    return this._handleWhereToken(whereToken, "%s OR %s");
+  or_where(cond, op, dval) {
+    const where_token = this._get_condition_token(cond, op, dval);
+    return this._handle_where_token(where_token, "%s OR %s");
   }
-  orWhereNot(cond, op, dval) {
-    const whereToken = this._getConditionTokenNot(cond, op, dval);
-    return this._handleWhereToken(whereToken, "%s OR %s");
+  or_where_not(cond, op, dval) {
+    const where_token = this._get_condition_token_not(cond, op, dval);
+    return this._handle_where_token(where_token, "%s OR %s");
   }
-  whereExists(builder) {
+  where_exists(builder) {
     if (this._where) {
       this._where = `(${this._where}) AND EXISTS (${builder})`;
     } else {
@@ -2222,7 +2065,7 @@ class Model {
     }
     return this;
   }
-  whereNotExists(builder) {
+  where_not_exists(builder) {
     if (this._where) {
       this._where = `(${this._where}) AND NOT EXISTS (${builder})`;
     } else {
@@ -2230,69 +2073,69 @@ class Model {
     }
     return this;
   }
-  whereIn(cols, range) {
+  where_in(cols, range) {
     if (typeof cols === "string") {
-      return this._baseWhereIn(this._getColumn(cols), range);
+      return this._base_where_in(this._get_column(cols), range);
     } else {
-      const res = cols.map((e) => this._getColumn(e));
-      return this._baseWhereIn(res, range);
+      const res = cols.map((e) => this._get_column(e));
+      return this._base_where_in(res, range);
     }
   }
-  whereNotIn(cols, range) {
+  where_not_in(cols, range) {
     if (typeof cols === "string") {
-      cols = this._getColumn(cols);
-    } else {
-      for (let i = 0; i < cols.length; i = i + 1) {
-        cols[i] = this._getColumn(cols[i]);
-      }
-    }
-    return this._baseWhereNotIn(cols, range);
-  }
-  whereNull(col) {
-    return this._baseWhereNull(this._getColumn(col));
-  }
-  whereNotNull(col) {
-    return this._baseWhereNotNull(this._getColumn(col));
-  }
-  whereBetween(col, low, high) {
-    return this._baseWhereBetween(this._getColumn(col), low, high);
-  }
-  whereNotBetween(col, low, high) {
-    return this._baseWhereNotBetween(this._getColumn(col), low, high);
-  }
-  orWhereIn(cols, range) {
-    if (typeof cols === "string") {
-      cols = this._getColumn(cols);
+      cols = this._get_column(cols);
     } else {
       for (let i = 0; i < cols.length; i = i + 1) {
-        cols[i] = this._getColumn(cols[i]);
+        cols[i] = this._get_column(cols[i]);
       }
     }
-    return this._baseOrWhereIn(cols, range);
+    return this._base_where_not_in(cols, range);
   }
-  orWhereNotIn(cols, range) {
+  where_null(col) {
+    return this._base_where_null(this._get_column(col));
+  }
+  where_not_null(col) {
+    return this._base_where_not_null(this._get_column(col));
+  }
+  where_between(col, low, high) {
+    return this._base_where_between(this._get_column(col), low, high);
+  }
+  where_not_between(col, low, high) {
+    return this._base_where_not_between(this._get_column(col), low, high);
+  }
+  or_where_in(cols, range) {
     if (typeof cols === "string") {
-      cols = this._getColumn(cols);
+      cols = this._get_column(cols);
     } else {
       for (let i = 0; i < cols.length; i = i + 1) {
-        cols[i] = this._getColumn(cols[i]);
+        cols[i] = this._get_column(cols[i]);
       }
     }
-    return this._baseOrWhereNotIn(cols, range);
+    return this._base_or_where_in(cols, range);
   }
-  orWhereNull(col) {
-    return this._baseOrWhereNull(this._getColumn(col));
+  or_where_not_in(cols, range) {
+    if (typeof cols === "string") {
+      cols = this._get_column(cols);
+    } else {
+      for (let i = 0; i < cols.length; i = i + 1) {
+        cols[i] = this._get_column(cols[i]);
+      }
+    }
+    return this._base_or_where_not_in(cols, range);
   }
-  orWhereNotNull(col) {
-    return this._baseOrWhereNotNull(this._getColumn(col));
+  or_where_null(col) {
+    return this._base_or_where_null(this._get_column(col));
   }
-  orWhereBetween(col, low, high) {
-    return this._baseOrWhereBetween(this._getColumn(col), low, high);
+  or_where_not_null(col) {
+    return this._base_or_where_not_null(this._get_column(col));
   }
-  orWhereNotBetween(col, low, high) {
-    return this._baseOrWhereNotBetween(this._getColumn(col), low, high);
+  or_where_between(col, low, high) {
+    return this._base_or_where_between(this._get_column(col), low, high);
   }
-  orWhereExists(builder) {
+  or_where_not_between(col, low, high) {
+    return this._base_or_where_not_between(this._get_column(col), low, high);
+  }
+  or_where_exists(builder) {
     if (this._where) {
       this._where = `${this._where} OR EXISTS (${builder})`;
     } else {
@@ -2300,7 +2143,7 @@ class Model {
     }
     return this;
   }
-  orWhereNotExists(builder) {
+  or_where_not_exists(builder) {
     if (this._where) {
       this._where = `${this._where} OR NOT EXISTS (${builder})`;
     } else {
@@ -2310,21 +2153,21 @@ class Model {
   }
   having(cond, op, dval) {
     if (this._having) {
-      this._having = `(${this._having}) AND (${this._getConditionToken(cond, op, dval)})`;
+      this._having = `(${this._having}) AND (${this._get_condition_token(cond, op, dval)})`;
     } else {
-      this._having = this._getConditionToken(cond, op, dval);
+      this._having = this._get_condition_token(cond, op, dval);
     }
     return this;
   }
-  havingNot(cond, op, dval) {
+  having_not(cond, op, dval) {
     if (this._having) {
-      this._having = `(${this._having}) AND (${this._getConditionTokenNot(cond, op, dval)})`;
+      this._having = `(${this._having}) AND (${this._get_condition_token_not(cond, op, dval)})`;
     } else {
-      this._having = this._getConditionTokenNot(cond, op, dval);
+      this._having = this._get_condition_token_not(cond, op, dval);
     }
     return this;
   }
-  havingExists(builder) {
+  having_exists(builder) {
     if (this._having) {
       this._having = `(${this._having}) AND EXISTS (${builder})`;
     } else {
@@ -2332,7 +2175,7 @@ class Model {
     }
     return this;
   }
-  havingNotExists(builder) {
+  having_not_exists(builder) {
     if (this._having) {
       this._having = `(${this._having}) AND NOT EXISTS (${builder})`;
     } else {
@@ -2340,25 +2183,25 @@ class Model {
     }
     return this;
   }
-  havingIn(cols, range) {
-    const inToken = this._getInToken(cols, range);
+  having_in(cols, range) {
+    const in_token = this._get_in_token(cols, range);
     if (this._having) {
-      this._having = `(${this._having}) AND ${inToken}`;
+      this._having = `(${this._having}) AND ${in_token}`;
     } else {
-      this._having = inToken;
+      this._having = in_token;
     }
     return this;
   }
-  havingNotIn(cols, range) {
-    const notInToken = this._getInToken(cols, range, "NOT IN");
+  having_not_in(cols, range) {
+    const not_in_token = this._get_in_token(cols, range, "NOT IN");
     if (this._having) {
-      this._having = `(${this._having}) AND ${notInToken}`;
+      this._having = `(${this._having}) AND ${not_in_token}`;
     } else {
-      this._having = notInToken;
+      this._having = not_in_token;
     }
     return this;
   }
-  havingNull(col) {
+  having_null(col) {
     if (this._having) {
       this._having = `(${this._having}) AND ${col} IS NULL`;
     } else {
@@ -2366,7 +2209,7 @@ class Model {
     }
     return this;
   }
-  havingNotNull(col) {
+  having_not_null(col) {
     if (this._having) {
       this._having = `(${this._having}) AND ${col} IS NOT NULL`;
     } else {
@@ -2374,7 +2217,7 @@ class Model {
     }
     return this;
   }
-  havingBetween(col, low, high) {
+  having_between(col, low, high) {
     if (this._having) {
       this._having = `(${this._having}) AND (${col} BETWEEN ${low} AND ${high})`;
     } else {
@@ -2382,7 +2225,7 @@ class Model {
     }
     return this;
   }
-  havingNotBetween(col, low, high) {
+  having_not_between(col, low, high) {
     if (this._having) {
       this._having = `(${this._having}) AND (${col} NOT BETWEEN ${low} AND ${high})`;
     } else {
@@ -2390,23 +2233,23 @@ class Model {
     }
     return this;
   }
-  orHaving(cond, op, dval) {
+  or_having(cond, op, dval) {
     if (this._having) {
-      this._having = `${this._having} OR ${this._getConditionToken(cond, op, dval)}`;
+      this._having = `${this._having} OR ${this._get_condition_token(cond, op, dval)}`;
     } else {
-      this._having = this._getConditionToken(cond, op, dval);
+      this._having = this._get_condition_token(cond, op, dval);
     }
     return this;
   }
-  orHavingNot(cond, op, dval) {
+  or_having_not(cond, op, dval) {
     if (this._having) {
-      this._having = `${this._having} OR ${this._getConditionTokenNot(cond, op, dval)}`;
+      this._having = `${this._having} OR ${this._get_condition_token_not(cond, op, dval)}`;
     } else {
-      this._having = this._getConditionTokenNot(cond, op, dval);
+      this._having = this._get_condition_token_not(cond, op, dval);
     }
     return this;
   }
-  orHavingExists(builder) {
+  or_having_exists(builder) {
     if (this._having) {
       this._having = `${this._having} OR EXISTS (${builder})`;
     } else {
@@ -2414,7 +2257,7 @@ class Model {
     }
     return this;
   }
-  orHavingNotExists(builder) {
+  or_having_not_exists(builder) {
     if (this._having) {
       this._having = `${this._having} OR NOT EXISTS (${builder})`;
     } else {
@@ -2422,25 +2265,25 @@ class Model {
     }
     return this;
   }
-  orHavingIn(cols, range) {
-    const inToken = this._getInToken(cols, range);
+  or_having_in(cols, range) {
+    const in_token = this._get_in_token(cols, range);
     if (this._having) {
-      this._having = `${this._having} OR ${inToken}`;
+      this._having = `${this._having} OR ${in_token}`;
     } else {
-      this._having = inToken;
+      this._having = in_token;
     }
     return this;
   }
-  orHavingNotIn(cols, range) {
-    const notInToken = this._getInToken(cols, range, "NOT IN");
+  or_having_not_in(cols, range) {
+    const not_in_token = this._get_in_token(cols, range, "NOT IN");
     if (this._having) {
-      this._having = `${this._having} OR ${notInToken}`;
+      this._having = `${this._having} OR ${not_in_token}`;
     } else {
-      this._having = notInToken;
+      this._having = not_in_token;
     }
     return this;
   }
-  orHavingNull(col) {
+  or_having_null(col) {
     if (this._having) {
       this._having = `${this._having} OR ${col} IS NULL`;
     } else {
@@ -2448,7 +2291,7 @@ class Model {
     }
     return this;
   }
-  orHavingNotNull(col) {
+  or_having_not_null(col) {
     if (this._having) {
       this._having = `${this._having} OR ${col} IS NOT NULL`;
     } else {
@@ -2456,7 +2299,7 @@ class Model {
     }
     return this;
   }
-  orHavingBetween(col, low, high) {
+  or_having_between(col, low, high) {
     if (this._having) {
       this._having = `${this._having} OR (${col} BETWEEN ${low} AND ${high})`;
     } else {
@@ -2464,7 +2307,7 @@ class Model {
     }
     return this;
   }
-  orHavingNotBetween(col, low, high) {
+  or_having_not_between(col, low, high) {
     if (this._having) {
       this._having = `${this._having} OR (${col} NOT BETWEEN ${low} AND ${high})`;
     } else {
@@ -2474,7 +2317,7 @@ class Model {
   }
   async exists() {
     const statement = `SELECT EXISTS (${this.select(1).limit(1).statement()})`;
-    const res = await this.cls.sqlQuery(statement);
+    const res = await this.cls.sql_query(statement);
     return res;
   }
   compact() {
@@ -2492,11 +2335,11 @@ class Model {
     this._commit = bool;
     return this;
   }
-  skipValidate(bool) {
+  skip_validate(bool) {
     if (bool === undefined) {
       bool = true;
     }
-    this._skipValidate = bool;
+    this._skip_validate = bool;
     return this;
   }
   async flat(depth) {
@@ -2515,10 +2358,10 @@ class Model {
   async create(rows, columns) {
     return await this.insert(rows, columns).returning("*").execr();
   }
-  async tryGet(cond, op, dval) {
+  async try_get(cond, op, dval) {
     let records;
     if (cond !== undefined) {
-      if (typeof cond === "object" && isEmptyObject(cond)) {
+      if (typeof cond === "object" && is_empty_object(cond)) {
         throw new Error("empty condition table is not allowed");
       }
       records = await this.where(cond, op, dval).limit(2).exec();
@@ -2534,7 +2377,7 @@ class Model {
   async get(cond, op, dval) {
     let records;
     if (cond !== undefined) {
-      if (typeof cond === "object" && isEmptyObject(cond)) {
+      if (typeof cond === "object" && is_empty_object(cond)) {
         throw new Error("empty condition table is not allowed");
       }
       records = await this.where(cond, op, dval).limit(2).exec();
@@ -2549,7 +2392,7 @@ class Model {
       throw new Error("multiple records returned: " + records.length);
     }
   }
-  async getOrCreate(params, defaults) {
+  async get_or_create(params, defaults) {
     const records = await this.where(params).limit(2).exec();
     if (records.length === 1) {
       return [records[0], false];
@@ -2557,18 +2400,18 @@ class Model {
       const pk = this.primary_key;
       const data = { ...params, ...defaults };
       //**NOTE: transacion here?
-      const res = await this.newSql().insert(data, this.names).returning(pk).execr();
+      const res = await this.new_sql().insert(data, this.names).returning(pk).execr();
       data[pk] = res[0][pk];
-      return [this.cls.newRecord(data), true];
+      return [this.cls.new_record(data), true];
     } else {
       throw new Error("expect 1 row returned, but now get " + records.length);
     }
   }
-  async asSet() {
+  async as_set() {
     const res = (await this.compact().execr()).flat();
     return new Set(res);
   }
-  static async sqlQuery(statement) {
+  static async sql_query(statement) {
     // if (process?.env["PRINT_QUERY_SQL"] === "on") {
     //   console.log("  ", statement);
     // }
@@ -2580,11 +2423,11 @@ class Model {
   async exec() {
     const cls = this.cls;
     const statement = this.statement();
-    const records = await cls.sqlQuery(statement);
+    const records = await cls.sql_query(statement);
     if (this._raw || this._compact || this._update || this._insert || this._delete) {
       return records;
     } else {
-      if (!this._loadFk) {
+      if (!this._load_fk) {
         for (const [i, record] of records.entries()) {
           records[i] = cls.load(record);
         }
@@ -2596,72 +2439,72 @@ class Model {
             const field = fields[name];
             const value = record[name];
             if (value !== undefined) {
-              const fkModel = this._loadFk[name];
-              if (!fkModel) {
+              const fk_model = this._load_fk[name];
+              if (!fk_model) {
                 if (!field.load) {
                   record[name] = value;
                 } else {
                   record[name] = field.load(value);
                 }
               } else {
-                record[name] = fkModel.load(getForeignObject(record, name + "__"));
+                record[name] = fk_model.load(get_foreign_object(record, name + "__"));
               }
             }
           }
-          records[i] = cls.newRecord(record);
+          records[i] = cls.new_record(record);
         }
       }
       return records;
     }
   }
-  loadFk(fkName, selectNames, ...varargs) {
-    const fk = this.foreignKeys[fkName];
+  load_fk(fk_name, select_names, ...varargs) {
+    const fk = this.foreign_keys[fk_name];
     if (fk === undefined) {
-      throw new Error(fkName + (" is not a valid forein key name for " + this.table_name));
+      throw new Error(fk_name + (" is not a valid forein key name for " + this.table_name));
     }
-    const fkModel = fk.reference;
-    const joinKey = fkName + "__" + fkModel.table_name;
-    const joinObj = this._registerJoinModel({
-      joinKey,
-      column: fkName,
-      fkModel,
-      fkColumn: fk.reference_column,
+    const fk_model = fk.reference;
+    const join_key = fk_name + "__" + fk_model.table_name;
+    const join_obj = this._register_join_model({
+      join_key,
+      column: fk_name,
+      fk_model,
+      fk_column: fk.reference_column,
     });
-    if (!this._loadFk) {
-      this._loadFk = {};
+    if (!this._load_fk) {
+      this._load_fk = {};
     }
-    this._loadFk[fkName] = fkModel;
-    this.select(fkName);
-    if (!selectNames) {
+    this._load_fk[fk_name] = fk_model;
+    this.select(fk_name);
+    if (!select_names) {
       return this;
     }
-    const rightAlias = joinObj.fkAlias;
+    const right_alias = join_obj.fk_alias;
     let fks;
-    if (typeof selectNames === "object") {
+    if (typeof select_names === "object") {
       const res = [];
-      for (const fkn of selectNames) {
-        assert(fkModel.fields[fkn], "invalid field name for fk model: " + fkn);
-        res.push(`${rightAlias}.${fkn} AS ${fkName}__${fkn}`);
+      for (const fkn of select_names) {
+        assert(fk_model.fields[fkn], "invalid field name for fk model: " + fkn);
+        res.push(`${right_alias}.${fkn} AS ${fk_name}__${fkn}`);
       }
       fks = res.join(", ");
-    } else if (selectNames === "*") {
+    } else if (select_names === "*") {
       const res = [];
-      for (const fkn of fkModel.field_names) {
-        res.push(`${rightAlias}.${fkn} AS ${fkName}__${fkn}`);
+      for (const fkn of fk_model.field_names) {
+        res.push(`${right_alias}.${fkn} AS ${fk_name}__${fkn}`);
       }
       fks = res.join(", ");
-    } else if (typeof selectNames === "string") {
-      assert(fkModel.fields[selectNames], "invalid field name for fk model: " + selectNames);
-      fks = `${rightAlias}.${selectNames} AS ${fkName}__${selectNames}`;
+    } else if (typeof select_names === "string") {
+      assert(fk_model.fields[select_names], "invalid field name for fk model: " + select_names);
+      fks = `${right_alias}.${select_names} AS ${fk_name}__${select_names}`;
       for (let i = 0; i < varargs.length; i = i + 1) {
         const fkn = varargs[i];
-        assert(fkModel.fields[fkn], "invalid field name for fk model: " + fkn);
-        fks = `${fks}, ${rightAlias}.${fkn} AS ${fkName}__${fkn}`;
+        assert(fk_model.fields[fkn], "invalid field name for fk model: " + fkn);
+        fks = `${fks}, ${right_alias}.${fkn} AS ${fk_name}__${fkn}`;
       }
     } else {
-      throw new Error(`invalid argument type ${typeof selectNames} for load_fk`);
+      throw new Error(`invalid argument type ${typeof select_names} for load_fk`);
     }
-    return this._baseSelect(fks);
+    return this._base_select(fks);
   }
 }
 

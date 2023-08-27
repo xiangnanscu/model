@@ -234,7 +234,7 @@ class basefield {
       try {
         value = validator(value, ctx);
       } catch (error) {
-        if (error instanceof Validator.Skip_validate_error) {
+        if (error instanceof Validator.SkipValidateError) {
           return value;
         } else {
           throw error;
@@ -250,10 +250,10 @@ class basefield {
       return this.default(ctx);
     }
   }
-  make_error(err, index) {
+  make_error(message, index) {
     return {
       type: "field_error",
-      message: err,
+      message,
       index,
       name: this.name,
       label: this.label,
@@ -711,7 +711,7 @@ class json extends basefield {
 
 function skip_validate_when_string(v) {
   if (typeof v === "string") {
-    throw new Validator.Skip_validate_error();
+    throw new Validator.SkipValidateError();
   } else {
     return v;
   }

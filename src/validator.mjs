@@ -1,4 +1,4 @@
-class Skip_validate_error extends Error {}
+class SkipValidateError extends Error {}
 
 function required(message) {
   message = message || "此项必填";
@@ -13,7 +13,7 @@ function required(message) {
 }
 function not_required(v) {
   if (v === undefined || v === "") {
-    throw new Skip_validate_error();
+    throw new SkipValidateError();
   } else {
     return v;
   }
@@ -298,7 +298,7 @@ function sfzh(v) {
 }
 
 export {
-  Skip_validate_error,
+  SkipValidateError,
   required,
   not_required,
   string,

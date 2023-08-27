@@ -60,8 +60,5 @@
     "vue": "^3.2.37",
     "vue-eslint-parser": "^9.1.0",
     "vue-tsc": "^1.0.8"
-  },
-  "dependencies": {
-    "@xiangnanscu/field": "^0.12.0"
   }
 }

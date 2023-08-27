@@ -1,4 +1,5 @@
 // ([a-z])([A-Z]) => $1_\L$2
+// \[_, (\w+)\] of ([\w.]+)\.entries\(\) => $1 of $2
 // rows[0] 替换为Array.isArray(rows)
 // is_sql_instance\((\w+)\) => $1 instanceof Sql
 // lua混合array和object, js只能分别处理:
@@ -103,10 +104,6 @@ function assemble_sql(opts) {
   return (opts.with && `WITH ${opts.with} ${statement}`) || statement;
 }
 class Sql {
-  // static Validate_error = Validate_error;
-  // static Validate_batch_error = Validate_batch_error;
-  // static base_model = base_model;
-  // static make_field_from_json = make_field_from_json;
   static token = make_token;
   static NULL = NULL;
   static DEFAULT = DEFAULT;

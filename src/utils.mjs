@@ -114,18 +114,13 @@ export function _prefix_with_V(column) {
   return "V." + column;
 }
 export function dict(t1, t2) {
-  const res = clone(t1);
-  if (t2) {
-    for (const [key, value] of Object.entries(t2)) {
-      res[key] = value;
-    }
-  }
-  return res;
+  return { ...t1, ...t2 };
 }
 export const capitalize = (s) => s.charAt(0).toUpperCase() + s.slice(1);
 export const unique = (arr) => {
   return arr.filter((e, i) => arr.indexOf(e) === i);
 };
+export const getenv = (key) => process.env[key];
 export const clone = (o) => JSON.parse(JSON.stringify(o));
 export const string_format = (s, ...varargs) => {
   let status = 0;
@@ -203,7 +198,7 @@ export const FK_TYPE_NOT_DEFIEND = Object.freeze(Symbol("FK_TYPE_NOT_DEFIEND"));
 export function get_localtime(d = new Date()) {
   return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()} ${d.getHours()}:${d.getMinutes()}:${d.getSeconds()}`;
 }
-
+export const ngx_localtime = get_localtime
 export const is_empty_object = (obj) => {
   for (var i in obj) {
     return false;
@@ -212,3 +207,8 @@ export const is_empty_object = (obj) => {
 };
 
 export class Http {}
+export function Query(options) {
+  return async (statement) => {
+    return await Http(statement);
+  };
+}

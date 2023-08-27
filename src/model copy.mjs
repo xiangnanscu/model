@@ -2,6 +2,128 @@ import * as Field from "./field";
 import * as utils from "./utils";
 import { Http } from "@/globals/Http";
 
+const DEFAULT_STRING_MAXLENGTH = 256;
+const FOREIGN_KEY = 2;
+const NON_FOREIGN_KEY = 3;
+const END = 4;
+const COMPARE_OPERATORS = {
+  lt: "<",
+  lte: "<=",
+  gt: ">",
+  gte: ">=",
+  ne: "<>",
+  eq: "=",
+};
+const IS_PG_KEYWORDS = {};
+const NON_MERGE_NAMES = {
+  sql: true,
+  fields: true,
+  field_names: true,
+  extend: true,
+  mixins: true,
+  admin: true,
+};
+const is_empty_object = (obj) => {
+  for (var i in obj) {
+    return false;
+  }
+  return true;
+};
+const get_localtime = Field.Base_field.get_localtime;
+const string_format = (s, ...varargs) => {
+  let status = 0;
+  const res = [];
+  let j = -1;
+  for (let i = 0; i < s.length; i++) {
+    const c = s[i];
+    if (c === "%") {
+      if (status === 0) {
+        status = 1;
+      } else if (status === 1) {
+        status = 0;
+        res.push("%");
+      }
+    } else if (c === "s" && status === 1) {
+      j = j + 1;
+      res.push(varargs[j]);
+      status = 0;
+    } else {
+      res.push(c);
+    }
+  }
+  return res.join("");
+};
+const capitalize = (s) => s.char_at(0).to_upper_case() + s.slice(1);
+const base_model = {
+  abstract: true,
+  field_names: ["id", "ctime", "utime"],
+  fields: {
+    id: { type: "integer", primary_key: true, serial: true },
+    ctime: { label: "创建时间", type: "datetime", auto_now_add: true },
+    utime: { label: "更新时间", type: "datetime", auto_now: true },
+  },
+};
+const unique = (arr) => {
+  return arr.filter((e, i) => arr.index_of(e) === i);
+};
+const clone = (o) => JSON.parse(JSON.stringify(o));
+function _prefix_with_V(column) {
+  return "V." + column;
+}
+function map(tbl, func) {
+  const res = [];
+  for (let i = 0; i < tbl.length; i = i + 1) {
+    res[i] = func(tbl[i]);
+  }
+  return res;
+}
+function check_reserved(name) {
+  assert(typeof name === "string", `name must by string, not ${typeof name} (${name})`);
+  assert(!name.includes("__"), "don't use __ in a field name");
+  assert(!IS_PG_KEYWORDS[name.to_upper_case()], `${name} is a postgresql reserved word`);
+}
+function normalize_array_and_hash_fields(fields) {
+  assert(typeof fields === "object", "you must provide fields for a model");
+  const aligned_fields = [];
+  const field_names = [];
+  if (Array.is_array(fields)) {
+    for (const field of fields) {
+      aligned_fields[field.name] = field;
+      field_names.push(field.name);
+    }
+  } else {
+    for (const [name, field] of Object.entries(fields)) {
+      if (typeof name === "number") {
+        assert(field.name, "you must define name for a field when using array fields");
+        aligned_fields[field.name] = field;
+        field_names.push(field.name);
+      } else {
+        aligned_fields[name] = field;
+        field_names.push(name);
+      }
+    }
+  }
+
+  return [aligned_fields, field_names];
+}
+function normalize_field_names(field_names) {
+  assert(typeof field_names === "object", "you must provide field_names for a model");
+  for (const name of field_names) {
+    assert(typeof name === "string", "element of field_names must be string");
+  }
+  return field_names;
+}
+function get_foreign_object(attrs, prefix) {
+  const fk = {};
+  const n = prefix.length;
+  for (const [k, v] of Object.entries(attrs)) {
+    if (k.slice(0, n) === prefix) {
+      fk[k.slice(n)] = v;
+      delete attrs[k];
+    }
+  }
+  return fk;
+}
 function make_record_class(model) {
   class Record {
     constructor(attrs) {
@@ -39,7 +161,48 @@ function make_record_class(model) {
   }
   return Record;
 }
-
+function assert(bool, err_msg) {
+  if (!bool) {
+    throw new Error(err_msg);
+  } else {
+    return bool;
+  }
+}
+class Validate_error extends Error {
+  constructor({ name, message, label }) {
+    super(message);
+    Object.assign(this, { name, label, message });
+  }
+  String() {
+    return `MODEL FIELD ERROR: ${this.name}(${this.label})+${this.message}`;
+  }
+}
+class Validate_batch_error extends Validate_error {
+  constructor({ name, message, label, index }) {
+    super({ name, message, label });
+    this.index = index;
+  }
+}
+function make_field_from_json(json, kwargs) {
+  const options = { ...json, ...kwargs };
+  if (!options.type) {
+    if (options.reference) {
+      options.type = "foreignkey";
+    } else if (options.model) {
+      options.type = "table";
+    } else {
+      options.type = "string";
+    }
+  }
+  if ((options.type === "string" || options.type === "alioss") && !options.maxlength) {
+    options.maxlength = DEFAULT_STRING_MAXLENGTH;
+  }
+  const fcls = Field[`${capitalize(utils.snake_to_camel(options.type))}Field`];
+  if (!fcls) {
+    throw new Error("invalid field type:" + String(options.type));
+  }
+  return fcls.new(options);
+}
 function make_token(s) {
   function raw_token() {
     return s;
@@ -74,7 +237,7 @@ function _escape_factory(is_literal, is_bracket) {
       return "NULL";
     } else if (value instanceof Model) {
       return "(" + value.statement() + ")";
-    } else if (Array.isArray(value)) {
+    } else if (Array.is_array(value)) {
       if (value.length === 0) {
         throw new Error("empty array as Sql value is not allowed");
       }
@@ -256,7 +419,7 @@ class Model {
     Object.define_property(this, "name", class_name);
   }
   static make_model_class(opts) {
-    class Concrete_model extends this {
+    class ModelClass extends this {
       static sql_query = opts.sql_query ? opts.sql_query : this.sql_query;
       static table_name = opts.table_name;
       static admin = opts.admin || {};
@@ -271,48 +434,48 @@ class Model {
       static name_to_label = opts.name_to_label;
       static label_to_name = opts.label_to_name;
       static disable_auto_primary_key = opts.disable_auto_primary_key == undefined ? true : false;
-      cls = Concrete_model;
+      cls = ModelClass;
     }
     let pk_defined = false;
-    Concrete_model.foreign_keys = {};
-    Concrete_model.names = [];
-    for (const [name, field] of Object.entries(Concrete_model.fields)) {
+    ModelClass.foreign_keys = {};
+    ModelClass.names = [];
+    for (const [name, field] of Object.entries(ModelClass.fields)) {
       let fk_model = field.reference;
       if (fk_model === "self") {
-        fk_model = Concrete_model;
-        field.reference = Concrete_model;
+        fk_model = ModelClass;
+        field.reference = ModelClass;
       }
       if (fk_model) {
-        Concrete_model.foreign_keys[name] = field;
+        ModelClass.foreign_keys[name] = field;
       }
       if (field.primary_key) {
         const pk_name = field.name;
         assert(!pk_defined, `duplicated primary key: "${pk_name}" and "${pk_defined}"`);
         pk_defined = pk_name;
-        Concrete_model.primary_key = pk_name;
+        ModelClass.primary_key = pk_name;
       } else if (field.auto_now) {
-        Concrete_model.auto_now_name = field.name;
+        ModelClass.auto_now_name = field.name;
       } else if (field.auto_now_add) {
-        Concrete_model.auto_now_add_name = field.name;
+        ModelClass.auto_now_add_name = field.name;
       } else {
-        Concrete_model.names.push(name);
+        ModelClass.names.push(name);
       }
     }
-    for (const [_, field] of Object.entries(Concrete_model.fields)) {
+    for (const [_, field] of Object.entries(ModelClass.fields)) {
       if (field.db_type === Field.Base_field.FK_TYPE_NOT_DEFIEND) {
-        field.db_type = Concrete_model.fields[field.reference_column].db_type;
+        field.db_type = ModelClass.fields[field.reference_column].db_type;
       }
     }
-    Concrete_model.__is_model_class__ = true;
-    if (Concrete_model.table_name) {
-      Concrete_model.materialize_with_table_name({
-        table_name: Concrete_model.table_name,
+    ModelClass.__is_model_class__ = true;
+    if (ModelClass.table_name) {
+      ModelClass.materialize_with_table_name({
+        table_name: ModelClass.table_name,
       });
     } else {
-      Concrete_model.set_class_name("Abstract");
+      ModelClass.set_class_name("Abstract");
     }
-    Concrete_model.set_label_name_dict();
-    return Concrete_model;
+    ModelClass.set_label_name_dict();
+    return ModelClass;
   }
 
   static materialize_with_table_name({ table_name, label }) {
@@ -571,7 +734,7 @@ class Model {
   static new_sql() {
     return new this({ table_name: this.table_name });
   }
-  static throw_field_error({ name, message, index }) {
+  static make_field_error({ name, message, index }) {
     const label = this.fields[name].label;
     if (index !== undefined) {
       throw new Validate_batch_error({ name, message, label, index });
@@ -585,7 +748,7 @@ class Model {
       if (typeof key === "string") {
         for (const [i, row] of rows.entries()) {
           if (row[key] === undefined || row[key] === "") {
-            return this.throw_field_error({
+            return this.make_field_error({
               message: "不能为空",
               index: i,
               name: key,
@@ -596,7 +759,7 @@ class Model {
         for (const [i, row] of rows.entries()) {
           for (const k of key) {
             if (row[k] === undefined || row[k] === "") {
-              return this.throw_field_error({
+              return this.make_field_error({
                 message: "不能为空",
                 index: i,
                 name: k,
@@ -607,7 +770,7 @@ class Model {
       }
     } else if (typeof key === "string") {
       if (rows[key] === undefined || rows[key] === "") {
-        return this.throw_field_error({
+        return this.make_field_error({
           message: "不能为空",
           name: key,
         });
@@ -615,7 +778,7 @@ class Model {
     } else {
       for (const k of key) {
         if (rows[k] === undefined || rows[k] === "") {
-          return this.throw_field_error({
+          return this.make_field_error({
             message: "不能为空",
             name: k,
           });
@@ -642,7 +805,7 @@ class Model {
       try {
         value = field.validate(input[name], input);
       } catch (error) {
-        return this.throw_field_error({
+        return this.make_field_error({
           name,
           message: error.message,
         });
@@ -654,7 +817,7 @@ class Model {
           try {
             value = field.default(input);
           } catch (error) {
-            return this.throw_field_error({
+            return this.make_field_error({
               name,
               message: error.message,
             });
@@ -687,7 +850,7 @@ class Model {
             data[name] = value;
           }
         } catch (error) {
-          return this.throw_field_error({
+          return this.make_field_error({
             name,
             message: error.message,
           });
@@ -737,8 +900,8 @@ class Model {
           cleaned[index] = this.validate_create(row, columns);
         } catch (error) {
           if (error instanceof Validate_error) {
-            return this.throw_field_error({
-              index,
+            return this.make_field_error({
+              batch_index: index,
               name: error.name,
               message: error.message,
             });
@@ -762,7 +925,7 @@ class Model {
           cleaned[index] = this.validate_update(row, columns);
         } catch (error) {
           if (error instanceof Validate_error) {
-            return this.throw_field_error({
+            return this.make_field_error({
               index,
               name: error.name,
               message: error.message,
@@ -789,11 +952,23 @@ class Model {
   }
   static prepare_db_rows(rows, columns, is_update) {
     let cleaned;
-    columns = columns || this.get_keys(rows);
+    columns = columns || Sql.get_keys(rows);
     if (rows instanceof Array) {
-      cleaned = [];
+      cleaned = {};
       for (const [i, row] of rows.entries()) {
-        cleaned[i] = this.prepare_for_db(row, columns, is_update);
+        try {
+          cleaned[i] = this.prepare_for_db(row, columns, is_update);
+        } catch (error) {
+          if (error instanceof ValidateError) {
+            return this.make_field_error({
+              batch_index: i,
+              name: error.name,
+              message: error.message,
+            });
+          } else {
+            throw error;
+          }
+        }
       }
     } else {
       cleaned = this.prepare_for_db(rows, columns, is_update);
@@ -821,7 +996,7 @@ class Model {
           const val = field.prepare_for_db(value, data);
           prepared[name] = val;
         } catch (error) {
-          return this.throw_field_error({
+          return this.make_field_error({
             name,
             message: error.message,
           });
@@ -919,7 +1094,7 @@ class Model {
     const insert_subquery = Model.new({ table_name: "V" })
       ._base_select(vals_columns)
       ._base_left_join("U AS T", join_cond)
-      ._base_where_null("T." + (Array.isArray(key) ? key[0] : key));
+      ._base_where_null("T." + (Array.is_array(key) ? key[0] : key));
     let updated_subquery;
     if ((typeof key === "object" && key.length === columns.length) || columns.length === 1) {
       updated_subquery = Model.new({ table_name: "V" })
@@ -940,7 +1115,7 @@ class Model {
     if (rows instanceof Model) {
       assert(columns !== undefined, "you must specify columns when use subquery as values of upsert");
       this._insert = this._get_upsert_query_token(rows, key, columns);
-    } else if (Array.isArray(rows)) {
+    } else if (Array.is_array(rows)) {
       this._insert = this._get_bulk_upsert_token(rows, key, columns);
     } else {
       this._insert = this._get_upsert_token(rows, key, columns);
@@ -1026,7 +1201,7 @@ class Model {
   }
   _base_get_condition_token_from_table(kwargs, logic) {
     const tokens = [];
-    if (Array.isArray(kwargs)) {
+    if (Array.is_array(kwargs)) {
       for (const value of kwargs) {
         const token = this._base_get_condition_token(value);
         if (token !== undefined && token !== "") {
@@ -1251,7 +1426,7 @@ class Model {
   }
   _get_select_token(a, b, ...varargs) {
     if (b === undefined) {
-      if (Array.isArray(a)) {
+      if (Array.is_array(a)) {
         const tokens = a.map((e) => this._get_select_column(e));
         return as_token(tokens);
       } else if (typeof a === "string") {
@@ -1271,7 +1446,7 @@ class Model {
   }
   _get_select_token_literal(a, b, ...varargs) {
     if (b === undefined) {
-      if (Array.isArray(a)) {
+      if (Array.is_array(a)) {
         const tokens = a.map(as_literal);
         return as_token(tokens);
       } else {
@@ -1344,7 +1519,7 @@ class Model {
     const insert_token = `(${as_token(insert_columns)}) VALUES ${values_token} ON CONFLICT (${this._get_select_token(
       key
     )})`;
-    if ((Array.isArray(key) && key.length === insert_columns.length) || insert_columns.length === 1) {
+    if ((Array.is_array(key) && key.length === insert_columns.length) || insert_columns.length === 1) {
       return `${insert_token} DO NOTHING`;
     } else {
       return `${insert_token} DO UPDATE SET ${this._get_update_token_with_prefix(insert_columns, key, "EXCLUDED")}`;
@@ -1355,7 +1530,7 @@ class Model {
     const insert_token = `(${as_token(columns)}) VALUES ${as_token(rows)} ON CONFLICT (${this._base_get_select_token(
       key
     )})`;
-    if ((Array.isArray(key) && key.length === columns.length) || columns.length === 1) {
+    if ((Array.is_array(key) && key.length === columns.length) || columns.length === 1) {
       return `${insert_token} DO NOTHING`;
     } else {
       return `${insert_token} DO UPDATE SET ${this._get_update_token_with_prefix(columns, key, "EXCLUDED")}`;
@@ -1364,7 +1539,7 @@ class Model {
   _get_upsert_query_token(rows, key, columns) {
     const columns_token = this._get_select_token(columns);
     const insert_token = `(${columns_token}) ${rows.statement()} ON CONFLICT (${this._get_select_token(key)})`;
-    if ((Array.isArray(key) && key.length === columns.length) || columns.length === 1) {
+    if ((Array.is_array(key) && key.length === columns.length) || columns.length === 1) {
       return `${insert_token} DO NOTHING`;
     } else {
       return `${insert_token} DO UPDATE SET ${this._get_update_token_with_prefix(columns, key, "EXCLUDED")}`;
@@ -1509,19 +1684,19 @@ class Model {
       }
     }
   }
-  _parse_column(key) {
+  _get_where_key(key) {
     let a = key.index_of("__");
     if (a === -1) {
       return [this._get_column(key), "eq"];
     }
-    let token = key.slice(0, a);
-    let [field, model, prefix] = this._find_field_model(token);
+    let e = key.slice(0, a);
+    let [field, model, prefix] = this._find_field_model(e);
     if (!field) {
-      throw new Error(`${token} is not a valid field name for ${this.table_name}`);
+      throw new Error(`${e} is not a valid field name for ${this.table_name}`);
     }
     let i, state, fk_model, rc, join_key;
     let op = "eq";
-    let field_name = token;
+    let field_name = e;
     if (field.reference) {
       fk_model = field.reference;
       rc = field.reference_column;
@@ -1534,15 +1709,15 @@ class Model {
       i = a + 2;
       a = key.index_of("__", i);
       if (a === -1) {
-        token = key.slice(i);
+        e = key.slice(i);
       } else {
-        token = key.slice(i, a);
+        e = key.slice(i, a);
       }
       if (state === NON_FOREIGN_KEY) {
-        op = token;
+        op = e;
         state = END;
       } else if (state === FOREIGN_KEY) {
-        const field_of_fk = fk_model.fields[token];
+        const field_of_fk = fk_model.fields[e];
         if (field_of_fk) {
           if (!join_key) {
             join_key = field_name + "__" + fk_model.table_name;
@@ -1565,13 +1740,13 @@ class Model {
           } else {
             state = NON_FOREIGN_KEY;
           }
-          field_name = token;
+          field_name = e;
         } else {
-          op = token;
+          op = e;
           state = END;
         }
       } else {
-        throw new Error(`invalid cond table key parsing state ${state} with token ${token}`);
+        throw new Error(`invalid cond table key parsing state ${state} with token ${e}`);
       }
       if (a == -1) {
         break;
@@ -1644,7 +1819,7 @@ class Model {
   }
   _get_condition_token_from_table(kwargs, logic) {
     const tokens = [];
-    if (Array.isArray(kwargs)) {
+    if (Array.is_array(kwargs)) {
       for (const value of kwargs) {
         const token = this._get_condition_token(value);
         if (token !== undefined && token !== "") {
@@ -1653,7 +1828,7 @@ class Model {
       }
     } else {
       for (const [k, value] of Object.entries(kwargs)) {
-        tokens.push(this._get_expr_token(value, ...this._parse_column(k)));
+        tokens.push(this._get_expr_token(value, ...this._get_where_key(k)));
       }
     }
     if (logic === undefined) {

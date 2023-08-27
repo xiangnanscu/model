@@ -1,6 +1,6 @@
 import { alioss_list, alioss } from "./src/field.mjs";
 
-const al = alioss_list.new({ name: "pics", size: "2m", key_id: "key_id", key_secret: "key_secret" });
+const al = alioss_list.create_field({ name: "pics", size: "2m", key_id: "key_id", key_secret: "key_secret" });
 // const bl = alioss.new({ name: "pics", size: "2m", key_id: "foo" });
 console.log(al.json());
 console.log(al.get_options());
@@ -38,11 +38,12 @@ class C extends B {
   ins = console.log("C.ins") || "C";
   constructor() {
     console.log("C constuctor begin...");
-    super();
+    console.log(super().c === this);
     // console.log(this.constructor.foo);
     // console.log(super.constructor.foo);
     console.log("C constuctor end..." + this.constructor.name);
   }
+  foo() {}
 }
 
-// new C();
+console.log(new C());

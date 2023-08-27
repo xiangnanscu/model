@@ -15,7 +15,7 @@
 // match(key, ...) => key.match
 // lua循环起始值为2时js的处理, 例如:parse_where_exp
 // lua: type(obj)=='table', js要考虑是不是Array.isArray(obj)
-import { clone, string_format, assert, next, make_token, NULL, DEFAULT, _prefix_with_V } from "./utils";
+import { clone, string_format, assert, next, make_token, NULL, DEFAULT, _prefix_with_V } from "./utils.mjs";
 
 const PG_SET_MAP = {
   _union: "UNION",
@@ -211,7 +211,7 @@ Sql.prototype._base_merge = function (rows, key, columns) {
   const insert_subquery = Sql.new({ table_name: "V" })
     ._base_select(vals_columns)
     ._base_join("LEFT", "U AS T", join_cond)
-    ._base_where_null("T." + (Array.is_array(key) ? key[0] : key));
+    ._base_where_null("T." + (Array.isArray(key) ? key[0] : key));
   let updated_subquery;
   if ((typeof key === "object" && key.length === columns.length) || columns.length === 1) {
     updated_subquery = Sql.new({ table_name: "V" })
@@ -232,7 +232,7 @@ Sql.prototype._base_upsert = function (rows, key, columns) {
   if (rows instanceof Sql) {
     assert(columns !== undefined, "you must specify columns when use subquery as values of upsert");
     this._insert = this._get_upsert_query_token(rows, key, columns);
-  } else if (Array.is_array(rows)) {
+  } else if (Array.isArray(rows)) {
     this._insert = this._get_bulk_upsert_token(rows, key, columns);
   } else {
     this._insert = this._get_upsert_token(rows, key, columns);

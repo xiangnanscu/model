@@ -201,7 +201,7 @@ class basefield {
   }
   json(data = {}) {
     const res = { ...this.get_options(), ...data };
-    delete res.error_messages;
+    // delete res.error_messages;
     if (typeof res.default === "function") {
       delete res.default;
     }
@@ -413,7 +413,7 @@ class integer extends basefield {
   add_min_or_max_validators(validators) {
     for (const e of number_validator_names) {
       if (this[e]) {
-        validators.unshift(Validator[e](this[e], this.error_messages[e]));
+        validators.unshift(Validator[e](this[e], this.get_error_message[e]));
       }
     }
   }
@@ -458,7 +458,7 @@ class float extends basefield {
   add_min_or_max_validators(validators) {
     for (const e of number_validator_names) {
       if (this[e]) {
-        validators.unshift(Validator[e](this[e], this.error_messages[e]));
+        validators.unshift(Validator[e](this[e], this.get_error_message[e]));
       }
     }
   }
@@ -617,7 +617,7 @@ class foreignkey extends basefield {
   }
   setup_with_fk_model(fk_model) {
     assert(
-      typeof fk_model === "object" && fk_model.__is_model_class__,
+      fk_model.__is_model_class__,
       `a foreignkey must define a reference model. not ${fk_model}(type: ${typeof fk_model})`
     );
     const rc = this.reference_column || fk_model.primary_key || fk_model.DEFAULT_PRIMARY_KEY || "id";
@@ -659,7 +659,7 @@ class foreignkey extends basefield {
     //** todo 用Proxy改写
     const fk_name = this.reference_column;
     const fk_model = this.reference;
-    return fk_model.new_record({ [fk_name]: value });
+    return fk_model.create_record({ [fk_name]: value });
   }
   json() {
     const ret = super.json();

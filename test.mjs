@@ -1,28 +1,25 @@
 /* eslint-disable no-undef */
 import Model from "./src/model.mjs";
-import postgres from "postgres";
+import { Query } from "./src/utils.mjs";
 
-function p() {
-  console.log.apply(this, arguments);
-}
-const sql = postgres({
+const db_options = {
   host: "localhost",
+  port: "5432",
   user: "postgres",
   password: "postgres",
   database: "test",
   max: 20,
   idle_timeout: 20,
   connect_timeout: 2,
-});
-// https://www.npmjs.com/package/postgres#connection-details
-const sqlQuery = async (statement) => {
-  p(statement);
-  return await sql.unsafe(statement);
 };
-await sqlQuery(`
-DROP TABLE IF EXISTS post;
-DROP TABLE IF EXISTS profile;
-DROP TABLE IF EXISTS usr;
+Model.db_options = db_options;
+function p() {
+  console.log.apply(this, arguments);
+}
+const sql_query = Query(db_options);
+await sql_query(`
+DROP TABLE IF EXISTS profile cascade;
+DROP TABLE IF EXISTS usr cascade;
 
 CREATE TABLE usr (
   id serial PRIMARY KEY,
@@ -30,53 +27,54 @@ CREATE TABLE usr (
   age integer);
 CREATE TABLE profile (
   id serial PRIMARY KEY,
-  usrName varchar(4) REFERENCES "usr" ("name") ON DELETE NO ACTION ON UPDATE CASCADE,
+  usr_name varchar(4) REFERENCES "usr" ("name") ON DELETE NO ACTION ON UPDATE CASCADE,
   info varchar(50));
+
+
 `);
-const Usr = Model.createModel({
-  sqlQuery,
-  tableName: "usr",
+
+const Usr = Model.create_model({
+  table_name: "usr",
   fields: {
-    name: { label: "姓名", unique: true, maxlength: 4, minlength: 1 },
+    name: { label: "姓名", primary_key: true, maxlength: 4, minlength: 1 },
     age: { label: "年龄", type: "integer", max: 100, min: 1, required: true },
   },
 });
-const Profile = Model.createModel({
-  sqlQuery,
-  tableName: "profile",
+const Profile = Model.create_model({
+  table_name: "profile",
   fields: {
-    usrName: { label: "用户", reference: Usr, referenceColumn: "name" },
+    usr_name: { label: "用户", reference: Usr, reference_column: "name" },
     info: { label: "信息", maxlength: 50 },
   },
 });
-
-const firstUser = { name: "tom", age: 22 };
-await Usr.insert(firstUser).execr();
+const first_user = { name: "tom", age: 22 };
+await Usr.insert(first_user).execr();
 const usrs_after_insert = await Usr.all();
 test("test insert one row", () => {
-  expect(usrs_after_insert).toEqual([{ id: 1, ...firstUser }]);
+  expect(usrs_after_insert).toEqual([{ id: 1, ...first_user }]);
 });
 
-const bulkInsertUsers = [
+const bulk_insert_users = [
   { name: "kate", age: 21 },
   { name: "mike", age: 11 },
 ];
-const allUsers = [firstUser, ...bulkInsertUsers];
-await Usr.insert(bulkInsertUsers).execr();
+const all_users = [first_user, ...bulk_insert_users];
+
+await Usr.insert(bulk_insert_users).execr();
 const usrs_after_bulk_insert = await Usr.all();
 test("test bulk insert", () => {
   for (const u of usrs_after_bulk_insert) {
-    expect(u).toMatchObject(allUsers.find((e) => e.name == u.name));
+    expect(u).toMatchObject(all_users.find((e) => e.name == u.name));
   }
 });
 
-const mergedUsers = [...allUsers, { name: "foo", age: 11 }];
-await Usr.merge(mergedUsers, "name");
+const merged_users = [...all_users, { name: "foo", age: 11 }];
+await Usr.merge(merged_users, "name").exec();
 const usrs_after_merge = await Usr.all();
 test("test merge - update && insert", () => {
   expect(usrs_after_merge.length).toBe(4);
   for (const u of usrs_after_merge) {
-    expect(u).toMatchObject(mergedUsers.find((e) => e.name == u.name));
+    expect(u).toMatchObject(merged_users.find((e) => e.name == u.name));
   }
 });
 
@@ -85,15 +83,15 @@ const users_after_delete = await Usr.all();
 test("test delete", () => {
   expect(users_after_delete.length).toBe(3);
   for (const u of users_after_delete) {
-    expect(u).toMatchObject(allUsers.find((e) => e.name == u.name));
+    expect(u).toMatchObject(all_users.find((e) => e.name == u.name));
   }
 });
 
-const mergedUpdateUsers = [
+const merged_update_users = [
   { name: "kate", age: 50 },
   { name: "tom", age: 60 },
 ];
-await Usr.merge(mergedUpdateUsers, "name");
+await Usr.merge(merged_update_users, "name").exec();
 const users_after_merge_update = await Usr.all();
 test("test no new rows", () => {
   expect(users_after_merge_update.length).toBe(3);
@@ -108,17 +106,17 @@ test("test tom age changed and select age only and condition in get", () => {
 });
 
 await Usr.update({ age: 66 }).where({ name: "kate" }).execr();
-const usrKate = await Usr.get({ name: "kate" });
+const usr_kate = await Usr.get({ name: "kate" });
 test("test update by where", () => {
-  expect(usrKate.age).toEqual(66);
+  expect(usr_kate.age).toEqual(66);
 });
 
-const bulkUpdateUsers = [
+const bulk_update_users = [
   { name: "tom", age: 22 },
   { name: "kate", age: 21 },
   { name: "foo", age: 21 },
 ];
-await Usr.updates(bulkUpdateUsers, "name");
+await Usr.updates(bulk_update_users, "name").exec();
 const users_after_updates = await Usr.all();
 test("test no new rows after sql.updates", () => {
   expect(users_after_updates.length).toBe(3);
@@ -135,11 +133,9 @@ const no_foo = await Usr.select("age").where({ name: "foo" }).execr();
 test("test foo is not inserted in sql.updates", () => {
   expect(no_foo.length).toBe(0);
 });
-const ageLt20Users = await Usr.select("name", "age")
-  .where({ age__lt: 20 })
-  .execr();
+const age_lt20Users = await Usr.select("name", "age").where({ age__lt: 20 }).execr();
 test("test select where by age less than 20", () => {
-  for (const u of ageLt20Users) {
+  for (const u of age_lt20Users) {
     expect(u).toMatchObject({ name: "mike", age: 11 });
   }
 });
@@ -150,82 +146,78 @@ test("test update where and get", () => {
   expect(u30).toMatchObject({ name: "kate", age: 30 });
 });
 
-const profileUsers = [
-  { usrName: "tom", info: "dad" },
-  { usrName: "kate", info: "mom" },
+const profile_users = [
+  { usr_name: "tom", info: "dad" },
+  { usr_name: "kate", info: "mom" },
 ];
-await Profile.merge(profileUsers, "usrName");
-const p1 = await Profile.where({ usrName__age: 30 }).get();
+await Profile.merge(profile_users, "usr_name").exec();
+const p1 = await Profile.where({ usr_name__age: 30 }).get();
 test("test join get", () => {
   expect(p1).toMatchObject({ name: "kate", age: 30 });
 });
 
-const usr_from_saveCreate = await Usr.saveCreate({ name: "u1", age: 50 });
+const usr_from_save_create = await Usr.save_create({ name: "u1", age: 50 });
 const u1 = await Usr.get({ name: "u1" });
-test("test saveCreate", async () => {
+test("test save_create", async () => {
   expect(u1).toMatchObject({ name: "u1", age: 50 });
 });
 
-usr_from_saveCreate.age = 66;
-await usr_from_saveCreate.save();
+usr_from_save_create.age = 66;
+await usr_from_save_create.save();
 const u1_after_save = await Usr.get({ name: "u1" });
 test("test save", async () => {
   expect(u1_after_save).toMatchObject({ name: "u1", age: 66 });
 });
 
-await Usr.saveUpdate({ name: "u1", age: 13 }, ["age"], "name");
+await Usr.save_update({ name: "u1", age: 13 }, ["age"], "name");
 const u1_after_modelsave = await Usr.get({ name: "u1" });
 test("test model class save", async () => {
   expect(u1_after_modelsave).toMatchObject({ name: "u1", age: 13 });
 });
 
-it("saveCreate raise required error", async () => {
-  await expect(Usr.saveCreate({ name: "u1" })).rejects.toThrow(
+it("save_create raise required error", async () => {
+  await expect(Usr.save_create({ name: "u1" })).rejects.toThrow(
     new Model.ValidateError({ name: "age", message: "此项必填" })
   );
 });
-it("saveCreate raise max error", async () => {
-  await expect(Usr.saveCreate({ name: "u1", age: 500 })).rejects.toThrow(
+it("save_create raise max error", async () => {
+  await expect(Usr.save_create({ name: "u1", age: 500 })).rejects.toThrow(
     new Model.ValidateError({
       name: "age",
       message: `值不能大于${Usr.fields.age.max}`,
     })
   );
 });
-it("saveCreate raise maxlength error", async () => {
-  await expect(
-    Usr.saveCreate({ name: "u11111111111", age: 3 })
-  ).rejects.toThrow(
+
+it("insert raise max batch error", () => {
+  let err;
+  try {
+    Usr.insert([
+      { name: "u2", age: 2 },
+      { name: "u1", age: 500 },
+    ]);
+  } catch (error) {
+    err = error;
+  }
+  expect(err).toMatchObject({
+    name: "age",
+    message: `值不能大于${Usr.fields.age.max}`,
+    batch_index: 1,
+  });
+});
+it("save_create raise maxlength error", async () => {
+  await expect(Usr.save_create({ name: "u11111111111", age: 3 })).rejects.toThrow(
     new Model.ValidateError({
       name: "age",
       message: `字数不能多于${Usr.fields.name.maxlength}个`,
     })
   );
 });
-
-it("insert raise max batch error", () => {
-  expect(() =>
-    Usr.insert([
-      { name: "u2", age: 2 },
-      { name: "u1", age: 500 },
-    ])
-  ).toThrow(
-    expect.objectContaining({
-      name: "age",
-      message: `值不能大于${Usr.fields.age.max}`,
-      label: "年龄",
-      index: 1,
-    })
-  );
-});
-
 it("insert skip max batch error", () => {
   expect(
-    Usr.skipValidate().insert([
+    Usr.skip_validate().insert([
       { name: "u2", age: 2 },
       { name: "u1", age: 500 },
     ])
-  ).toMatchObject({ _skipValidate: true });
+  ).toMatchObject({ _skip_validate: true });
 });
-
-await sql.end();

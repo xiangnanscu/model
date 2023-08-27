@@ -1,3 +1,4 @@
+import postgres from "postgres";
 export const IS_PG_KEYWORDS = {
   EQ: true,
   NOTIN: true,
@@ -121,7 +122,7 @@ export const unique = (arr) => {
   return arr.filter((e, i) => arr.indexOf(e) === i);
 };
 export const getenv = (key) => process.env[key];
-export const clone = (o) => JSON.parse(JSON.stringify(o));
+export const clone = (o) => (Array.isArray(o) ? [...o] : { ...o });
 export const string_format = (s, ...varargs) => {
   let status = 0;
   const res = [];
@@ -198,7 +199,7 @@ export const FK_TYPE_NOT_DEFIEND = Object.freeze(Symbol("FK_TYPE_NOT_DEFIEND"));
 export function get_localtime(d = new Date()) {
   return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()} ${d.getHours()}:${d.getMinutes()}:${d.getSeconds()}`;
 }
-export const ngx_localtime = get_localtime
+export const ngx_localtime = get_localtime;
 export const is_empty_object = (obj) => {
   for (var i in obj) {
     return false;
@@ -208,7 +209,23 @@ export const is_empty_object = (obj) => {
 
 export class Http {}
 export function Query(options) {
+  // const postgres = require("postgres");
+  options = Object.fromEntries(Object.entries(options).map(([k, v]) => [k.toLowerCase(), v]));
+  console.log({ options });
+  const sql_query = postgres({
+    host: options.host || "localhost",
+    port: options.port || "5432",
+    database: options.database || "postgres",
+    user: options.user || "postgres",
+    password: options.password || "postgres",
+    max: options.max || 20,
+    idle_timeout: options.idle_timeout || 20,
+    connect_timeout: options.connect_timeout || 2,
+  });
   return async (statement) => {
-    return await Http(statement);
+    // console.log(statement);
+    const result = await sql_query.unsafe(statement);
+    // console.log(result);
+    return result;
   };
 }

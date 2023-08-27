@@ -1,4 +1,4 @@
-import * as Fields from "./field";
+import * as Fields from "./field.mjs";
 import Sql from "./sql.mjs";
 import {
   clone,
@@ -14,8 +14,11 @@ import {
   getenv,
   ngx_localtime,
   IS_PG_KEYWORDS,
-} from "./utils";
-
+} from "./utils.mjs";
+function p() {
+  console.log.apply(this, arguments);
+}
+// https://www.npmjs.com/package/postgres#connection-details
 const default_query = Query({
   getenv,
   HOST: getenv("PGHOST") || "127.0.0.1",
@@ -39,7 +42,7 @@ const MODEL_MERGE_NAMES = {
 class ValidateError extends Error {
   constructor({ name, message, label, index }) {
     super(message);
-    Object.assign(this, { name, label, message, index });
+    Object.assign(this, { name, label, index });
   }
   toString() {
     return `MODEL FIELD ERROR: ${this.name}(${this.label})+${this.message}`;
@@ -48,7 +51,7 @@ class ValidateError extends Error {
 class ValidateBatchError extends ValidateError {
   constructor({ name, message, label, index, batch_index }) {
     super({ name, message, label, index });
-    this.batch_index = batch_index;
+    Object.assign(this, { batch_index });
   }
 }
 const base_model = {
@@ -156,7 +159,7 @@ ModelSql.prototype._get_cte_values_literal = function (rows, columns, no_check) 
   }
   const res = [];
   res[0] = "(" + (as_token(first_row) + ")");
-  for (let i = 2; i <= rows.length; i = i + 1) {
+  for (let i = 1; i < rows.length; i = i + 1) {
     res[i] = as_literal(rows[i]);
   }
   return [res, columns];
@@ -249,7 +252,7 @@ ModelSql.prototype._find_field_model = function (col) {
   }
 };
 ModelSql.prototype._parse_column = function (key, as_select, strict, disable_alias) {
-  let a = key.index_of("__");
+  let a = key.indexOf("__");
   if (a === -1) {
     return [this._get_column(key, strict), "eq"];
   }
@@ -262,8 +265,8 @@ ModelSql.prototype._parse_column = function (key, as_select, strict, disable_ali
   let field_name = token;
   // eslint-disable-next-line no-constant-condition
   while (1) {
-    i = a + 1;
-    a = key.index_of("__", i);
+    i = a + 2;
+    a = key.indexOf("__", i);
     if (a === -1) {
       token = key.slice(i);
     } else {
@@ -306,7 +309,7 @@ ModelSql.prototype._parse_column = function (key, as_select, strict, disable_ali
         field_name = token;
       }
     }
-    if (!a) {
+    if (a === -1) {
       break;
     }
   }
@@ -602,7 +605,7 @@ ModelSql.prototype.load_fk = function (fk_name, select_names, ...varargs) {
 };
 
 function make_record_meta(model) {
-  class RecordMeta extends Object {
+  class RecordClass extends Object {
     constructor(data) {
       super(data);
       for (const [k, v] of Object.entries(data)) {
@@ -611,10 +614,10 @@ function make_record_meta(model) {
       return this;
     }
   }
-  Object.defineProperty(this, "name", {
+  Object.defineProperty(RecordClass, "name", {
     value: `${model.name}Record`,
   });
-  RecordMeta.prototype.delete = async function (key) {
+  RecordClass.prototype.delete = async function (key) {
     key = model.check_unique_key(key || model.primary_key);
     if (this[key] === undefined) {
       throw new Error("empty value for delete key:" + key);
@@ -625,25 +628,25 @@ function make_record_meta(model) {
       .returning(key)
       .exec();
   };
-  RecordMeta.prototype.save = async function (names, key) {
-    return await model.prototype.save.call(this, names, key);
+  RecordClass.prototype.save = async function (names, key) {
+    return await model.save(this, names, key);
   };
-  RecordMeta.prototype.save_create = async function (names, key) {
-    return await model.prototype.save_create.call(this, names, key);
+  RecordClass.prototype.save_create = async function (names, key) {
+    return await model.save_create(this, names, key);
   };
-  RecordMeta.prototype.save_update = async function (names, key) {
-    return await model.prototype.save_update.call(this, names, key);
+  RecordClass.prototype.save_update = async function (names, key) {
+    return await model.save_update(this, names, key);
   };
-  RecordMeta.prototype.validate = async function (names, key) {
-    return await model.prototype.validate.call(this, names, key);
+  RecordClass.prototype.validate = async function (names, key) {
+    return await model.validate(this, names, key);
   };
-  RecordMeta.prototype.validate_update = async function (names) {
-    return await model.prototype.validate_update.call(this, names);
+  RecordClass.prototype.validate_update = async function (names) {
+    return await model.validate_update(this, names);
   };
-  RecordMeta.prototype.validate_create = async function (names) {
-    return await model.prototype.validate_create.call(this, names);
+  RecordClass.prototype.validate_create = async function (names) {
+    return await model.validate_create(this, names);
   };
-  return RecordMeta;
+  return RecordClass;
 }
 
 function create_model_proxy(Xodel) {
@@ -687,7 +690,6 @@ class Xodel {
   static ValidateError = ValidateError;
   static ValidateBatchError = ValidateBatchError;
   static Http = Http;
-  static _query = default_query;
   static base_model = base_model;
   static DEFAULT_PRIMARY_KEY = DEFAULT_PRIMARY_KEY;
   static NULL = NULL;
@@ -697,89 +699,87 @@ class Xodel {
   static as_token = Sql.as_token;
   static as_literal = Sql.as_literal;
   static http_model_cache = {};
-
-  static set_class_name(table_name) {
-    const class_name = {
-      value: `${capitalize(table_name)}Model`,
-    };
-    Object.defineProperty(this, "name", class_name);
-  }
-  static get_defaults() {
-    return Object.from_entries(this.names.map((k) => [k, this.fields[k].default]));
-  }
-  static to_form_value(values, names) {
-    const res = {};
-    for (const name of names || this.field_names) {
-      const field = this.fields[name];
-      const value = field.to_form_value(values[name]);
-      res[name] = value;
-    }
-    return res;
-  }
-  static to_post_value(values, names) {
-    const data = {};
-    for (const name of names || this.field_names) {
-      const field = this.fields[name];
-      data[name] = field.to_post_value(values[name]);
-    }
-    return data;
-  }
-  static async create_model_async(options) {
-    for (const name of options.field_names || Object.keys(options.fields)) {
-      const field = options.fields[name];
-      if (field.choices_url) {
-        const fetch_choices = async () => {
-          const choices_url = options.is_admin_mode
-            ? field.choices_url_admin || field.choices_url // 如果不是fk,那么choices_url_admin不会定义
-            : field.choices_url;
-          const { data: choices } = await this.Http[field.choices_url_method || "post"](choices_url);
-          const res = options.choices_callback ? options.choices_callback(choices, field) : choices;
-          return res;
-        };
-        if (field.preload) {
-          field.choices = await fetch_choices();
-        } else {
-          field.choices = fetch_choices;
-        }
-      }
-      if (typeof field.reference == "string") {
-        if (field.reference == field.table_name) {
-          field.reference = "self";
-        } else {
-          const model_url = options.is_admin_mode ? field.reference_url_admin : field.reference_url || field.reference;
-          field.reference = await this.get_http_model(model_url, options.is_admin_mode);
-        }
-      }
-      if (field.type == "table" && !field.model?.__is_model_class__) {
-        const model_key = field.model.table_name;
-        if (!this.http_model_cache[model_key]) {
-          this.http_model_cache[model_key] = await Xodel.create_model_async({
-            ...field.model,
-            is_admin_mode: options.is_admin_mode,
-          });
-        }
-        field.model = this.http_model_cache[model_key];
-      }
-    }
-    return this.create_model(options);
-  }
-  static async get_http_model(model_key, is_admin_mode) {
-    if (!this.http_model_cache[model_key]) {
-      const model_url = model_key.match(/^https?:/) || model_key.match(/^\//) ? model_key : `/admin/model/${model_key}`;
-      const { data } = await this.Http.get(model_url);
-      // is_admin_mode具有传染性
-      this.http_model_cache[model_key] = await Xodel.create_model_async({
-        ...data,
-        is_admin_mode,
-      });
-    } else {
-      console.log("cached:" + model_key);
-    }
-    return this.http_model_cache[model_key];
-  }
 }
 Xodel.query = async function (statement, compact) {
-  return await this._query(statement, compact);
+  return await default_query(statement, compact);
+};
+Xodel.set_class_name = function (table_name) {
+  Object.defineProperty(this, "name", {
+    value: `${capitalize(table_name)}Model`,
+  });
+};
+Xodel.get_defaults = function () {
+  return Object.from_entries(this.names.map((k) => [k, this.fields[k].default]));
+};
+Xodel.to_form_value = function (values, names) {
+  const res = {};
+  for (const name of names || this.field_names) {
+    const field = this.fields[name];
+    const value = field.to_form_value(values[name]);
+    res[name] = value;
+  }
+  return res;
+};
+Xodel.to_post_value = function (values, names) {
+  const data = {};
+  for (const name of names || this.field_names) {
+    const field = this.fields[name];
+    data[name] = field.to_post_value(values[name]);
+  }
+  return data;
+};
+Xodel.create_model_async = async function (options) {
+  for (const name of options.field_names || Object.keys(options.fields)) {
+    const field = options.fields[name];
+    if (field.choices_url) {
+      const fetch_choices = async () => {
+        const choices_url = options.is_admin_mode
+          ? field.choices_url_admin || field.choices_url // 如果不是fk,那么choices_url_admin不会定义
+          : field.choices_url;
+        const { data: choices } = await this.Http[field.choices_url_method || "post"](choices_url);
+        const res = options.choices_callback ? options.choices_callback(choices, field) : choices;
+        return res;
+      };
+      if (field.preload) {
+        field.choices = await fetch_choices();
+      } else {
+        field.choices = fetch_choices;
+      }
+    }
+    if (typeof field.reference == "string") {
+      if (field.reference == field.table_name) {
+        field.reference = "self";
+      } else {
+        const model_url = options.is_admin_mode ? field.reference_url_admin : field.reference_url || field.reference;
+        field.reference = await this.get_http_model(model_url, options.is_admin_mode);
+      }
+    }
+    if (field.type == "table" && !field.model?.__is_model_class__) {
+      const model_key = field.model.table_name;
+      if (!this.http_model_cache[model_key]) {
+        this.http_model_cache[model_key] = await Xodel.create_model_async({
+          ...field.model,
+          is_admin_mode: options.is_admin_mode,
+        });
+      }
+      field.model = this.http_model_cache[model_key];
+    }
+  }
+  return this.create_model(options);
+};
+Xodel.get_http_model = async function (model_key, is_admin_mode) {
+  if (!this.http_model_cache[model_key]) {
+    const model_url = model_key.match(/^https?:/) || model_key.match(/^\//) ? model_key : `/admin/model/${model_key}`;
+    const { data } = await this.Http.get(model_url);
+    // is_admin_mode具有传染性
+    this.http_model_cache[model_key] = await Xodel.create_model_async({
+      ...data,
+      is_admin_mode,
+    });
+  } else {
+    console.log("cached:" + model_key);
+  }
+  return this.http_model_cache[model_key];
 };
 Xodel.create_model = function (options) {
   const XodelClass = this._make_model_class(this.normalize(options));
@@ -801,14 +801,19 @@ Xodel.is_model_class = function (model) {
 };
 Xodel.check_field_name = function (name) {
   check_reserved(name);
-  if (Object.prototype.hasOwnProperty.call(this, name) || Object.prototype.hasOwnProperty.call(this.prototype, name)) {
+  if (
+    name !== "name" &&
+    name !== "apply" &&
+    name !== "call" &&
+    (Object.prototype.hasOwnProperty.call(this, name) || Object.prototype.hasOwnProperty.call(this.prototype, name))
+  ) {
     throw new Error(`field name '${name}' conflicts with model class attributes`);
   }
 };
 Xodel._make_model_class = function (opts) {
   class ModelClass extends this {
-    static _query =
-      (opts.db_options && Query(opts.db_options)) || (this.db_options && Query(this.db_options)) || this._query;
+    static query =
+      (opts.db_options && Query(opts.db_options)) || (this.db_options && Query(this.db_options)) || this.query;
     static table_name = opts.table_name;
     static admin = opts.admin || {};
     static label = opts.label || opts.table_name;
@@ -835,6 +840,9 @@ Xodel._make_model_class = function (opts) {
       assert(!pk_defined, `duplicated primary key: "${pk_name}" and "${pk_defined}"`);
       pk_defined = pk_name;
       ModelClass.primary_key = pk_name;
+      if (ModelClass.disable_auto_primary_key) {
+        ModelClass.names.push(pk_name);
+      }
     } else if (field.auto_now) {
       ModelClass.auto_now_name = field.name;
     } else if (field.auto_now_add) {
@@ -860,7 +868,10 @@ Xodel._make_model_class = function (opts) {
     ModelClass.set_class_name("Abstract");
   }
   ModelClass.set_label_name_dict();
-  ModelClass.ensure_ctime_in_list_names();
+  ModelClass.ensure_admin_list_names();
+  if (ModelClass.auto_now_add_name) {
+    ModelClass.ensure_ctime_list_names(ModelClass.auto_now_add_name);
+  }
   ModelClass.resolve_self_foreignkey();
   return ModelClass;
 };
@@ -870,7 +881,6 @@ Xodel.normalize = function (options) {
     admin: clone(options.admin || {}),
     table_name: options.table_name || (_extends && _extends.table_name) || undefined,
   };
-  model.admin.list_names = clone(model.admin.list_names || []);
   const opts_fields = {};
   const opts_field_names = [];
   for (let [key, field] of Object.entries(options.fields || {})) {
@@ -950,12 +960,15 @@ Xodel.set_label_name_dict = function () {
     this.name_to_label[name] = field.label;
   }
 };
-Xodel.ensure_ctime_in_list_names = function () {
+Xodel.ensure_admin_list_names = function () {
+  this.admin.list_names = clone(this.admin.list_names || []);
+  if (this.admin.list_names.length === 0) {
+    this.admin.list_names = [...this.field_names];
+  }
+};
+Xodel.ensure_ctime_list_names = function (ctime_name) {
   const admin = this.admin;
-  const ctime_name = this.auto_now_add_name;
-  if (!admin.list_names || admin.list_names.length === 0) {
-    admin.list_names = [...this.names, ctime_name];
-  } else if (!admin.list_names.includes(ctime_name)) {
+  if (!admin.list_names.includes(ctime_name)) {
     admin.list_names = [...admin.list_names, ctime_name];
   }
 };
@@ -1113,10 +1126,10 @@ Xodel.get_or_create = async function (params, defaults, columns) {
   return [ins, created];
 };
 Xodel.save = async function (input, names, key) {
-  key = key || this.primary_key;
+  const uk = key || this.primary_key;
   // TODO: need check recursive here. lua code: rawget(input, key)
-  if (input[key] !== undefined) {
-    return await this.save_update(input, names, key);
+  if (input[uk] !== undefined) {
+    return await this.save_update(input, names, uk);
   } else {
     return await this.save_create(input, names, key);
   }
@@ -1309,7 +1322,7 @@ Xodel.check_upsert_key = function (rows, key) {
 Xodel.make_field_error = function ({ name, message, index, batch_index }) {
   const field = assert(this.fields[name], "invalid feild name: " + name);
   const err = field.make_error(message, index);
-  if (batch_index) {
+  if (batch_index !== undefined) {
     err.batch_index = batch_index;
     throw new ValidateBatchError(err);
   } else {
@@ -1347,7 +1360,7 @@ Xodel.validate_create_data = function (rows, columns) {
   let cleaned;
   columns = columns || this.names;
   if (rows instanceof Array) {
-    cleaned = {};
+    cleaned = [];
     for (const [index, row] of rows.entries()) {
       try {
         cleaned[index] = this.validate_create(row, columns);
@@ -1355,6 +1368,7 @@ Xodel.validate_create_data = function (rows, columns) {
         if (error instanceof ValidateError) {
           return this.make_field_error({
             ...error,
+            message: error.message,
             batch_index: index,
           });
         } else {
@@ -1379,6 +1393,7 @@ Xodel.validate_update_data = function (rows, columns) {
         if (error instanceof ValidateError) {
           return this.make_field_error({
             ...error,
+            message: error.message,
             batch_index: index,
           });
         } else {
@@ -1405,7 +1420,7 @@ Xodel.prepare_db_rows = function (rows, columns, is_update) {
   let cleaned;
   columns = columns || Sql.get_keys(rows);
   if (rows instanceof Array) {
-    cleaned = {};
+    cleaned = [];
     for (const [i, row] of rows.entries()) {
       try {
         cleaned[i] = this.prepare_for_db(row, columns, is_update);
@@ -1413,6 +1428,7 @@ Xodel.prepare_db_rows = function (rows, columns, is_update) {
         if (error instanceof ValidateError) {
           return this.make_field_error({
             ...error,
+            message: error.message,
             batch_index: i,
           });
         } else {

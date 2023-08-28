@@ -880,6 +880,7 @@ Xodel.normalize = function (options) {
   const model = {
     admin: clone(options.admin || {}),
     table_name: options.table_name || (_extends && _extends.table_name) || undefined,
+    label: options.label || (_extends && _extends.label) || undefined,
   };
   const opts_fields = {};
   const opts_field_names = [];

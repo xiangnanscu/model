@@ -3,7 +3,7 @@ import { fileURLToPath, URL } from "node:url";
 import { defineConfig } from "vite";
 import vue from "@vitejs/plugin-vue";
 import vueJsx from "@vitejs/plugin-vue-jsx";
-
+import { nodePolyfills } from "vite-plugin-node-polyfills";
 import { VueRouterAutoImports } from "unplugin-vue-router";
 import AutoImport from "unplugin-auto-import/vite";
 import Components from "unplugin-vue-components/vite";
@@ -17,6 +17,27 @@ export default defineConfig({
   base: "/model/",
   define: Object.fromEntries(Object.entries(DOTENV || {}).map(([k, v]) => [`process.env.${k}`, JSON.stringify(v)])),
   plugins: [
+    nodePolyfills({
+      // To add only specific polyfills, add them here. If no option is passed, adds all polyfills
+      // include: ["path"],
+      // To exclude specific polyfills, add them to this list. Note: if include is provided, this has no effect
+      exclude: [
+        "http", // Excludes the polyfill for `http` and `node:http`.
+      ],
+      // Whether to polyfill specific globals.
+      globals: {
+        Buffer: true, // can also be 'build', 'dev', or false
+        global: true,
+        process: true,
+      },
+      // Override the default polyfills for specific modules.
+      overrides: {
+        // Since `fs` is not supported in browsers, we can use the `memfs` package to polyfill it.
+        // fs: "memfs",
+      },
+      // Whether to polyfill `node:` protocol imports.
+      protocolImports: true,
+    }),
     // https://github.com/unplugin/unplugin-vue-components?tab=readme-ov-file#configuration
     Components({
       dirs: ["./components", "./src/components", "./src/localComponents"],

@@ -1,32 +1,28 @@
 <script setup>
-import { computed, onMounted } from "vue";
-import MainPage from "./components/MainPage.vue";
-import packages from "../package.json";
-
-const githubRepoUrl = computed(() => {
-  const matched = packages.name.match(/@(\w+)\/(\w+)/);
-  if (matched) {
-    return `https://github.com/${matched[1]}/${matched[2]}.git`;
-  } else {
-    return `https://github.com/xiangnanscu/${packages.name}.git`;
-  }
-});
-const npmUrl = `https://www.npmjs.com/package/${packages.name}`;
+import { RouterLink, RouterView } from "vue-router";
+import HelloWorld from "~/components/Hello.vue";
 </script>
 
 <template>
+  <header>
+    <img alt="Vue logo" class="logo" src="@/assets/logo.svg" width="125" height="125" />
 
-  <a-layout theme="light">
-    <a-layout-header theme="light">
-      <h1>
-        <a :href="githubRepoUrl">{{ packages.name }}</a
-        >-<a :href="npmUrl">{{ packages.version }}</a>
-      </h1></a-layout-header
-    >
-    <a-layout-content><MainPage /></a-layout-content>
-  </a-layout>
+    <div class="wrapper">
+      <HelloWorld msg="You did it!" />
+
+      <nav>
+        <RouterLink to="/HomeView">Home</RouterLink>
+        <RouterLink to="/AboutView" style="margin-left: 1em">About</RouterLink>
+      </nav>
+    </div>
+  </header>
+
+  <RouterView />
 </template>
 
-<style>
-
+<style scoped>
+header {
+  display: flex;
+  justify-content: left;
+}
 </style>

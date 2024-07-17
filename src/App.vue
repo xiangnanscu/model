@@ -1,35 +1,21 @@
 <script setup>
-import { RouterLink, RouterView } from "vue-router";
-import HelloWorld from "~/components/Hello.vue";
-import Model from "~/lib/model";
-import src from "@/assets/models.mjs?raw";
-
-const srcCode = ref(src);
-eval(srcCode.value);
-const playCode = ref("");
+const router = useRouter();
+router.push({ name: "Playground" });
 </script>
 
 <template>
-  <header>
-    <img alt="Vue logo" class="logo" src="@/assets/logo.svg" width="125" height="125" />
-
-    <div class="wrapper">
-      <HelloWorld msg="@xiangnanscu/model" />
-
-      <nav>
-        <RouterLink to="/HomeView">Home</RouterLink>
-        <RouterLink to="/AboutView" style="margin-left: 1em">About</RouterLink>
-      </nav>
-    </div>
-  </header>
-  <div style="display: flex; justify-content: space-between">
-    <textarea v-model="srcCode" placeholder="" placeholder-class="textarea-placeholder" rows="25" cols="100" />
-  </div>
-  <RouterView />
+  <h1>@xiangnanscu/model</h1>
+  <p>straight forward and powerful orm library for postgresql</p>
+  <router-link to="/">Home</router-link>
+  <router-link to="/Playground" style="margin-left: 1em">Playground</router-link>
+  <a style="margin-left: 1em" href="https://github.com/xiangnanscu/model" target="_blank">Github</a>
+  <Suspense>
+    <router-view />
+  </Suspense>
 </template>
 
 <style scoped>
-header {
+.row {
   display: flex;
   justify-content: left;
 }

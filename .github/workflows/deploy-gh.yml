@@ -16,7 +16,7 @@ jobs:
           node-version-file: ".nvmrc"
           registry-url: https://registry.npmjs.org
           check-latest: true
-          cache: "npm"
+
       - uses: harmon758/postgresql-action@v1
         with:
           postgresql version: "14"

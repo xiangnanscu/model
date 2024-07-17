@@ -1,7 +1,7 @@
 export { Model } from "~/lib/model";
 
-export const log = (...x) => {
-  console.log(...x);
-};
+export function p() {
+  console.log.apply(this, arguments);
+}
 
 export const toUpper = (s) => s.toUpperCase();

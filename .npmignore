@@ -1,2 +1,3 @@
 *
-!lib
+!/lib/model/
+!/lib/model/**

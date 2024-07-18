@@ -1,4 +1,5 @@
 Usr.where({ name: "kate" });
+Usr.where({ parent__name: "kate" });
 Profile.update({ info: "big kids" }).where({ usr__age__gt: 12 }).returning("info");
 Profile.where({ usr__age__gt: 12 }).select("info");
 Usr.insert({ name: "tom", age: 1 });

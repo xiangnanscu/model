@@ -213,20 +213,18 @@ it("save_create raise max error", async () => {
 });
 
 it("insert raise max batch error", () => {
-  let err;
   try {
     Usr.insert([
       { name: "u2", age: 2 },
       { name: "u1", age: 500 },
     ]);
   } catch (error) {
-    err = error;
+    expect(error).toMatchObject({
+      name: "age",
+      message: `值不能大于${Usr.fields.age.max}`,
+      batch_index: 1,
+    });
   }
-  expect(err).toMatchObject({
-    name: "age",
-    message: `值不能大于${Usr.fields.age.max}`,
-    batch_index: 1,
-  });
 });
 it("save_create raise maxlength error", async () => {
   await expect(Usr.save_create({ name: "u11111111111", age: 3 })).rejects.toThrow(

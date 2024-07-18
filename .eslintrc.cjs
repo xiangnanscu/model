@@ -7,6 +7,7 @@ module.exports = {
     amd: true,
   },
   rules: {
+    "no-constant-condition": 0,
     "no-empty": 0,
     "prettier/prettier": [
       "warn",

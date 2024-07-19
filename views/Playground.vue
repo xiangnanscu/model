@@ -23,10 +23,16 @@ const editTestStatus = ref(false);
 const srcCode = ref(modelsSrc);
 const testCode = ref(testSrc);
 const testBufferCode = ref(testSrc);
+const gotoLine = (i) => {
+  const element = document.getElementById(`line-${i}`);
+  if (element) {
+    element.scrollIntoView({ behavior: "smooth" });
+  }
+};
 const models = computed(() =>
   eval(`(() => {
 ${srcCode.value}
-return { ${Array.from(srcCode.value.matchAll(/const\s+([\w_]+)\s+=\s+Model.create/g))
+return { ${Array.from(srcCode.value.matchAll(/const\s+([\w_]+)\s+=\s+(Model.create|new Model)/g))
     .map((e) => e[1])
     .join(", ")} };
 })()`),
@@ -35,7 +41,7 @@ watch(models, () => Object.assign(self, models.value), { immediate: true });
 const jsQueryLines = computed(() =>
   testCode.value
     .split(";")
-    .map((e) => e.trim().replaceAll("\n", ""))
+    .map((e) => e.trim())
     .filter((e) => e),
 );
 const queryObjects = ref([]);
@@ -71,20 +77,6 @@ watch(
 <template>
   <div class="row">
     <div style="width: 50%">
-      <button @click="editTestStatus = !editTestStatus">{{ !editTestStatus ? "edit" : "save" }} test code</button>
-      <div v-if="editTestStatus" style="display: flex; justify-content: space-between">
-        <textarea
-          v-model.lazy="testCode"
-          placeholder=""
-          placeholder-class="textarea-placeholder"
-          rows="25"
-          style="width: 100%"
-        />
-      </div>
-      <div v-else>
-        <highlightjs id="testCode" language="javascript" :code="testCode" />
-        <!-- <pre>{{ testCode }}</pre> -->
-      </div>
       <button @click="editModelsStatus = !editModelsStatus">{{ !editModelsStatus ? "edit" : "save" }} models</button>
       <div v-if="editModelsStatus" style="display: flex; justify-content: space-between">
         <textarea
@@ -99,9 +91,24 @@ watch(
         <highlightjs id="srcCode" language="javascript" :code="srcCode" />
         <!-- <pre>{{ srcCode }}</pre> -->
       </div>
+      <button @click="editTestStatus = !editTestStatus">{{ !editTestStatus ? "edit" : "save" }} test code</button>
+      <div v-if="editTestStatus" style="display: flex; justify-content: space-between">
+        <textarea
+          v-model.lazy="testCode"
+          placeholder=""
+          placeholder-class="textarea-placeholder"
+          rows="25"
+          style="width: 100%"
+        />
+      </div>
+      <div v-else>
+        <div v-for="(code, i) of jsQueryLines" :key="i" style="cursor: pointer">
+          <highlightjs @click="gotoLine(i)" language="javascript" :code="code" />
+        </div>
+      </div>
     </div>
-    <div style="padding: 1em; width: 50%">
-      <div v-for="(out, i) in sqlOutput" :key="i">
+    <div style="padding: 1em; width: 50%; padding-bottom: 100em">
+      <div v-for="(out, i) in sqlOutput" :key="i" :id="`line-${i}`">
         <highlightjs language="javascript" :code="out.js" />
         <highlightjs language="sql" :code="out.sql" />
         <div style="border: 1px solid #ccc; height: 0"></div>

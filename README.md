@@ -1,52 +1,73 @@
-# jj
+# @xiangnanscu/model
 
-This template should help get you started developing with Vue 3 in Vite.
+[@xiangnanscu/model](https://xiangnanscu.github.io/model/) straight forward and powerful orm library for postgresql.
 
-## Recommended IDE Setup
-
-[VSCode](https://code.visualstudio.com/) + [Volar](https://marketplace.visualstudio.com/items?itemName=Vue.volar) (and disable Vetur) + [TypeScript Vue Plugin (Volar)](https://marketplace.visualstudio.com/items?itemName=Vue.vscode-typescript-vue-plugin).
-
-## Type Support for `.vue` Imports in TS
-
-TypeScript cannot handle type information for `.vue` imports by default, so we replace the `tsc` CLI with `vue-tsc` for type checking. In editors, we need [TypeScript Vue Plugin (Volar)](https://marketplace.visualstudio.com/items?itemName=Vue.vscode-typescript-vue-plugin) to make the TypeScript language service aware of `.vue` types.
-
-If the standalone TypeScript plugin doesn't feel fast enough to you, Volar has also implemented a [Take Over Mode](https://github.com/johnsoncodehk/volar/discussions/471#discussioncomment-1361669) that is more performant. You can enable it by the following steps:
-
-1. Disable the built-in TypeScript Extension
-    1) Run `Extensions: Show Built-in Extensions` from VSCode's command palette
-    2) Find `TypeScript and JavaScript Language Features`, right click and select `Disable (Workspace)`
-2. Reload the VSCode window by running `Developer: Reload Window` from the command palette.
-
-## Customize configuration
-
-See [Vite Configuration Reference](https://vitejs.dev/config/).
-
-## Project Setup
+# Install
 
 ```sh
-npm install
+npm install -g @xiangnanscu/model
 ```
 
-### Compile and Hot-Reload for Development
+# Usage
 
-```sh
-npm run dev
-```
+## example
 
-### Type-Check, Compile and Minify for Production
+```js
+import { Model } from "@xiangnanscu/model";
 
-```sh
-npm run build
-```
+const Usr = new Model({
+  table_name: "usr",
+  fields: {
+    id: { type: "integer", primary_key: true, serial: true },
+    name: { type: "string", unique: true, maxlength: 4, minlength: 1, required: true },
+    age: { type: "integer", max: 100, min: 1, default: 1 },
+    parent: { type: "foreignkey", reference: "self" },
+    child: { reference: "self" },
+  },
+});
 
-### Run Unit Tests with [Vitest](https://vitest.dev/)
+// define abstract model for table field
+const ResumeItem = new Model({
+  fields: {
+    start_time: { type: "date", required: true },
+    end_time: { type: "date" },
+    content: { required: true },
+  },
+});
 
-```sh
-npm run test:unit
-```
+const Profile = new Model({
+  table_name: "profile",
+  fields: {
+    usr: { reference: Usr },
+    info: { type: "text", maxlength: 50 },
+    resume: { type: "table", model: ResumeItem },
+  },
+});
 
-### Lint with [ESLint](https://eslint.org/)
+// test code
+Usr.where({ name: "kate" });
+Usr.where({ parent__name: "kate" });
+Usr.where({ parent__age: 20 });
+Usr.where({ parent__parent__age: 40 });
 
-```sh
-npm run lint
+Profile.where({ usr__age__gt: 12 }).select("info");
+Profile.where({ usr__age__gt: 12, usr__parent__age__gt: 32 }).select("info");
+Profile.where({ usr__parent__age__gt: 12 }).select("info");
+
+Profile.update({ info: "big kids" }).where({ usr__age__gt: 12 }).returning("info");
+Profile.where({ usr__age__gt: 12 }).delete().returning("info");
+
+Usr.insert({ name: "tom", age: 1 });
+Usr.insert([
+  { name: "tom", age: 1 },
+  { name: "kate", age: 2 },
+]);
+Usr.upsert([
+  { name: "tom", age: 1 },
+  { name: "kate", age: 2 },
+]);
+Usr.align([
+  { name: "tom", age: 1 },
+  { name: "kate", age: 2 },
+]);
 ```

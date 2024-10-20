@@ -14,7 +14,7 @@ import { config } from "dotenv";
 const { parsed: DOTENV } = config({ processEnv: {} });
 // https://vitejs.dev/config/
 export default defineConfig({
-  base: "/model/",
+  base: "./",
   define: Object.fromEntries(Object.entries(DOTENV || {}).map(([k, v]) => [`process.env.${k}`, JSON.stringify(v)])),
   plugins: [
     nodePolyfills({

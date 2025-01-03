@@ -72,7 +72,7 @@ CREATE TABLE profile (
 
 const first_user = { name: "tom", age: 22 };
 await Usr.insert(first_user).execr();
-const usrs_after_insert = await Usr.all();
+const usrs_after_insert = await Usr.exec();
 test("test insert one row", () => {
   expect(usrs_after_insert).toEqual([{ id: 1, ...first_user }]);
 });
@@ -84,7 +84,7 @@ const bulk_insert_users = [
 const all_users = [first_user, ...bulk_insert_users];
 
 await Usr.insert(bulk_insert_users).execr();
-const usrs_after_bulk_insert = await Usr.all();
+const usrs_after_bulk_insert = await Usr.exec();
 test("test bulk insert", () => {
   for (const u of usrs_after_bulk_insert) {
     expect(u).toMatchObject(all_users.find((e) => e.name == u.name));
@@ -93,7 +93,7 @@ test("test bulk insert", () => {
 
 const merged_users = [...all_users, { name: "foo", age: 11 }];
 await Usr.merge(merged_users, "name").exec();
-const usrs_after_merge = await Usr.all();
+const usrs_after_merge = await Usr.exec();
 test("test merge - update && insert", () => {
   expect(usrs_after_merge.length).toBe(4);
   for (const u of usrs_after_merge) {
@@ -102,7 +102,7 @@ test("test merge - update && insert", () => {
 });
 
 await Usr.delete({ name: "foo" }).execr();
-const users_after_delete = await Usr.all();
+const users_after_delete = await Usr.exec();
 test("test delete", () => {
   expect(users_after_delete.length).toBe(3);
   for (const u of users_after_delete) {
@@ -115,7 +115,7 @@ const merged_update_users = [
   { name: "tom", age: 60 },
 ];
 await Usr.merge(merged_update_users, "name").exec();
-const users_after_merge_update = await Usr.all();
+const users_after_merge_update = await Usr.exec();
 test("test no new rows", () => {
   expect(users_after_merge_update.length).toBe(3);
 });
@@ -140,7 +140,7 @@ const bulk_update_users = [
   { name: "foo", age: 21 },
 ];
 await Usr.updates(bulk_update_users, "name").exec();
-const users_after_updates = await Usr.all();
+const users_after_updates = await Usr.exec();
 test("test no new rows after sql.updates", () => {
   expect(users_after_updates.length).toBe(3);
 });

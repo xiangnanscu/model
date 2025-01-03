@@ -12,10 +12,10 @@ module.exports = {
     "prettier/prettier": [
       "warn",
       {
-        printWidth: 120,
+        printWidth: 100,
       },
     ],
-    "max-len": ["warn", { code: 120, ignoreComments: true, ignoreStrings: true }],
+    "max-len": ["warn", { code: 100, ignoreComments: true, ignoreStrings: true }],
     "prefer-const": [
       "error",
       {

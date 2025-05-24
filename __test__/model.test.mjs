@@ -1,7 +1,7 @@
 /* eslint-disable no-undef */
 import postgres from "postgres";
 import { it, expect, test } from "vitest";
-import Model from "~/lib/model";
+import Model from "~/lib/xodel";
 
 function p() {
   console.log.apply(this, arguments);

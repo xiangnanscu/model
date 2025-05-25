@@ -1,13 +1,18 @@
-class MyClass {
-  constructor() {
-    this.property = "value";
-    // 显式返回一个不同的对象
-    return {
-      customProperty: "customValue",
-    };
+function foo(n) {
+  if (n === 1) {
+    return 1;
+  } else {
+    return Promise.resolve(2);
   }
 }
 
-const instance = new MyClass();
-console.log(instance); // 输出: { customProperty: 'customValue' }
-console.log(instance.property); // 输出: undefined
+console.log(foo(1));
+console.log(await foo(2));
+console.log(foo(3));
+console.log(foo(4));
+console.log(foo(5));
+console.log(foo(6));
+console.log(foo(7));
+console.log(foo(8));
+console.log(foo(9));
+console.log(foo(10));

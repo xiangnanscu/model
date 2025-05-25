@@ -41,7 +41,7 @@ Model.db_options = db_options;
 
 const sql = Model.Query(db_options);
 
-const Usr = new Model({
+const Usr = Model.create_model({
   table_name: "usr",
   fields: {
     name: { primary_key: true, maxlength: 4, minlength: 1 },
@@ -49,7 +49,7 @@ const Usr = new Model({
   },
 });
 
-const Profile = new Model({
+const Profile = Model.create_model({
   table_name: "profile",
   fields: {
     usr_name: { label: "用户", reference: Usr, reference_column: "name" },

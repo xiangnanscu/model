@@ -7,7 +7,7 @@ function p() {
   console.log.apply(this, arguments);
 }
 
-const db_options = {
+const db_config = {
   host: "localhost",
   port: "5432",
   user: "postgres",
@@ -37,9 +37,9 @@ Model.Query = (options) => {
   };
 };
 
-Model.db_options = db_options;
+Model.db_config = db_config;
 
-const sql = Model.Query(db_options);
+const sql = Model.Query(db_config);
 
 const Usr = Model.create_model({
   table_name: "usr",

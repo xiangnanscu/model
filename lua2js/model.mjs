@@ -2235,7 +2235,7 @@ const MODEL_MERGE_NAMES = {
   table_name: true,
   class_name: true,
   label: true,
-  db_options: true,
+  db_config: true,
   abstract: true,
   auto_primary_key: true,
   primary_key: true,
@@ -2564,10 +2564,10 @@ Xodel._make_model_class = function (opts) {
   if (ModelClass.preload === undefined) {
     ModelClass.preload = true;
   }
-  if (Xodel.Query && opts.db_options) {
-    ModelClass.query = Xodel.Query(opts.db_options);
-  } else if (Xodel.Query && this.db_options) {
-    ModelClass.query = Xodel.Query(this.db_options);
+  if (Xodel.Query && opts.db_config) {
+    ModelClass.query = Xodel.Query(opts.db_config);
+  } else if (Xodel.Query && this.db_config) {
+    ModelClass.query = Xodel.Query(this.db_config);
   } else if (Xodel.Query) {
     // https://www.npmjs.com/package/postgres#connection-details
     const default_query = Xodel.Query({

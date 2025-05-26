@@ -2,23 +2,23 @@
 
 [English](README.md) | [中文](README.zh-CN.md)
 
-[@xiangnanscu/model](https://xiangnanscu.github.io/model/) Declarative, intuitive and powerful PostgreSQL ORM library.
+[@xiangnanscu/model](https://xiangnanscu.github.io/model/) 一个声明式的、直观且强大的 PostgreSQL ORM 库。
 
-## Installation
+## 安装
 
 ```sh
 npm install -g @xiangnanscu/model
 ```
 
-## Quick Start
+## 快速开始
 
-### Database Configuration
+### 数据库配置
 
 ```js
 import Model from "@xiangnanscu/model";
 import postgres from "postgres";
 
-// Configure database connection
+// 配置数据库连接
 Model.db_config = {
   host: "localhost",
   port: "5432",
@@ -31,10 +31,10 @@ Model.db_config = {
 };
 ```
 
-### Model Definition
+### 模型定义
 
 ```js
-// Basic model definition
+// 基础模型定义
 const User = Model.create_model({
   table_name: "user",
   fields: {
@@ -51,7 +51,7 @@ const Blog = Model.create_model({
   },
 });
 
-// Model with foreign key relationships
+// 带外键关系的模型
 const Entry = Model.create_model({
   table_name: "entry",
   fields: {
@@ -67,28 +67,28 @@ const Entry = Model.create_model({
   },
 });
 
-// Model with composite fields
+// 带复合字段的模型
 const Author = Model.create_model({
   table_name: "author",
   fields: {
-    name: { label: "Name", maxlength: 200, unique: true },
+    name: { label: "姓名", maxlength: 200, unique: true },
     email: { type: "email" },
     age: { type: "integer", max: 100, min: 10 },
-    resume: { model: Resume }, // JSON field
+    resume: { model: Resume }, // JSON 字段
   },
 });
 
-// Model inheritance (mixins)
+// 模型继承（mixins）
 const BlogBin = Model.create_model({
   table_name: "blog_bin",
   mixins: [Blog],
   fields: {
-    name: { unique: false }, // Override parent model's unique property
+    name: { unique: false }, // 覆盖父模型的 unique 属性
     note: { type: "text" },
   },
 });
 
-// Model without auto primary key
+// 无自动主键的模型
 const Resume = Model.create_model({
   auto_primary_key: false,
   table_name: "resume",
@@ -103,12 +103,12 @@ const Resume = Model.create_model({
 });
 ```
 
-## Query Operations
+## 查询操作
 
-### Basic Queries
+### 基础查询
 
 ```js
-// Get helper functions
+// 获取辅助函数
 const Q = Model.Q;
 const F = Model.F;
 const Sum = Model.Sum;
@@ -117,7 +117,7 @@ const Max = Model.Max;
 const Min = Model.Min;
 const Count = Model.Count;
 
-// Query all records
+// 查询所有记录
 const blogs = await Blog.exec();
 ```
 
@@ -126,7 +126,7 @@ SELECT * FROM blog T
 ```
 
 ```js
-// Conditional query
+// 条件查询
 const blog = await Blog.where({ id: 1 }).get();
 ```
 
@@ -145,7 +145,7 @@ WHERE T.name = 'First Blog'
 ```
 
 ```js
-// String condition query
+// 字符串条件查询
 const result = await Blog.where("name", "First Blog").exec();
 ```
 
@@ -154,12 +154,12 @@ SELECT * FROM blog T
 WHERE T.name = 'First Blog'
 ```
 
-### Field Selection
+### 字段选择
 
 ```js
-// Select single field
+// 选择单个字段
 const result = await Blog.select("name").where({ id: 1 }).exec();
-// Result: [{ name: "First Blog" }]
+// 结果: [{ name: "First Blog" }]
 ```
 
 ```sql
@@ -169,9 +169,9 @@ WHERE T.id = 1
 ```
 
 ```js
-// Select multiple fields
+// 选择多个字段
 const result = await Blog.select("name", "tagline").where({ id: 1 }).exec();
-// Or using array form
+// 或者使用数组形式
 const result = await Blog.select(["name", "tagline"]).where({ id: 1 }).exec();
 ```
 
@@ -182,7 +182,7 @@ WHERE T.id = 1
 ```
 
 ```js
-// Field aliases
+// 字段别名
 const result = await Blog.select_as({
   name: "blog_name",
   tagline: "blog_tagline"
@@ -196,7 +196,7 @@ WHERE T.id = 1
 ```
 
 ```js
-// Literal selection
+// 字面量选择
 const result = await Blog.select_literal("'Hello World'")
   .select(["name"])
   .where({ id: 1 })
@@ -210,7 +210,7 @@ WHERE T.id = 1
 ```
 
 ```js
-// Literal aliases
+// 字面量别名
 const result = await Blog.select_literal_as({
   "'Hello World'": "greeting"
 }).select(["id"]).where({ id: 1 }).exec();
@@ -222,10 +222,10 @@ FROM blog T
 WHERE T.id = 1
 ```
 
-### Foreign Key Queries
+### 外键查询
 
 ```js
-// Query foreign key fields
+// 查询外键字段
 const result = await Book.select("name", "author__name").where({ id: 1 }).exec();
 ```
 
@@ -237,7 +237,7 @@ WHERE T.id = 1
 ```
 
 ```js
-// Nested foreign key query
+// 嵌套外键查询
 const result = await ViewLog.select("entry_id__blog_id__name").where({ id: 1 }).exec();
 ```
 
@@ -250,7 +250,7 @@ WHERE T.id = 1
 ```
 
 ```js
-// Reverse foreign key query
+// 反向外键查询
 const result = await Blog.select("id", "name", "entry__rating")
   .where({ name: "Second Blog" })
   .exec();
@@ -263,10 +263,10 @@ INNER JOIN entry T1 ON (T.id = T1.blog_id)
 WHERE T.name = 'Second Blog'
 ```
 
-### Conditional Queries
+### 条件查询
 
 ```js
-// Basic conditions
+// 基础条件
 const result = await Book.where({ price: 100 }).exec();
 ```
 
@@ -276,8 +276,8 @@ WHERE T.price = 100
 ```
 
 ```js
-// Comparison operators
-const result = await Book.where({ price__gt: 100 }).exec(); // greater than
+// 比较操作符
+const result = await Book.where({ price__gt: 100 }).exec(); // 大于
 ```
 
 ```sql
@@ -286,7 +286,7 @@ WHERE T.price > 100
 ```
 
 ```js
-const result = await Book.where({ price__lt: 100 }).exec(); // less than
+const result = await Book.where({ price__lt: 100 }).exec(); // 小于
 ```
 
 ```sql
@@ -295,7 +295,7 @@ WHERE T.price < 100
 ```
 
 ```js
-const result = await Book.where({ price__gte: 100 }).exec(); // greater than or equal
+const result = await Book.where({ price__gte: 100 }).exec(); // 大于等于
 ```
 
 ```sql
@@ -304,7 +304,7 @@ WHERE T.price >= 100
 ```
 
 ```js
-const result = await Book.where({ price__lte: 100 }).exec(); // less than or equal
+const result = await Book.where({ price__lte: 100 }).exec(); // 小于等于
 ```
 
 ```sql
@@ -313,8 +313,8 @@ WHERE T.price <= 100
 ```
 
 ```js
-// String operations
-const result = await Blog.where({ name__contains: "blog" }).exec(); // contains
+// 字符串操作
+const result = await Blog.where({ name__contains: "blog" }).exec(); // 包含
 ```
 
 ```sql
@@ -323,7 +323,7 @@ WHERE T.name LIKE '%blog%'
 ```
 
 ```js
-const result = await Blog.where({ name__startswith: "First" }).exec(); // starts with
+const result = await Blog.where({ name__startswith: "First" }).exec(); // 开始于
 ```
 
 ```sql
@@ -332,7 +332,7 @@ WHERE T.name LIKE 'First%'
 ```
 
 ```js
-const result = await Blog.where({ name__endswith: "Blog" }).exec(); // ends with
+const result = await Blog.where({ name__endswith: "Blog" }).exec(); // 结束于
 ```
 
 ```sql
@@ -341,8 +341,8 @@ WHERE T.name LIKE '%Blog'
 ```
 
 ```js
-// List operations
-const result = await Blog.where({ id__in: [1, 2, 3] }).exec(); // in list
+// 列表操作
+const result = await Blog.where({ id__in: [1, 2, 3] }).exec(); // 在列表中
 ```
 
 ```sql
@@ -351,7 +351,7 @@ WHERE T.id IN (1, 2, 3)
 ```
 
 ```js
-const result = await Blog.where({ id__notin: [1, 2, 3] }).exec(); // not in list
+const result = await Blog.where({ id__notin: [1, 2, 3] }).exec(); // 不在列表中
 ```
 
 ```sql
@@ -360,8 +360,8 @@ WHERE T.id NOT IN (1, 2, 3)
 ```
 
 ```js
-// Null checks
-const result = await Blog.where({ tagline__isnull: true }).exec(); // is null
+// 空值检查
+const result = await Blog.where({ tagline__isnull: true }).exec(); // 为空
 ```
 
 ```sql
@@ -370,7 +370,7 @@ WHERE T.tagline IS NULL
 ```
 
 ```js
-const result = await Blog.where({ tagline__notnull: true }).exec(); // is not null
+const result = await Blog.where({ tagline__notnull: true }).exec(); // 不为空
 ```
 
 ```sql
@@ -378,10 +378,10 @@ SELECT * FROM blog T
 WHERE T.tagline IS NOT NULL
 ```
 
-### Complex Conditional Queries
+### 复杂条件查询
 
 ```js
-// Using Q objects for complex queries
+// 使用 Q 对象进行复杂查询
 const result = await Book.where(
   Q({ price__gt: 100 }).or(Q({ price__lt: 200 }))
 ).exec();
@@ -393,7 +393,7 @@ WHERE (T.price > 100) OR (T.price < 200)
 ```
 
 ```js
-// Negation conditions
+// 否定条件
 const result = await Book.where(Q({ price__gt: 100 }).not()).exec();
 ```
 
@@ -403,7 +403,7 @@ WHERE NOT (T.price > 100)
 ```
 
 ```js
-// Combined conditions
+// 组合条件
 const result = await Book.where(
   Q({ id: 1 }).and(Q({ price__gt: 100 }).or(Q({ price__lt: 200 })))
 ).exec();
@@ -414,12 +414,12 @@ SELECT * FROM book T
 WHERE (T.id = 1) AND ((T.price > 100) OR (T.price < 200))
 ```
 
-### Foreign Key Conditional Queries
+### 外键条件查询
 
 ```js
-// Foreign key equality query
+// 外键等值查询
 const result = await Entry.where({ blog_id: 1 }).exec();
-const result = await Entry.where({ blog_id__id: 1 }).exec(); // equivalent
+const result = await Entry.where({ blog_id__id: 1 }).exec(); // 等效
 ```
 
 ```sql
@@ -428,7 +428,7 @@ WHERE T.blog_id = 1
 ```
 
 ```js
-// Foreign key field query
+// 外键字段查询
 const result = await Entry.where({ blog_id__name: "my blog name" }).exec();
 ```
 
@@ -439,7 +439,7 @@ WHERE T1.name = 'my blog name'
 ```
 
 ```js
-// Nested foreign key query
+// 嵌套外键查询
 const result = await ViewLog.where({ entry_id__blog_id__name: "my blog name" }).exec();
 ```
 
@@ -451,7 +451,7 @@ WHERE T2.name = 'my blog name'
 ```
 
 ```js
-// Reverse foreign key query
+// 反向外键查询
 const result = await Blog.where({ entry__rating: 1 }).exec();
 ```
 
@@ -461,10 +461,10 @@ INNER JOIN entry T1 ON (T.id = T1.blog_id)
 WHERE T1.rating = 1
 ```
 
-### JSON Field Queries
+### JSON 字段查询
 
 ```js
-// JSON key existence check
+// JSON 键存在检查
 const result = await Author.where({ resume__has_key: "start_date" }).exec();
 ```
 
@@ -474,7 +474,7 @@ WHERE (T.resume) ? 'start_date'
 ```
 
 ```js
-// JSON multiple keys existence check
+// JSON 多键存在检查
 const result = await Author.where({ resume__0__has_keys: ["a", "b"] }).exec();
 ```
 
@@ -484,7 +484,7 @@ WHERE (T.resume #> ARRAY['0']) ?& ARRAY['a', 'b']
 ```
 
 ```js
-// JSON any keys existence check
+// JSON 任意键存在检查
 const result = await Author.where({ resume__has_any_keys: ["a", "b"] }).exec();
 ```
 
@@ -494,7 +494,7 @@ WHERE (T.resume) ?| ARRAY['a', 'b']
 ```
 
 ```js
-// JSON path access
+// JSON 路径访问
 const result = await Author.where({ resume__start_date__time: "12:00:00" }).exec();
 ```
 
@@ -504,7 +504,7 @@ WHERE (T.resume #> ARRAY['start_date', 'time']) = '"12:00:00"'
 ```
 
 ```js
-// JSON contains check
+// JSON 包含检查
 const result = await Author.where({
   resume__contains: { start_date: "2025-01-01" }
 }).exec();
@@ -516,7 +516,7 @@ WHERE (T.resume) @> '{"start_date":"2025-01-01"}'
 ```
 
 ```js
-// JSON contained by check
+// JSON 被包含检查
 const result = await Author.where({
   resume__contained_by: { start_date: "2025-01-01" }
 }).exec();
@@ -527,10 +527,10 @@ SELECT * FROM author T
 WHERE (T.resume) <@ '{"start_date":"2025-01-01"}'
 ```
 
-### Date Queries
+### 日期查询
 
 ```js
-// Year query
+// 年份查询
 const result = await ViewLog.where({ ctime__year: 2025 }).exec();
 ```
 
@@ -540,7 +540,7 @@ WHERE T.ctime BETWEEN '2025-01-01' AND '2025-12-31'
 ```
 
 ```js
-// Month query
+// 月份查询
 const result = await ViewLog.where({ ctime__month: 1 }).exec();
 ```
 
@@ -550,7 +550,7 @@ WHERE EXTRACT(MONTH FROM T.ctime) = 1
 ```
 
 ```js
-// Day query
+// 日期查询
 const result = await ViewLog.where({ ctime__day: 15 }).exec();
 ```
 
@@ -559,10 +559,10 @@ SELECT * FROM view_log T
 WHERE EXTRACT(DAY FROM T.ctime) = 15
 ```
 
-### Ordering
+### 排序
 
 ```js
-// Single field ordering
+// 单字段排序
 const result = await Blog.order_by(["name"]).exec();
 ```
 
@@ -572,7 +572,7 @@ ORDER BY T.name
 ```
 
 ```js
-// Descending order
+// 降序排序
 const result = await Blog.order_by(["-name"]).exec();
 ```
 
@@ -582,7 +582,7 @@ ORDER BY T.name DESC
 ```
 
 ```js
-// Multiple field ordering
+// 多字段排序
 const result = await Blog.order_by(["name", "-id"]).exec();
 ```
 
@@ -592,7 +592,7 @@ ORDER BY T.name, T.id DESC
 ```
 
 ```js
-// Foreign key field ordering
+// 外键字段排序
 const result = await Entry.order_by(["blog_id__name"]).exec();
 ```
 
@@ -602,10 +602,10 @@ INNER JOIN blog T1 ON (T.blog_id = T1.id)
 ORDER BY T1.name
 ```
 
-### Aggregation Queries
+### 聚合查询
 
 ```js
-// Group by query
+// 分组查询
 const result = await Book.group_by(["name"])
   .annotate({ price_total: Sum("price") })
   .exec();
@@ -618,7 +618,7 @@ GROUP BY T.name
 ```
 
 ```js
-// Aggregation functions
+// 聚合函数
 const result = await Book.annotate({ price_total: Sum("price") }).exec();
 ```
 
@@ -628,7 +628,7 @@ FROM book T
 ```
 
 ```js
-const result = await Book.annotate([Sum("price")]).exec(); // auto alias as price_sum
+const result = await Book.annotate([Sum("price")]).exec(); // 自动别名为 price_sum
 ```
 
 ```sql
@@ -637,7 +637,7 @@ FROM book T
 ```
 
 ```js
-// Multiple aggregations
+// 多种聚合
 const result = await Book.annotate({
   price_sum: Sum("price"),
   price_avg: Avg("price"),
@@ -658,7 +658,7 @@ FROM book T
 ```
 
 ```js
-// HAVING clause
+// HAVING 子句
 const result = await Book.group_by(["name"])
   .annotate([Sum("price")])
   .having({ price_sum__gt: 100 })
@@ -673,7 +673,7 @@ HAVING SUM(T.price) > 100
 ```
 
 ```js
-// Complex HAVING conditions
+// 复杂 HAVING 条件
 const result = await Book.group_by(["name"])
   .annotate([Sum("price")])
   .having(Q({ price_sum__lt: 100 }).or(Q({ price_sum__gt: 200 })))
@@ -687,10 +687,10 @@ GROUP BY T.name
 HAVING (SUM(T.price) < 100) OR (SUM(T.price) > 200)
 ```
 
-### Field Expressions
+### 字段表达式
 
 ```js
-// Field operations
+// 字段运算
 const result = await Book.annotate({
   double_price: F("price").mul(2)
 }).exec();
@@ -702,7 +702,7 @@ FROM book T
 ```
 
 ```js
-// Field-to-field operations
+// 字段间运算
 const result = await Book.annotate({
   price_per_page: F("price").div(F("pages"))
 }).exec();
@@ -714,7 +714,7 @@ FROM book T
 ```
 
 ```js
-// String concatenation
+// 字符串连接
 const result = await Entry.update({
   headline: F("headline") + " suffix by function"
 }).where({ id: 1 }).exec();
@@ -726,10 +726,10 @@ SET headline = (T.headline || ' suffix by function')
 WHERE T.id = 1
 ```
 
-### Related Query Counting
+### 关联查询计数
 
 ```js
-// Left join counting
+// 左连接计数
 const result = await Blog.annotate({
   entry_count: Count("entry")
 }).exec();
@@ -741,12 +741,12 @@ FROM blog T
 LEFT JOIN entry T1 ON (T.id = T1.blog_id)
 ```
 
-## Insert Operations
+## 插入操作
 
-### Basic Insert
+### 基础插入
 
 ```js
-// Insert single record
+// 插入单条记录
 const result = await Blog.insert({
   name: "New Blog",
   tagline: "New blog tagline"
@@ -759,7 +759,7 @@ VALUES ('New Blog', 'New blog tagline')
 ```
 
 ```js
-// Insert and return specified fields
+// 插入并返回指定字段
 const result = await Blog.insert({
   name: "Return Test Blog",
   tagline: "Return test tagline"
@@ -773,7 +773,7 @@ RETURNING id, name
 ```
 
 ```js
-// Return all fields
+// 返回所有字段
 const result = await Blog.insert({
   name: "All Fields Blog"
 }).returning("*").exec();
@@ -785,10 +785,10 @@ VALUES ('All Fields Blog')
 RETURNING *
 ```
 
-### Bulk Insert
+### 批量插入
 
 ```js
-// Bulk insert
+// 批量插入
 const result = await Blog.insert([
   { name: "bulk insert 1", tagline: "bulk insert 1" },
   { name: "bulk insert 2", tagline: "bulk insert 2" }
@@ -803,7 +803,7 @@ VALUES
 ```
 
 ```js
-// Bulk insert with return
+// 批量插入并返回
 const result = await Blog.insert([
   { name: "bulk return 1", tagline: "bulk return 1" },
   { name: "bulk return 2", tagline: "bulk return 2" }
@@ -818,10 +818,10 @@ VALUES
 RETURNING *
 ```
 
-### Insert from Subquery
+### 从子查询插入
 
 ```js
-// Insert from SELECT subquery
+// 从 SELECT 子查询插入
 const result = await BlogBin.insert(
   Blog.where({ name: "Second Blog" }).select(["name", "tagline"])
 ).exec();
@@ -835,7 +835,7 @@ WHERE T.name = 'Second Blog'
 ```
 
 ```js
-// Insert with specified column names
+// 指定列名插入
 const result = await BlogBin.insert(
   Blog.where({ name: "First Blog" })
     .select(["name", "tagline"])
@@ -852,7 +852,7 @@ WHERE T.name = 'First Blog'
 ```
 
 ```js
-// Insert from UPDATE RETURNING
+// 从 UPDATE RETURNING 插入
 const result = await BlogBin.insert(
   Blog.update({ name: "update returning 2" })
     .where({ name: "update returning" })
@@ -875,7 +875,7 @@ RETURNING name, tagline, note
 ```
 
 ```js
-// Insert from DELETE RETURNING
+// 从 DELETE RETURNING 插入
 const result = await BlogBin.insert(
   Blog.delete({ name: "delete returning" })
     .returning(["name", "tagline"])
@@ -895,17 +895,17 @@ SELECT * FROM deleted
 RETURNING name, tagline, note
 ```
 
-### Column-Specific Insert
+### 指定列插入
 
 ```js
-// Insert only specified columns
+// 只插入指定列
 const result = await BlogBin.insert(
   {
     name: "Column Test Blog",
     tagline: "Column test tagline",
     note: "should not be inserted"
   },
-  ["name", "tagline"] // Only insert these two columns
+  ["name", "tagline"] // 只插入这两列
 ).returning("name", "tagline", "note").exec();
 ```
 
@@ -915,12 +915,12 @@ VALUES ('Column Test Blog', 'Column test tagline')
 RETURNING name, tagline, note
 ```
 
-## Update Operations
+## 更新操作
 
-### Basic Update
+### 基础更新
 
 ```js
-// Basic update
+// 基础更新
 const result = await Blog.where({ name: "First Blog" })
   .update({ tagline: "changed tagline" })
   .returning("*")
@@ -935,7 +935,7 @@ RETURNING *
 ```
 
 ```js
-// Update using field expressions
+// 使用字段表达式更新
 const result = await Entry.update({ headline: F("blog_id__name") })
   .where({ id: 1 })
   .returning("headline")
@@ -951,7 +951,7 @@ RETURNING T.headline
 ```
 
 ```js
-// Field arithmetic update
+// 字段运算更新
 const result = await Entry.update({
   headline: F("headline") + " suffix by function"
 }).where({ id: 1 }).returning("headline").exec();
@@ -964,10 +964,10 @@ WHERE T.id = 1
 RETURNING T.headline
 ```
 
-### Field Increment
+### 字段递增
 
 ```js
-// Single field increment
+// 单字段递增
 const result = await Entry.increase({ rating: 1 })
   .where({ id: 1 })
   .returning("rating")
@@ -982,7 +982,7 @@ RETURNING T.rating
 ```
 
 ```js
-// Multiple field increment
+// 多字段递增
 const result = await Entry.increase({
   number_of_comments: 1,
   number_of_pingbacks: 2
@@ -999,7 +999,7 @@ RETURNING *
 ```
 
 ```js
-// String parameter increment
+// 字符串参数递增
 const result = await Entry.increase("rating", 2)
   .where({ id: 1 })
   .returning("rating")
@@ -1013,10 +1013,10 @@ WHERE T.id = 1
 RETURNING T.rating
 ```
 
-### Update with Joins
+### 带连接的更新
 
 ```js
-// Update with foreign key conditions
+// 带外键条件的更新
 const result = await Entry.update({
   headline: F("headline") + " from first blog"
 }).where({
@@ -1032,12 +1032,12 @@ WHERE T.blog_id = T1.id AND T1.name = 'First Blog'
 RETURNING T.id, T.headline
 ```
 
-## Advanced Operations
+## 高级操作
 
-### MERGE Operations
+### MERGE 操作
 
 ```js
-// Basic merge (update if exists, insert if not)
+// 基础 merge（存在则更新，不存在则插入）
 const result = await Blog.merge([
   { name: "First Blog", tagline: "updated by merge" },
   { name: "Blog added by merge", tagline: "inserted by merge" }
@@ -1054,10 +1054,10 @@ DO UPDATE SET tagline = EXCLUDED.tagline
 ```
 
 ```js
-// Insert only non-existing records
+// 只插入不存在的记录
 const result = await Blog.merge([
-  { name: "First Blog" }, // exists, no update
-  { name: "Blog added by merge" } // doesn't exist, insert
+  { name: "First Blog" }, // 存在，不更新
+  { name: "Blog added by merge" } // 不存在，插入
 ]).exec();
 ```
 
@@ -1067,10 +1067,10 @@ VALUES ('First Blog'), ('Blog added by merge')
 ON CONFLICT (name) DO NOTHING
 ```
 
-### UPSERT Operations
+### UPSERT 操作
 
 ```js
-// UPSERT (update if exists, insert if not, return both)
+// UPSERT（存在则更新，不存在则插入，都返回）
 const result = await Blog.upsert([
   { name: "First Blog", tagline: "updated by upsert" },
   { name: "Blog added by upsert", tagline: "inserted by upsert" }
@@ -1088,7 +1088,7 @@ RETURNING *
 ```
 
 ```js
-// UPSERT from subquery
+// 从子查询 UPSERT
 const result = await Blog.upsert(
   BlogBin.update({ tagline: "updated by upsert returning" })
     .returning(["name", "tagline"])
@@ -1109,7 +1109,7 @@ RETURNING id, name, tagline
 ```
 
 ```js
-// UPSERT from SELECT subquery
+// 从 SELECT 子查询 UPSERT
 const result = await Blog.upsert(
   BlogBin.where({
     name__notin: Blog.select(["name"]).distinct()
@@ -1129,13 +1129,13 @@ DO UPDATE SET tagline = EXCLUDED.tagline
 RETURNING id, name, tagline
 ```
 
-### UPDATES Operations
+### UPDATES 操作
 
 ```js
-// Bulk update (only update existing records)
+// 批量更新（只更新存在的记录）
 const result = await Blog.updates([
   { name: "Third Blog", tagline: "Updated by updates" },
-  { name: "Fourth Blog", tagline: "wont update" } // doesn't exist, no update
+  { name: "Fourth Blog", tagline: "wont update" } // 不存在，不更新
 ]).exec();
 ```
 
@@ -1152,10 +1152,10 @@ WHERE V.name = T.name
 ```
 
 ```js
-// Bulk update from SELECT subquery
+// 从 SELECT 子查询批量更新
 const result = await BlogBin.updates(
   Blog.where({ name: "Second Blog" }).select(["name", "tagline"]),
-  "name" // match field
+  "name" // 匹配字段
 ).returning("*").exec();
 ```
 
@@ -1173,7 +1173,7 @@ RETURNING *
 ```
 
 ```js
-// Bulk update from UPDATE subquery
+// 从 UPDATE 子查询批量更新
 const result = await BlogBin.updates(
   Blog.where({ name: "Third Blog" })
     .update({ tagline: "XXX" })
@@ -1195,10 +1195,10 @@ FROM V
 WHERE V.name = T.name
 ```
 
-### MERGE_GETS Operations
+### MERGE_GETS 操作
 
 ```js
-// Merge then query
+// 先 merge 再查询
 const result = await Blog.select("name")
   .merge_gets([
     { id: 1, name: "Merged First Blog" },
@@ -1222,7 +1222,7 @@ WHERE T.id IN (1, 2)
 ```
 
 ```js
-// Merge then query (query after)
+// 先 merge 再查询（查询在后）
 const result = await Blog.merge_gets([
   { id: 1, name: "Merged First Blog" },
   { id: 2, name: "Merged Second Blog" }
@@ -1245,10 +1245,10 @@ FROM blog T
 WHERE T.id IN (1, 2)
 ```
 
-## Delete Operations
+## 删除操作
 
 ```js
-// Basic delete
+// 基础删除
 const result = await Blog.delete({ name: "Blog to delete" }).exec();
 ```
 
@@ -1258,7 +1258,7 @@ WHERE T.name = 'Blog to delete'
 ```
 
 ```js
-// Delete with return
+// 带返回的删除
 const result = await Blog.delete({ name: "Blog to delete" })
   .returning("*")
   .exec();
@@ -1271,7 +1271,7 @@ RETURNING *
 ```
 
 ```js
-// Conditional delete
+// 条件删除
 const result = await Blog.delete({ name__startswith: "temp" }).exec();
 ```
 
@@ -1281,7 +1281,7 @@ WHERE T.name LIKE 'temp%'
 ```
 
 ```js
-// Delete all records
+// 删除所有记录
 const result = await Blog.delete().exec();
 ```
 
@@ -1289,12 +1289,12 @@ const result = await Blog.delete().exec();
 DELETE FROM blog T
 ```
 
-## Convenience Methods
+## 便捷方法
 
-### Create Records
+### 创建记录
 
 ```js
-// Create single record and return complete object
+// 创建单条记录并返回完整对象
 const blog = await Blog.create({
   name: "Created Blog",
   tagline: "Created tagline"
@@ -1308,7 +1308,7 @@ RETURNING *
 ```
 
 ```js
-// Equivalent to
+// 等效于
 const result = await Blog.insert({
   name: "Created Blog",
   tagline: "Created tagline"
@@ -1316,10 +1316,10 @@ const result = await Blog.insert({
 const blog = result[0];
 ```
 
-### Get Single Record
+### 获取单条记录
 
 ```js
-// Get single record
+// 获取单条记录
 const blog = await Blog.where({ id: 1 }).get();
 ```
 
@@ -1330,7 +1330,7 @@ LIMIT 1
 ```
 
 ```js
-// Get specific fields of single record
+// 获取单条记录的特定字段
 const blog = await Blog.where({ id: 1 }).select(["name"]).get();
 ```
 
@@ -1341,10 +1341,10 @@ WHERE T.id = 1
 LIMIT 1
 ```
 
-### Flatten Results
+### 扁平化结果
 
 ```js
-// Get array of single column values
+// 获取单列值的数组
 const names = await Blog.flat("name");
 ```
 
@@ -1354,7 +1354,7 @@ FROM blog T
 ```
 
 ```js
-// Flatten with conditions
+// 带条件的扁平化
 const names = await Blog.where({ tagline__contains: "blog" })
   .order_by(["name"])
   .flat("name");
@@ -1367,162 +1367,163 @@ WHERE T.tagline LIKE '%blog%'
 ORDER BY T.name
 ```
 
-## Raw Queries
+## 原生查询
 
 ```js
-// Execute raw SQL
+// 执行原生 SQL
 const result = await Blog.query("SELECT * FROM blog WHERE id = $1", [1]);
 ```
 
 ```sql
--- Execute raw SQL (parameterized query)
+-- 执行原生 SQL（参数化查询）
 SELECT * FROM blog WHERE id = $1
--- Parameters: [1]
+-- 参数: [1]
 ```
 
 ```js
-// Get SQL statement (without execution)
+// 获取 SQL 语句（不执行）
 const sql = Blog.where({ id: 1 }).statement();
 console.log(sql); // "SELECT * FROM blog T WHERE T.id = 1"
 ```
 
-## Field Types
+## 字段类型
 
-### Basic Types
+### 基础类型
 
 ```js
 const Model = Model.create_model({
   table_name: "example",
   fields: {
-    // String type
+    // 字符串类型
     name: { type: "string", maxlength: 100, minlength: 2 },
-    title: { maxlength: 200 }, // defaults to string type
+    title: { maxlength: 200 }, // 默认为 string 类型
 
-    // Text type
+    // 文本类型
     content: { type: "text" },
 
-    // Integer type
+    // 整数类型
     age: { type: "integer", min: 0, max: 150 },
 
-    // Float type
+    // 浮点数类型
     price: { type: "float" },
 
-    // Boolean type
+    // 布尔类型
     is_active: { type: "boolean", default: true },
 
-    // Date type
+    // 日期类型
     birth_date: { type: "date" },
 
-    // DateTime type
+    // 日期时间类型
     created_at: { type: "datetime" },
 
-    // Email type
+    // 邮箱类型
     email: { type: "email" },
 
-    // JSON type
+    // JSON 类型
     metadata: { type: "json" },
 
-    // Foreign key reference
+    // 外键引用
     user_id: { reference: User },
 
-    // Composite field
+    // 复合字段
     profile: { model: Profile }
   }
 });
 ```
 
-### Field Constraints
+### 字段约束
 
 ```js
 const Model = Model.create_model({
   table_name: "example",
   fields: {
-    // Unique constraint
+    // 唯一约束
     username: { unique: true },
 
-    // Not null constraint
+    // 非空约束
     email: { null: false },
 
-    // Default value
+    // 默认值
     status: { default: "active" },
 
-    // Label (for form display, etc.)
-    name: { label: "Name" },
+    // 标签（用于表单显示等）
+    name: { label: "姓名" },
 
-    // Compact storage (for long text)
+    // 压缩存储（用于长文本）
     content: { compact: false }
   }
 });
 ```
 
-### Model Options
+### 模型选项
 
 ```js
 const Model = Model.create_model({
-  // Table name
+  // 表名
   table_name: "my_table",
 
-  // Auto create primary key
-  auto_primary_key: true, // default true
+  // 是否自动创建主键
+  auto_primary_key: true, // 默认 true
 
-  // Composite unique constraint
+  // 联合唯一约束
   unique_together: ["field1", "field2"],
 
-  // Model inheritance
+  // 模型继承
   mixins: [BaseModel],
 
-  // Field definitions
+  // 字段定义
   fields: {
     // ...
   }
 });
 ```
 
-## Error Handling
+## 错误处理
 
 ```js
 try {
-  // Unique constraint violation
+  // 违反唯一约束
   await Blog.insert({ name: "First Blog" }).exec();
 } catch (error) {
-  console.error("Insert failed:", error.message);
+  console.error("插入失败:", error.message);
 }
 
 try {
-  // Field length exceeded
+  // 字段长度超限
   await Blog.insert({
     name: "This name is way too long and exceeds the maximum length"
   }).exec();
 } catch (error) {
-  console.error("Field validation failed:", error.message);
+  console.error("字段验证失败:", error.message);
 }
 
 try {
-  // Age out of range
+  // 年龄超出范围
   await Author.insert({ name: "Tom", age: 101 }).exec();
 } catch (error) {
-  console.error("Age validation failed:", error.message);
+  console.error("年龄验证失败:", error.message);
 }
 ```
 
-## Debugging
+## 调试
 
 ```js
-// Get SQL statement without execution
+// 获取 SQL 语句而不执行
 const sql = Blog.where({ id: 1 }).statement();
 console.log(sql);
 
-// Enable full SQL matching (for testing)
+// 启用完整 SQL 匹配（用于测试）
 process.env.SQL_WHOLE_MATCH = true;
 ```
 
-## Best Practices
+## 最佳实践
 
-1. **Model Definition**: Define related models in the same file for easier foreign key relationship management
-2. **Field Validation**: Make full use of field constraints for data validation
-3. **Query Optimization**: Use `select()` to query only needed fields
-4. **Transaction Handling**: Consider using database transactions for complex operations
-5. **Error Handling**: Always wrap database operations in try-catch blocks
-6. **Index Optimization**: Add database indexes for frequently queried fields
+1. **模型定义**: 将相关模型定义在同一个文件中，便于管理外键关系
+2. **字段验证**: 充分利用字段约束进行数据验证
+3. **查询优化**: 使用 `select()` 只查询需要的字段
+4. **事务处理**: 对于复杂操作，考虑使用数据库事务
+5. **错误处理**: 始终包装数据库操作在 try-catch 中
+6. **索引优化**: 为经常查询的字段添加数据库索引
 
-This ORM provides rich query interfaces and flexible data manipulation methods that can meet the needs of most PostgreSQL applications.
+这个 ORM 提供了丰富的查询接口和灵活的数据操作方法，能够满足大多数 PostgreSQL 应用的需求。
+</rewritten_file>

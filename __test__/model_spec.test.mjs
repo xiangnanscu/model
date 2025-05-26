@@ -1,50 +1,20 @@
 /* eslint-disable no-undef */
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import postgres from "postgres";
 import Model from "~/lib/xodel";
 
 process.env.SQL_WHOLE_MATCH = true;
+
 // Database configuration
-const db_options = {
+Model.db_config = {
   host: "localhost",
   port: "5432",
+  database: "test",
   user: "postgres",
   password: "postgres",
-  database: "test",
   max: 20,
   idle_timeout: 20,
-  connect_timeout: 2,
-  DEBUG: (statement) => {
-    console.log("SQL:", statement);
-  },
+  connect_timeout: 3,
 };
-
-Model.Query = (options) => {
-  const sql = postgres({
-    host: options.host || "localhost",
-    port: options.port || "5432",
-    database: options.database || "test",
-    user: options.user || "postgres",
-    password: options.password || "postgres",
-    max: options.max || 20,
-    idle_timeout: options.idle_timeout || 20,
-    connect_timeout: options.connect_timeout || 2,
-  });
-  return async (statement, compact = false) => {
-    const result = await sql.unsafe(statement);
-    if (compact) {
-      for (let i = 0; i < result.length; i++) {
-        result[i] = Object.values(result[i]);
-      }
-      return result;
-    } else {
-      return result;
-    }
-  };
-};
-
-Model.db_options = db_options;
-Model.auto_primary_key = true;
 
 const Q = Model.Q;
 const F = Model.F;
@@ -157,14 +127,12 @@ const model_list = [User, Blog, BlogBin, Author, Entry, ViewLog, Publisher, Book
 
 // Helper function to create tables
 async function createTablesFromModels() {
-  const sql = Model.Query(db_options);
-
   // Drop tables in reverse order
   for (let i = model_list.length - 1; i >= 0; i--) {
     const model = model_list[i];
-    await sql(`DROP TABLE IF EXISTS "${model.table_name}" CASCADE`);
+    await Model.query(`DROP TABLE IF EXISTS "${model.table_name}" CASCADE`);
     // Also drop sequences to avoid conflicts
-    await sql(`DROP SEQUENCE IF EXISTS "${model.table_name}_id_seq" CASCADE`);
+    await Model.query(`DROP SEQUENCE IF EXISTS "${model.table_name}_id_seq" CASCADE`);
   }
 
   // Create all tables with complete SQL definitions
@@ -247,7 +215,7 @@ async function createTablesFromModels() {
   `;
 
   // Execute the SQL to create all tables
-  await sql(createTablesSQL);
+  await Model.query(createTablesSQL);
 }
 
 // Initialize test data

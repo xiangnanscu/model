@@ -1,8 +1,8 @@
 # @xiangnanscu/model
 
-[English](README.md) | [中文](README.zh-CN.md)
-
 [@xiangnanscu/model](https://xiangnanscu.github.io/model/) Declarative, intuitive and powerful PostgreSQL ORM library.
+
+English | [简体中文](./README.zh-CN.md)
 
 ## Installation
 

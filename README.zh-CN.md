@@ -1,8 +1,8 @@
 # @xiangnanscu/model
 
-[English](README.md) | [中文](README.zh-CN.md)
+[@xiangnanscu/model](https://xiangnanscu.github.io/model/) 一个声明式的、直观且强大的PostgreSQL ORM库。
 
-[@xiangnanscu/model](https://xiangnanscu.github.io/model/) 一个声明式的、直观且强大的 PostgreSQL ORM 库。
+[English](./README.md) | 简体中文
 
 ## 安装
 

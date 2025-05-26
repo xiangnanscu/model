@@ -105,8 +105,6 @@ const Resume = Model({
 
 ## 查询操作
 
-### 基础查询
-
 ```js
 // 获取辅助函数
 const Q = Model.Q;
@@ -116,7 +114,10 @@ const Avg = Model.Avg;
 const Max = Model.Max;
 const Min = Model.Min;
 const Count = Model.Count;
+```
+### 基础查询
 
+```js
 // 查询所有记录
 const blogs = await Blog.exec();
 ```
@@ -124,6 +125,8 @@ const blogs = await Blog.exec();
 ```sql
 SELECT * FROM blog T
 ```
+
+---
 
 ```js
 // 条件查询
@@ -135,6 +138,8 @@ SELECT * FROM blog T
 WHERE T.id = 1
 ```
 
+---
+
 ```js
 const blogs = await Blog.where({ name: "First Blog" }).exec();
 ```
@@ -143,6 +148,8 @@ const blogs = await Blog.where({ name: "First Blog" }).exec();
 SELECT * FROM blog T
 WHERE T.name = 'First Blog'
 ```
+
+---
 
 ```js
 // 字符串条件查询
@@ -168,6 +175,8 @@ FROM blog T
 WHERE T.id = 1
 ```
 
+---
+
 ```js
 // 选择多个字段
 const result = await Blog.select("name", "tagline").where({ id: 1 }).exec();
@@ -180,6 +189,8 @@ SELECT T.name, T.tagline
 FROM blog T
 WHERE T.id = 1
 ```
+
+---
 
 ```js
 // 字段别名
@@ -195,6 +206,8 @@ FROM blog T
 WHERE T.id = 1
 ```
 
+---
+
 ```js
 // 字面量选择
 const result = await Blog.select_literal("'Hello World'")
@@ -208,6 +221,8 @@ SELECT 'Hello World' AS "?column?", T.name
 FROM blog T
 WHERE T.id = 1
 ```
+
+---
 
 ```js
 // 字面量别名
@@ -236,6 +251,8 @@ INNER JOIN author T1 ON (T.author = T1.id)
 WHERE T.id = 1
 ```
 
+---
+
 ```js
 // 嵌套外键查询
 const result = await ViewLog.select("entry_id__blog_id__name").where({ id: 1 }).exec();
@@ -248,6 +265,8 @@ INNER JOIN entry T1 ON (T.entry_id = T1.id)
 INNER JOIN blog T2 ON (T1.blog_id = T2.id)
 WHERE T.id = 1
 ```
+
+---
 
 ```js
 // 反向外键查询
@@ -275,6 +294,8 @@ SELECT * FROM book T
 WHERE T.price = 100
 ```
 
+---
+
 ```js
 // 比较操作符
 const result = await Book.where({ price__gt: 100 }).exec(); // 大于
@@ -285,6 +306,8 @@ SELECT * FROM book T
 WHERE T.price > 100
 ```
 
+---
+
 ```js
 const result = await Book.where({ price__lt: 100 }).exec(); // 小于
 ```
@@ -293,6 +316,8 @@ const result = await Book.where({ price__lt: 100 }).exec(); // 小于
 SELECT * FROM book T
 WHERE T.price < 100
 ```
+
+---
 
 ```js
 const result = await Book.where({ price__gte: 100 }).exec(); // 大于等于
@@ -303,6 +328,8 @@ SELECT * FROM book T
 WHERE T.price >= 100
 ```
 
+---
+
 ```js
 const result = await Book.where({ price__lte: 100 }).exec(); // 小于等于
 ```
@@ -311,6 +338,8 @@ const result = await Book.where({ price__lte: 100 }).exec(); // 小于等于
 SELECT * FROM book T
 WHERE T.price <= 100
 ```
+
+---
 
 ```js
 // 字符串操作
@@ -322,6 +351,8 @@ SELECT * FROM blog T
 WHERE T.name LIKE '%blog%'
 ```
 
+---
+
 ```js
 const result = await Blog.where({ name__startswith: "First" }).exec(); // 开始于
 ```
@@ -331,6 +362,8 @@ SELECT * FROM blog T
 WHERE T.name LIKE 'First%'
 ```
 
+---
+
 ```js
 const result = await Blog.where({ name__endswith: "Blog" }).exec(); // 结束于
 ```
@@ -339,6 +372,8 @@ const result = await Blog.where({ name__endswith: "Blog" }).exec(); // 结束于
 SELECT * FROM blog T
 WHERE T.name LIKE '%Blog'
 ```
+
+---
 
 ```js
 // 列表操作
@@ -350,6 +385,8 @@ SELECT * FROM blog T
 WHERE T.id IN (1, 2, 3)
 ```
 
+---
+
 ```js
 const result = await Blog.where({ id__notin: [1, 2, 3] }).exec(); // 不在列表中
 ```
@@ -358,6 +395,8 @@ const result = await Blog.where({ id__notin: [1, 2, 3] }).exec(); // 不在列�
 SELECT * FROM blog T
 WHERE T.id NOT IN (1, 2, 3)
 ```
+
+---
 
 ```js
 // 空值检查
@@ -368,6 +407,8 @@ const result = await Blog.where({ tagline__isnull: true }).exec(); // 为空
 SELECT * FROM blog T
 WHERE T.tagline IS NULL
 ```
+
+---
 
 ```js
 const result = await Blog.where({ tagline__notnull: true }).exec(); // 不为空
@@ -392,6 +433,8 @@ SELECT * FROM book T
 WHERE (T.price > 100) OR (T.price < 200)
 ```
 
+---
+
 ```js
 // 否定条件
 const result = await Book.where(Q({ price__gt: 100 }).not()).exec();
@@ -401,6 +444,8 @@ const result = await Book.where(Q({ price__gt: 100 }).not()).exec();
 SELECT * FROM book T
 WHERE NOT (T.price > 100)
 ```
+
+---
 
 ```js
 // 组合条件
@@ -427,6 +472,8 @@ SELECT * FROM entry T
 WHERE T.blog_id = 1
 ```
 
+---
+
 ```js
 // 外键字段查询
 const result = await Entry.where({ blog_id__name: "my blog name" }).exec();
@@ -437,6 +484,8 @@ SELECT * FROM entry T
 INNER JOIN blog T1 ON (T.blog_id = T1.id)
 WHERE T1.name = 'my blog name'
 ```
+
+---
 
 ```js
 // 嵌套外键查询
@@ -449,6 +498,8 @@ INNER JOIN entry T1 ON (T.entry_id = T1.id)
 INNER JOIN blog T2 ON (T1.blog_id = T2.id)
 WHERE T2.name = 'my blog name'
 ```
+
+---
 
 ```js
 // 反向外键查询
@@ -473,6 +524,8 @@ SELECT * FROM author T
 WHERE (T.resume) ? 'start_date'
 ```
 
+---
+
 ```js
 // JSON 多键存在检查
 const result = await Author.where({ resume__0__has_keys: ["a", "b"] }).exec();
@@ -482,6 +535,8 @@ const result = await Author.where({ resume__0__has_keys: ["a", "b"] }).exec();
 SELECT * FROM author T
 WHERE (T.resume #> ARRAY['0']) ?& ARRAY['a', 'b']
 ```
+
+---
 
 ```js
 // JSON 任意键存在检查
@@ -493,6 +548,8 @@ SELECT * FROM author T
 WHERE (T.resume) ?| ARRAY['a', 'b']
 ```
 
+---
+
 ```js
 // JSON 路径访问
 const result = await Author.where({ resume__start_date__time: "12:00:00" }).exec();
@@ -502,6 +559,8 @@ const result = await Author.where({ resume__start_date__time: "12:00:00" }).exec
 SELECT * FROM author T
 WHERE (T.resume #> ARRAY['start_date', 'time']) = '"12:00:00"'
 ```
+
+---
 
 ```js
 // JSON 包含检查
@@ -514,6 +573,8 @@ const result = await Author.where({
 SELECT * FROM author T
 WHERE (T.resume) @> '{"start_date":"2025-01-01"}'
 ```
+
+---
 
 ```js
 // JSON 被包含检查
@@ -539,6 +600,8 @@ SELECT * FROM view_log T
 WHERE T.ctime BETWEEN '2025-01-01' AND '2025-12-31'
 ```
 
+---
+
 ```js
 // 月份查询
 const result = await ViewLog.where({ ctime__month: 1 }).exec();
@@ -548,6 +611,8 @@ const result = await ViewLog.where({ ctime__month: 1 }).exec();
 SELECT * FROM view_log T
 WHERE EXTRACT(MONTH FROM T.ctime) = 1
 ```
+
+---
 
 ```js
 // 日期查询
@@ -571,6 +636,8 @@ SELECT * FROM blog T
 ORDER BY T.name
 ```
 
+---
+
 ```js
 // 降序排序
 const result = await Blog.order_by(["-name"]).exec();
@@ -581,6 +648,8 @@ SELECT * FROM blog T
 ORDER BY T.name DESC
 ```
 
+---
+
 ```js
 // 多字段排序
 const result = await Blog.order_by(["name", "-id"]).exec();
@@ -590,6 +659,8 @@ const result = await Blog.order_by(["name", "-id"]).exec();
 SELECT * FROM blog T
 ORDER BY T.name, T.id DESC
 ```
+
+---
 
 ```js
 // 外键字段排序
@@ -617,6 +688,8 @@ FROM book T
 GROUP BY T.name
 ```
 
+---
+
 ```js
 // 聚合函数
 const result = await Book.annotate({ price_total: Sum("price") }).exec();
@@ -627,6 +700,8 @@ SELECT SUM(T.price) AS price_total
 FROM book T
 ```
 
+---
+
 ```js
 const result = await Book.annotate([Sum("price")]).exec(); // 自动别名为 price_sum
 ```
@@ -635,6 +710,8 @@ const result = await Book.annotate([Sum("price")]).exec(); // 自动别名为 pr
 SELECT SUM(T.price) AS price_sum
 FROM book T
 ```
+
+---
 
 ```js
 // 多种聚合
@@ -657,6 +734,8 @@ SELECT
 FROM book T
 ```
 
+---
+
 ```js
 // HAVING 子句
 const result = await Book.group_by(["name"])
@@ -671,6 +750,8 @@ FROM book T
 GROUP BY T.name
 HAVING SUM(T.price) > 100
 ```
+
+---
 
 ```js
 // 复杂 HAVING 条件
@@ -700,6 +781,8 @@ const result = await Book.annotate({
 SELECT (T.price * 2) AS double_price
 FROM book T
 ```
+
+---
 
 ```js
 // 字段间运算
@@ -758,6 +841,8 @@ INSERT INTO blog (name, tagline)
 VALUES ('New Blog', 'New blog tagline')
 ```
 
+---
+
 ```js
 // 插入并返回指定字段
 const result = await Blog.insert({
@@ -771,6 +856,8 @@ INSERT INTO blog (name, tagline)
 VALUES ('Return Test Blog', 'Return test tagline')
 RETURNING id, name
 ```
+
+---
 
 ```js
 // 返回所有字段
@@ -801,6 +888,8 @@ VALUES
   ('bulk insert 1', 'bulk insert 1'),
   ('bulk insert 2', 'bulk insert 2')
 ```
+
+---
 
 ```js
 // 批量插入并返回
@@ -834,6 +923,8 @@ FROM blog T
 WHERE T.name = 'Second Blog'
 ```
 
+---
+
 ```js
 // 指定列名插入
 const result = await BlogBin.insert(
@@ -850,6 +941,8 @@ SELECT T.name, T.tagline, 'select from another blog'
 FROM blog T
 WHERE T.name = 'First Blog'
 ```
+
+---
 
 ```js
 // 从 UPDATE RETURNING 插入
@@ -873,6 +966,8 @@ WITH updated AS (
 SELECT * FROM updated
 RETURNING name, tagline, note
 ```
+
+---
 
 ```js
 // 从 DELETE RETURNING 插入
@@ -934,6 +1029,8 @@ WHERE T.name = 'First Blog'
 RETURNING *
 ```
 
+---
+
 ```js
 // 使用字段表达式更新
 const result = await Entry.update({ headline: F("blog_id__name") })
@@ -949,6 +1046,8 @@ FROM blog T1
 WHERE T.blog_id = T1.id AND T.id = 1
 RETURNING T.headline
 ```
+
+---
 
 ```js
 // 字段运算更新
@@ -981,6 +1080,8 @@ WHERE T.id = 1
 RETURNING T.rating
 ```
 
+---
+
 ```js
 // 多字段递增
 const result = await Entry.increase({
@@ -997,6 +1098,8 @@ SET
 WHERE T.id = 1
 RETURNING *
 ```
+
+---
 
 ```js
 // 字符串参数递增
@@ -1053,6 +1156,8 @@ ON CONFLICT (name)
 DO UPDATE SET tagline = EXCLUDED.tagline
 ```
 
+---
+
 ```js
 // 只插入不存在的记录
 const result = await Blog.merge([
@@ -1087,6 +1192,8 @@ DO UPDATE SET tagline = EXCLUDED.tagline
 RETURNING *
 ```
 
+---
+
 ```js
 // 从子查询 UPSERT
 const result = await Blog.upsert(
@@ -1107,6 +1214,8 @@ ON CONFLICT (name)
 DO UPDATE SET tagline = EXCLUDED.tagline
 RETURNING id, name, tagline
 ```
+
+---
 
 ```js
 // 从 SELECT 子查询 UPSERT
@@ -1151,6 +1260,8 @@ FROM V
 WHERE V.name = T.name
 ```
 
+---
+
 ```js
 // 从 SELECT 子查询批量更新
 const result = await BlogBin.updates(
@@ -1171,6 +1282,8 @@ FROM V
 WHERE V.name = T.name
 RETURNING *
 ```
+
+---
 
 ```js
 // 从 UPDATE 子查询批量更新
@@ -1221,6 +1334,8 @@ FROM blog T
 WHERE T.id IN (1, 2)
 ```
 
+---
+
 ```js
 // 先 merge 再查询（查询在后）
 const result = await Blog.merge_gets([
@@ -1257,6 +1372,8 @@ DELETE FROM blog T
 WHERE T.name = 'Blog to delete'
 ```
 
+---
+
 ```js
 // 带返回的删除
 const result = await Blog.delete({ name: "Blog to delete" })
@@ -1270,6 +1387,8 @@ WHERE T.name = 'Blog to delete'
 RETURNING *
 ```
 
+---
+
 ```js
 // 条件删除
 const result = await Blog.delete({ name__startswith: "temp" }).exec();
@@ -1279,6 +1398,8 @@ const result = await Blog.delete({ name__startswith: "temp" }).exec();
 DELETE FROM blog T
 WHERE T.name LIKE 'temp%'
 ```
+
+---
 
 ```js
 // 删除所有记录
@@ -1307,6 +1428,8 @@ VALUES ('Created Blog', 'Created tagline')
 RETURNING *
 ```
 
+---
+
 ```js
 // 等效于
 const result = await Blog.insert({
@@ -1328,6 +1451,8 @@ SELECT * FROM blog T
 WHERE T.id = 1
 LIMIT 1
 ```
+
+---
 
 ```js
 // 获取单条记录的特定字段
@@ -1352,6 +1477,8 @@ const names = await Blog.flat("name");
 SELECT T.name
 FROM blog T
 ```
+
+---
 
 ```js
 // 带条件的扁平化
@@ -1379,6 +1506,8 @@ const result = await Blog.query("SELECT * FROM blog WHERE id = $1", [1]);
 SELECT * FROM blog WHERE id = $1
 -- 参数: [1]
 ```
+
+---
 
 ```js
 // 获取 SQL 语句（不执行）

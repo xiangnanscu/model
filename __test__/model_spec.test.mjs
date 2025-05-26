@@ -3,6 +3,7 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import postgres from "postgres";
 import Model from "~/lib/xodel";
 
+process.env.SQL_WHOLE_MATCH = true;
 // Database configuration
 const db_options = {
   host: "localhost",
@@ -477,6 +478,8 @@ describe("Model Tests", () => {
         const result = Book.where({ price: 100 }).statement();
         expect(result).toContain("WHERE");
         expect(result).toContain("price = 100");
+        process.env.SQL_WHOLE_MATCH &&
+          expect(result).toBe("SELECT * FROM book T WHERE T.price = 100");
       });
     });
 
@@ -485,6 +488,8 @@ describe("Model Tests", () => {
         const result = Book.where({ price__gt: 100 }).statement();
         expect(result).toContain("WHERE");
         expect(result).toContain("price > 100");
+        process.env.SQL_WHOLE_MATCH &&
+          expect(result).toBe("SELECT * FROM book T WHERE T.price > 100");
       });
     });
 
@@ -492,6 +497,8 @@ describe("Model Tests", () => {
       it("should generate correct SQL for negative condition", () => {
         const result = Book.where(Q({ price__gt: 100 }).not()).statement();
         expect(result).toContain("NOT");
+        process.env.SQL_WHOLE_MATCH &&
+          expect(result).toBe("SELECT * FROM book T WHERE NOT (T.price > 100)");
       });
     });
 
@@ -499,6 +506,8 @@ describe("Model Tests", () => {
       it("should generate correct SQL for OR conditions", () => {
         const result = Book.where(Q({ price__gt: 100 }).or(Q({ price__lt: 200 }))).statement();
         expect(result).toContain("OR");
+        process.env.SQL_WHOLE_MATCH &&
+          expect(result).toBe("SELECT * FROM book T WHERE (T.price > 100) OR (T.price < 200)");
       });
     });
 
@@ -511,18 +520,24 @@ describe("Model Tests", () => {
         ).statement();
         expect(result).toContain("NOT");
         expect(result).toContain("OR");
+        process.env.SQL_WHOLE_MATCH &&
+          expect(result).toBe(
+            "SELECT * FROM book T WHERE NOT ((T.price > 100) OR (T.price < 200))",
+          );
       });
     });
 
     describe("where combined with AND", () => {
       it("should generate correct SQL for AND with OR conditions", () => {
         const result = Book.where(
-          Q({ id: 1 })
-            .and(Q({ price__gt: 100 }))
-            .or(Q({ price__lt: 200 })),
+          Q({ id: 1 }).and(Q({ price__gt: 100 }).or(Q({ price__lt: 200 }))),
         ).statement();
         expect(result).toContain("AND");
         expect(result).toContain("OR");
+        process.env.SQL_WHOLE_MATCH &&
+          expect(result).toBe(
+            "SELECT * FROM book T WHERE (T.id = 1) AND ((T.price > 100) OR (T.price < 200))",
+          );
       });
     });
 
@@ -531,6 +546,8 @@ describe("Model Tests", () => {
         const result = Entry.where({ blog_id: 1 }).statement();
         expect(result).toContain("WHERE");
         expect(result).toContain("blog_id = 1");
+        process.env.SQL_WHOLE_MATCH &&
+          expect(result).toBe("SELECT * FROM entry T WHERE T.blog_id = 1");
       });
     });
 
@@ -538,6 +555,8 @@ describe("Model Tests", () => {
       it("should generate correct SQL for foreign key reference id", () => {
         const result = Entry.where({ blog_id__id: 1 }).statement();
         expect(result).toContain("blog_id = 1");
+        process.env.SQL_WHOLE_MATCH &&
+          expect(result).toBe("SELECT * FROM entry T WHERE T.blog_id = 1");
       });
     });
 
@@ -545,6 +564,8 @@ describe("Model Tests", () => {
       it("should generate correct SQL for foreign key greater than", () => {
         const result = Entry.where({ blog_id__gt: 1 }).statement();
         expect(result).toContain("blog_id > 1");
+        process.env.SQL_WHOLE_MATCH &&
+          expect(result).toBe("SELECT * FROM entry T WHERE T.blog_id > 1");
       });
     });
 
@@ -552,6 +573,8 @@ describe("Model Tests", () => {
       it("should generate correct SQL for foreign key reference id greater than", () => {
         const result = Entry.where({ blog_id__id__gt: 1 }).statement();
         expect(result).toContain("blog_id > 1");
+        process.env.SQL_WHOLE_MATCH &&
+          expect(result).toBe("SELECT * FROM entry T WHERE T.blog_id > 1");
       });
     });
 
@@ -560,6 +583,10 @@ describe("Model Tests", () => {
         const result = Entry.where({ blog_id__name: "my blog name" }).statement();
         expect(result).toContain("JOIN");
         expect(result).toContain("blog");
+        process.env.SQL_WHOLE_MATCH &&
+          expect(result).toBe(
+            "SELECT * FROM entry T INNER JOIN blog T1 ON (T.blog_id = T1.id) WHERE T1.name = 'my blog name'",
+          );
       });
     });
 
@@ -568,6 +595,10 @@ describe("Model Tests", () => {
         const result = Entry.where({ blog_id__name__contains: "my blog" }).statement();
         expect(result).toContain("LIKE");
         expect(result).toContain("%my blog%");
+        process.env.SQL_WHOLE_MATCH &&
+          expect(result).toBe(
+            "SELECT * FROM entry T INNER JOIN blog T1 ON (T.blog_id = T1.id) WHERE T1.name LIKE '%my blog%'",
+          );
       });
     });
 
@@ -576,6 +607,10 @@ describe("Model Tests", () => {
         const result = ViewLog.where({ entry_id__blog_id: 1 }).statement();
         expect(result).toContain("JOIN");
         expect(result).toContain("entry");
+        process.env.SQL_WHOLE_MATCH &&
+          expect(result).toBe(
+            "SELECT * FROM view_log T INNER JOIN entry T1 ON (T.entry_id = T1.id) WHERE T1.blog_id = 1",
+          );
       });
     });
 
@@ -583,6 +618,10 @@ describe("Model Tests", () => {
       it("should generate correct SQL for nested foreign key reference id", () => {
         const result = ViewLog.where({ entry_id__blog_id__id: 1 }).statement();
         expect(result).toContain("blog_id = 1");
+        process.env.SQL_WHOLE_MATCH &&
+          expect(result).toBe(
+            "SELECT * FROM view_log T INNER JOIN entry T1 ON (T.entry_id = T1.id) WHERE T1.blog_id = 1",
+          );
       });
     });
 
@@ -592,6 +631,10 @@ describe("Model Tests", () => {
         expect(result).toContain("JOIN");
         expect(result).toContain("entry");
         expect(result).toContain("blog");
+        process.env.SQL_WHOLE_MATCH &&
+          expect(result).toBe(
+            "SELECT * FROM view_log T INNER JOIN entry T1 ON (T.entry_id = T1.id) INNER JOIN blog T2 ON (T1.blog_id = T2.id) WHERE T2.name = 'my blog name'",
+          );
       });
     });
 
@@ -600,6 +643,10 @@ describe("Model Tests", () => {
         const result = ViewLog.where({ entry_id__blog_id__name__startswith: "my" }).statement();
         expect(result).toContain("LIKE");
         expect(result).toContain("my%");
+        process.env.SQL_WHOLE_MATCH &&
+          expect(result).toBe(
+            "SELECT * FROM view_log T INNER JOIN entry T1 ON (T.entry_id = T1.id) INNER JOIN blog T2 ON (T1.blog_id = T2.id) WHERE T2.name LIKE 'my%'",
+          );
       });
     });
 
@@ -610,6 +657,10 @@ describe("Model Tests", () => {
           .statement();
         expect(result).toContain("LIKE");
         expect(result).toContain("AND");
+        process.env.SQL_WHOLE_MATCH &&
+          expect(result).toBe(
+            "SELECT * FROM view_log T INNER JOIN entry T1 ON (T.entry_id = T1.id) INNER JOIN blog T2 ON (T1.blog_id = T2.id) WHERE (T2.name LIKE 'my%') AND (T1.headline = 'aa')",
+          );
       });
     });
 
@@ -626,6 +677,10 @@ describe("Model Tests", () => {
         const result = Blog.where({ entry__rating: 1 }).statement();
         expect(result).toContain("JOIN");
         expect(result).toContain("entry");
+        process.env.SQL_WHOLE_MATCH &&
+          expect(result).toBe(
+            "SELECT * FROM blog T INNER JOIN entry T1 ON (T.id = T1.blog_id) WHERE T1.rating = 1",
+          );
       });
     });
 
@@ -635,6 +690,10 @@ describe("Model Tests", () => {
         expect(result).toContain("JOIN");
         expect(result).toContain("entry");
         expect(result).toContain("view_log");
+        process.env.SQL_WHOLE_MATCH &&
+          expect(result).toBe(
+            "SELECT * FROM blog T INNER JOIN entry T1 ON (T.id = T1.blog_id) INNER JOIN view_log T2 ON (T1.id = T2.entry_id) WHERE T2.id = 1",
+          );
       });
     });
 
@@ -644,6 +703,10 @@ describe("Model Tests", () => {
         expect(result).toContain("BETWEEN");
         expect(result).toContain("2025-01-01");
         expect(result).toContain("2025-12-31");
+        process.env.SQL_WHOLE_MATCH &&
+          expect(result).toBe(
+            "SELECT * FROM blog T INNER JOIN entry T1 ON (T.id = T1.blog_id) INNER JOIN view_log T2 ON (T1.id = T2.entry_id) WHERE T2.ctime BETWEEN '2025-01-01' AND '2025-12-31'",
+          );
       });
     });
 
@@ -653,6 +716,10 @@ describe("Model Tests", () => {
           Q({ entry__view_log: 1 }).or(Q({ entry__view_log: 2 })),
         ).statement();
         expect(result).toContain("OR");
+        process.env.SQL_WHOLE_MATCH &&
+          expect(result).toBe(
+            "SELECT * FROM blog T INNER JOIN entry T1 ON (T.id = T1.blog_id) INNER JOIN view_log T2 ON (T1.id = T2.entry_id) WHERE (T2.id = 1) OR (T2.id = 2)",
+          );
       });
     });
 
@@ -663,6 +730,10 @@ describe("Model Tests", () => {
           .statement();
         expect(result).toContain("GROUP BY");
         expect(result).toContain("SUM");
+        process.env.SQL_WHOLE_MATCH &&
+          expect(result).toBe(
+            "SELECT T.name, SUM(T.price) AS price_total FROM book T GROUP BY T.name",
+          );
       });
     });
 
@@ -670,6 +741,8 @@ describe("Model Tests", () => {
       it("should generate correct SQL for annotation without group by", () => {
         const result = Book.annotate({ price_total: Sum("price") }).statement();
         expect(result).toContain("SUM");
+        process.env.SQL_WHOLE_MATCH &&
+          expect(result).toBe("SELECT SUM(T.price) AS price_total FROM book T");
       });
     });
 
@@ -687,6 +760,10 @@ describe("Model Tests", () => {
           .statement();
         expect(result).toContain("GROUP BY");
         expect(result).toContain("SUM");
+        process.env.SQL_WHOLE_MATCH &&
+          expect(result).toBe(
+            "SELECT T.name, SUM(T.price) AS price_sum FROM book T GROUP BY T.name",
+          );
       });
     });
 
@@ -698,6 +775,10 @@ describe("Model Tests", () => {
           .statement();
         expect(result).toContain("HAVING");
         expect(result).toContain("SUM");
+        process.env.SQL_WHOLE_MATCH &&
+          expect(result).toBe(
+            "SELECT T.name, SUM(T.price) AS price_sum FROM book T GROUP BY T.name HAVING SUM(T.price) > 100",
+          );
       });
     });
 
@@ -721,6 +802,10 @@ describe("Model Tests", () => {
           .statement();
         expect(result).toContain("HAVING");
         expect(result).toContain("SUM");
+        process.env.SQL_WHOLE_MATCH &&
+          expect(result).toBe(
+            "SELECT T.name, SUM(T.price) AS price_total FROM book T GROUP BY T.name HAVING SUM(T.price) > 100",
+          );
       });
     });
 
@@ -734,6 +819,10 @@ describe("Model Tests", () => {
         expect(result).toContain("HAVING");
         expect(result).toContain("ORDER BY");
         expect(result).toContain("DESC");
+        process.env.SQL_WHOLE_MATCH &&
+          expect(result).toBe(
+            "SELECT T.name, SUM(T.price) AS price_total FROM book T GROUP BY T.name HAVING SUM(T.price) > 100 ORDER BY SUM(T.price) DESC",
+          );
       });
     });
 
@@ -756,6 +845,10 @@ describe("Model Tests", () => {
         const result = Blog.annotate({ entry_count: Count("entry") }).statement();
         expect(result).toContain("COUNT");
         expect(result).toContain("LEFT JOIN");
+        process.env.SQL_WHOLE_MATCH &&
+          expect(result).toBe(
+            "SELECT COUNT(T1.id) AS entry_count FROM blog T LEFT JOIN entry T1 ON (T.id = T1.blog_id)",
+          );
       });
     });
 
@@ -764,6 +857,8 @@ describe("Model Tests", () => {
         const result = Author.where({ resume__has_key: "start_date" }).statement();
         expect(result).toContain("?");
         expect(result).toContain("resume");
+        process.env.SQL_WHOLE_MATCH &&
+          expect(result).toBe("SELECT * FROM author T WHERE (T.resume) ? start_date");
       });
     });
 
@@ -772,6 +867,8 @@ describe("Model Tests", () => {
         const result = Author.where({ resume__0__has_keys: ["a", "b"] }).statement();
         expect(result).toContain("?&");
         expect(result).toContain("resume");
+        process.env.SQL_WHOLE_MATCH &&
+          expect(result).toBe("SELECT * FROM author T WHERE (T.resume #> ['0']) ?& ['a', 'b']");
       });
     });
 
@@ -780,6 +877,8 @@ describe("Model Tests", () => {
         const result = Author.where({ resume__has_any_keys: ["a", "b"] }).statement();
         expect(result).toContain("?|");
         expect(result).toContain("resume");
+        process.env.SQL_WHOLE_MATCH &&
+          expect(result).toBe("SELECT * FROM author T WHERE (T.resume) ?| ['a', 'b']");
       });
     });
 
@@ -788,6 +887,10 @@ describe("Model Tests", () => {
         const result = Author.where({ resume__start_date__time: "12:00:00" }).statement();
         expect(result).toContain("#>");
         expect(result).toContain("resume");
+        process.env.SQL_WHOLE_MATCH &&
+          expect(result).toBe(
+            "SELECT * FROM author T WHERE (T.resume #> ['start_date', 'time']) = '\"12:00:00\"'",
+          );
       });
     });
 
@@ -796,6 +899,10 @@ describe("Model Tests", () => {
         const result = Author.where({ resume__contains: { start_date: "2025-01-01" } }).statement();
         expect(result).toContain("@>");
         expect(result).toContain("resume");
+        process.env.SQL_WHOLE_MATCH &&
+          expect(result).toBe(
+            'SELECT * FROM author T WHERE (T.resume) @> \'{"start_date":"2025-01-01"}\'',
+          );
       });
     });
 
@@ -806,6 +913,10 @@ describe("Model Tests", () => {
         }).statement();
         expect(result).toContain("<@");
         expect(result).toContain("resume");
+        process.env.SQL_WHOLE_MATCH &&
+          expect(result).toBe(
+            'SELECT * FROM author T WHERE (T.resume) <@ \'{"start_date":"2025-01-01"}\'',
+          );
       });
     });
 
@@ -813,6 +924,10 @@ describe("Model Tests", () => {
       it("should generate correct SQL for where with string and value", () => {
         const result = ViewLog.where("entry_id__blog_id", 1).statement();
         expect(result).toContain("blog_id = 1");
+        process.env.SQL_WHOLE_MATCH &&
+          expect(result).toBe(
+            "SELECT * FROM view_log T INNER JOIN entry T1 ON (T.entry_id = T1.id) WHERE T1.blog_id = 1",
+          );
       });
     });
 
@@ -820,6 +935,10 @@ describe("Model Tests", () => {
       it("should generate correct SQL for nested foreign key greater than", () => {
         const result = ViewLog.where({ entry_id__blog_id__gt: 1 }).statement();
         expect(result).toContain("blog_id > 1");
+        process.env.SQL_WHOLE_MATCH &&
+          expect(result).toBe(
+            "SELECT * FROM view_log T INNER JOIN entry T1 ON (T.entry_id = T1.id) WHERE T1.blog_id > 1",
+          );
       });
     });
   });

@@ -25,7 +25,7 @@ const Min = Model.Min;
 const Count = Model.Count;
 
 // Model definitions
-const User = Model.create_model({
+const User = Model({
   table_name: "user",
   fields: {
     username: { maxlength: 20, minlength: 2, unique: true },
@@ -33,7 +33,7 @@ const User = Model.create_model({
   },
 });
 
-const Blog = Model.create_model({
+const Blog = Model({
   table_name: "blog",
   fields: {
     name: { maxlength: 20, minlength: 2, unique: true },
@@ -41,7 +41,7 @@ const Blog = Model.create_model({
   },
 });
 
-const BlogBin = Model.create_model({
+const BlogBin = Model({
   table_name: "blog_bin",
   mixins: [Blog],
   fields: {
@@ -50,7 +50,7 @@ const BlogBin = Model.create_model({
   },
 });
 
-const Resume = Model.create_model({
+const Resume = Model({
   auto_primary_key: false,
   table_name: "resume",
   unique_together: ["start_date", "end_date", "company", "position"],
@@ -63,7 +63,7 @@ const Resume = Model.create_model({
   },
 });
 
-const Author = Model.create_model({
+const Author = Model({
   table_name: "author",
   fields: {
     name: { label: "姓名", maxlength: 200, unique: true },
@@ -73,7 +73,7 @@ const Author = Model.create_model({
   },
 });
 
-const Entry = Model.create_model({
+const Entry = Model({
   table_name: "entry",
   fields: {
     blog_id: { reference: Blog, related_query_name: "entry" },
@@ -88,7 +88,7 @@ const Entry = Model.create_model({
   },
 });
 
-const ViewLog = Model.create_model({
+const ViewLog = Model({
   table_name: "view_log",
   fields: {
     entry_id: { reference: Entry },
@@ -96,14 +96,14 @@ const ViewLog = Model.create_model({
   },
 });
 
-const Publisher = Model.create_model({
+const Publisher = Model({
   table_name: "publisher",
   fields: {
     name: { maxlength: 300 },
   },
 });
 
-const Book = Model.create_model({
+const Book = Model({
   table_name: "book",
   fields: {
     name: { maxlength: 300, compact: false },
@@ -116,7 +116,7 @@ const Book = Model.create_model({
   },
 });
 
-const Store = Model.create_model({
+const Store = Model({
   table_name: "store",
   fields: {
     name: { maxlength: 300 },

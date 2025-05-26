@@ -35,7 +35,7 @@ Model.db_config = {
 
 ```js
 // Basic model definition
-const User = Model.create_model({
+const User = Model({
   table_name: "user",
   fields: {
     username: { maxlength: 20, minlength: 2, unique: true },
@@ -43,7 +43,7 @@ const User = Model.create_model({
   },
 });
 
-const Blog = Model.create_model({
+const Blog = Model({
   table_name: "blog",
   fields: {
     name: { maxlength: 20, minlength: 2, unique: true },
@@ -52,7 +52,7 @@ const Blog = Model.create_model({
 });
 
 // Model with foreign key relationships
-const Entry = Model.create_model({
+const Entry = Model({
   table_name: "entry",
   fields: {
     blog_id: { reference: Blog, related_query_name: "entry" },
@@ -68,7 +68,7 @@ const Entry = Model.create_model({
 });
 
 // Model with composite fields
-const Author = Model.create_model({
+const Author = Model({
   table_name: "author",
   fields: {
     name: { label: "Name", maxlength: 200, unique: true },
@@ -79,7 +79,7 @@ const Author = Model.create_model({
 });
 
 // Model inheritance (mixins)
-const BlogBin = Model.create_model({
+const BlogBin = Model({
   table_name: "blog_bin",
   mixins: [Blog],
   fields: {
@@ -89,7 +89,7 @@ const BlogBin = Model.create_model({
 });
 
 // Model without auto primary key
-const Resume = Model.create_model({
+const Resume = Model({
   auto_primary_key: false,
   table_name: "resume",
   unique_together: ["start_date", "end_date", "company", "position"],
@@ -1391,7 +1391,7 @@ console.log(sql); // "SELECT * FROM blog T WHERE T.id = 1"
 ### Basic Types
 
 ```js
-const Model = Model.create_model({
+const Model = Model({
   table_name: "example",
   fields: {
     // String type
@@ -1434,7 +1434,7 @@ const Model = Model.create_model({
 ### Field Constraints
 
 ```js
-const Model = Model.create_model({
+const Model = Model({
   table_name: "example",
   fields: {
     // Unique constraint
@@ -1458,7 +1458,7 @@ const Model = Model.create_model({
 ### Model Options
 
 ```js
-const Model = Model.create_model({
+const Model = Model({
   // Table name
   table_name: "my_table",
 

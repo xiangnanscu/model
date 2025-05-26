@@ -35,7 +35,7 @@ Model.db_config = {
 
 ```js
 // 基础模型定义
-const User = Model.create_model({
+const User = Model({
   table_name: "user",
   fields: {
     username: { maxlength: 20, minlength: 2, unique: true },
@@ -43,7 +43,7 @@ const User = Model.create_model({
   },
 });
 
-const Blog = Model.create_model({
+const Blog = Model({
   table_name: "blog",
   fields: {
     name: { maxlength: 20, minlength: 2, unique: true },
@@ -52,7 +52,7 @@ const Blog = Model.create_model({
 });
 
 // 带外键关系的模型
-const Entry = Model.create_model({
+const Entry = Model({
   table_name: "entry",
   fields: {
     blog_id: { reference: Blog, related_query_name: "entry" },
@@ -68,7 +68,7 @@ const Entry = Model.create_model({
 });
 
 // 带复合字段的模型
-const Author = Model.create_model({
+const Author = Model({
   table_name: "author",
   fields: {
     name: { label: "姓名", maxlength: 200, unique: true },
@@ -79,7 +79,7 @@ const Author = Model.create_model({
 });
 
 // 模型继承（mixins）
-const BlogBin = Model.create_model({
+const BlogBin = Model({
   table_name: "blog_bin",
   mixins: [Blog],
   fields: {
@@ -89,7 +89,7 @@ const BlogBin = Model.create_model({
 });
 
 // 无自动主键的模型
-const Resume = Model.create_model({
+const Resume = Model({
   auto_primary_key: false,
   table_name: "resume",
   unique_together: ["start_date", "end_date", "company", "position"],
@@ -1391,7 +1391,7 @@ console.log(sql); // "SELECT * FROM blog T WHERE T.id = 1"
 ### 基础类型
 
 ```js
-const Model = Model.create_model({
+const Model = Model({
   table_name: "example",
   fields: {
     // 字符串类型
@@ -1434,7 +1434,7 @@ const Model = Model.create_model({
 ### 字段约束
 
 ```js
-const Model = Model.create_model({
+const Model = Model({
   table_name: "example",
   fields: {
     // 唯一约束
@@ -1458,7 +1458,7 @@ const Model = Model.create_model({
 ### 模型选项
 
 ```js
-const Model = Model.create_model({
+const Model = Model({
   // 表名
   table_name: "my_table",
 

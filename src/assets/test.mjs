@@ -66,19 +66,19 @@ Blog.where({ name__startswith: "temp" }).delete();
 
 // Aggregation queries
 Book.annotate({ price_total: Sum("price") });
-Book.group_by(["name"]).annotate({ price_sum: Sum("price") });
-Book.group_by(["name"])
+Book.group_by("name").annotate({ price_sum: Sum("price") });
+Book.group_by("name")
   .annotate({ price_total: Sum("price") })
   .having({ price_total__gt: 100 });
 
 // Advanced queries
-BlogBin.insert(Blog.where({ name: "Second Blog" }).select(["name", "tagline"]));
+BlogBin.insert(Blog.where({ name: "Second Blog" }).select("name", "tagline"));
 Blog.upsert([
   { name: "First Blog", tagline: "updated by upsert" },
   { name: "New Blog", tagline: "inserted by upsert" },
 ]);
 
 // Order by queries
-Blog.select("name").order_by(["name"]);
-Blog.select("name").order_by(["-name"]);
-Entry.where({ blog_id: 1 }).order_by(["pub_date", "-rating"]);
+Blog.select("name").order_by("name");
+Blog.select("name").order_by("-name");
+Entry.where({ blog_id: 1 }).order_by("pub_date", "-rating");

@@ -949,7 +949,7 @@ WHERE EXTRACT(DAY FROM T.ctime) = 15
 
 ```js
 // Single field ordering
-const result = await Blog.order_by(["name"]).exec();
+const result = await Blog.order_by("name").exec();
 ```
 
 </td>
@@ -967,7 +967,7 @@ ORDER BY T.name
 
 ```js
 // Descending order
-const result = await Blog.order_by(["-name"]).exec();
+const result = await Blog.order_by("-name").exec();
 ```
 
 </td>
@@ -985,7 +985,7 @@ ORDER BY T.name DESC
 
 ```js
 // Multiple field ordering
-const result = await Blog.order_by(["name", "-id"]).exec();
+const result = await Blog.order_by("name", "-id").exec();
 ```
 
 </td>
@@ -1003,7 +1003,7 @@ ORDER BY T.name, T.id DESC
 
 ```js
 // Foreign key field ordering
-const result = await Entry.order_by(["blog_id__name"]).exec();
+const result = await Entry.order_by("blog_id__name").exec();
 ```
 
 </td>
@@ -1031,7 +1031,7 @@ ORDER BY T1.name
 
 ```js
 // Group by query
-const result = await Book.group_by(["name"])
+const result = await Book.group_by("name")
   .annotate({ price_total: Sum("price") })
   .exec();
 ```
@@ -1116,7 +1116,7 @@ FROM book T
 
 ```js
 // HAVING clause
-const result = await Book.group_by(["name"])
+const result = await Book.group_by("name")
   .annotate([Sum("price")])
   .having({ price_sum__gt: 100 })
   .exec();
@@ -1139,7 +1139,7 @@ HAVING SUM(T.price) > 100
 
 ```js
 // Complex HAVING conditions
-const result = await Book.group_by(["name"])
+const result = await Book.group_by("name")
   .annotate([Sum("price")])
   .having(Q({ price_sum__lt: 100 }).or(Q({ price_sum__gt: 200 })))
   .exec();
@@ -1297,7 +1297,7 @@ VALUES ('New Blog', 'New blog tagline')
 const result = await Blog.insert({
   name: "Return Test Blog",
   tagline: "Return test tagline"
-}).returning(["id", "name"]).exec();
+}).returning("id", "name").exec();
 ```
 
 </td>
@@ -1452,10 +1452,10 @@ WHERE T.name = 'First Blog'
 const result = await BlogBin.insert(
   Blog.update({ name: "update returning 2" })
     .where({ name: "update returning" })
-    .returning(["name", "tagline"])
+    .returning("name", "tagline")
     .returning_literal("'update from another blog'"),
   ["name", "tagline", "note"]
-).returning(["name", "tagline", "note"]).exec();
+).returning("name", "tagline", "note").exec();
 ```
 
 </td>
@@ -1482,10 +1482,10 @@ RETURNING name, tagline, note
 // Insert from DELETE RETURNING
 const result = await BlogBin.insert(
   Blog.delete({ name: "delete returning" })
-    .returning(["name", "tagline"])
+    .returning("name", "tagline")
     .returning_literal("'deleted from another blog'"),
   ["name", "tagline", "note"]
-).returning(["name", "tagline", "note"]).exec();
+).returning("name", "tagline", "note").exec();
 ```
 
 </td>
@@ -1833,8 +1833,8 @@ RETURNING *
 // UPSERT from subquery
 const result = await Blog.upsert(
   BlogBin.update({ tagline: "updated by upsert returning" })
-    .returning(["name", "tagline"])
-).returning(["id", "name", "tagline"]).exec();
+    .returning("name", "tagline")
+).returning("id", "name", "tagline").exec();
 ```
 
 </td>
@@ -1864,7 +1864,7 @@ const result = await Blog.upsert(
   BlogBin.where({
     name__notin: Blog.select("name").distinct()
   }).select("name", "tagline").distinct("name")
-).returning(["id", "name", "tagline"]).exec();
+).returning("id", "name", "tagline").exec();
 ```
 
 </td>
@@ -1958,7 +1958,7 @@ RETURNING *
 const result = await BlogBin.updates(
   Blog.where({ name: "Third Blog" })
     .update({ tagline: "XXX" })
-    .returning(["name", "tagline"]),
+    .returning("name", "tagline"),
   "name"
 ).exec();
 ```
@@ -2251,7 +2251,7 @@ FROM blog T
 ```js
 // Flatten with conditions
 const names = await Blog.where({ tagline__contains: "blog" })
-  .order_by(["name"])
+  .order_by("name")
   .flat("name");
 ```
 

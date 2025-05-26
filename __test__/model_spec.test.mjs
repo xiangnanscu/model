@@ -66,7 +66,7 @@ const Resume = Model({
 const Author = Model({
   table_name: "author",
   fields: {
-    name: { label: "姓名", maxlength: 200, unique: true },
+    name: { label: "Name", maxlength: 200, unique: true },
     email: { type: "email" },
     age: { type: "integer", max: 100, min: 10 },
     resume: { model: Resume },
@@ -339,24 +339,24 @@ afterAll(async () => {
 });
 
 describe("Model Tests", () => {
-  describe("Model:create_model mixins: unique被混合的模型被覆盖", () => {
+  describe("Model:create_model mixins: unique property overridden by mixed model", () => {
     it("should override unique property from mixed model", () => {
       expect(BlogBin.fields.name.unique).toBe(false);
     });
   });
 
   describe("Xodel:select(a:(fun(ctx:table):string|table)|DBValue, b?:DBValue, ...:DBValue)", () => {
-    it("select单个字段", async () => {
+    it("select single field", async () => {
       const result = await Blog.select("name").where({ id: 1 }).exec();
       expect(result).toEqual([{ name: "First Blog" }]);
     });
 
-    it("select多个字段", async () => {
+    it("select multiple fields", async () => {
       const result = await Blog.select("name", "tagline").where({ id: 1 }).exec();
       expect(result).toEqual([{ name: "First Blog", tagline: "Welcome to my blog" }]);
     });
 
-    it("select多个字段,使用table和vararg等效", () => {
+    it("select multiple fields, using table and vararg are equivalent", () => {
       const s1 = Blog.select(["name", "tagline"]).where({ id: 1 }).statement();
       const s2 = Blog.select("name", "tagline").where({ id: 1 }).statement();
       expect(s1).toBe(s2);
@@ -386,13 +386,13 @@ describe("Model Tests", () => {
       expect(result[0]).toHaveProperty("id", 2);
     });
 
-    it("select外键", async () => {
+    it("select foreign key", async () => {
       const result = await Book.select("name", "author__name").where({ id: 1 }).exec();
       expect(result[0]).toHaveProperty("name", "Book One");
       expect(result[0]).toHaveProperty("author__name");
     });
 
-    it("select as外键", async () => {
+    it("select as foreign key", async () => {
       const result = await Book.select_as({ name: "book_name", author__name: "author_name" })
         .where({ id: 1 })
         .exec();
@@ -400,12 +400,12 @@ describe("Model Tests", () => {
       expect(result[0]).toHaveProperty("author_name");
     });
 
-    it("select嵌套外键", async () => {
+    it("select nested foreign key", async () => {
       const result = await ViewLog.select("entry_id__blog_id__name").where({ id: 1 }).exec();
       expect(result[0]).toHaveProperty("entry_id__blog_id__name");
     });
 
-    it("select as嵌套外键", async () => {
+    it("select as nested foreign key", async () => {
       const result = await ViewLog.select_as({ entry_id__blog_id__name: "blog_name" })
         .where({ id: 1 })
         .exec();
@@ -424,7 +424,7 @@ describe("Model Tests", () => {
     it("select reversed foreign key with order_by", async () => {
       const result = await Blog.select("id", "name", "entry__headline")
         .where({ name: "First Blog" })
-        .order_by(["entry__headline"])
+        .order_by("entry__headline")
         .exec();
       expect(result.length).toBeGreaterThan(0);
       expect(result[0]).toHaveProperty("name", "First Blog");
@@ -433,7 +433,7 @@ describe("Model Tests", () => {
     it("select reversed foreign key with order_by DESC", async () => {
       const result = await Blog.select("id", "name", "entry__headline")
         .where({ name: "First Blog" })
-        .order_by(["-entry__headline"])
+        .order_by("-entry__headline")
         .exec();
       expect(result.length).toBeGreaterThan(0);
       expect(result[0]).toHaveProperty("name", "First Blog");
@@ -693,7 +693,7 @@ describe("Model Tests", () => {
 
     describe("group by book name with total price", () => {
       it("should generate correct SQL for group by with aggregation", () => {
-        const result = Book.group_by(["name"])
+        const result = Book.group_by("name")
           .annotate({ price_total: Sum("price") })
           .statement();
         expect(result).toContain("GROUP BY");
@@ -723,7 +723,7 @@ describe("Model Tests", () => {
 
     describe("group by book name with sum price", () => {
       it("should generate correct SQL for group by with sum", () => {
-        const result = Book.group_by(["name"])
+        const result = Book.group_by("name")
           .annotate([Sum("price")])
           .statement();
         expect(result).toContain("GROUP BY");
@@ -737,7 +737,7 @@ describe("Model Tests", () => {
 
     describe("group by book name with having condition", () => {
       it("should generate correct SQL for having clause", () => {
-        const result = Book.group_by(["name"])
+        const result = Book.group_by("name")
           .annotate([Sum("price")])
           .having({ price_sum__gt: 100 })
           .statement();
@@ -752,7 +752,7 @@ describe("Model Tests", () => {
 
     describe("group by book name with having condition with Q object", () => {
       it("should generate correct SQL for having with Q object", () => {
-        const result = Book.group_by(["name"])
+        const result = Book.group_by("name")
           .annotate([Sum("price")])
           .having(Q({ price_sum__lt: 100 }).or(Q({ price_sum__gt: 200 })))
           .statement();
@@ -764,7 +764,7 @@ describe("Model Tests", () => {
 
     describe("group by book name with having total price condition", () => {
       it("should generate correct SQL for having with alias", () => {
-        const result = Book.group_by(["name"])
+        const result = Book.group_by("name")
           .annotate({ price_total: Sum("price") })
           .having({ price_total__gt: 100 })
           .statement();
@@ -779,10 +779,10 @@ describe("Model Tests", () => {
 
     describe("group by book name with having total price condition and order by", () => {
       it("should generate correct SQL for having with order by", () => {
-        const result = Book.group_by(["name"])
+        const result = Book.group_by("name")
           .annotate({ price_total: Sum("price") })
           .having({ price_total__gt: 100 })
-          .order_by(["-price_total"])
+          .order_by("-price_total")
           .statement();
         expect(result).toContain("HAVING");
         expect(result).toContain("ORDER BY");
@@ -912,7 +912,7 @@ describe("Model Tests", () => {
   });
 
   describe("Xodel:insert(rows:table|table[]|Sql, columns?:string[])", () => {
-    it("插入单行数据", async () => {
+    it("insert single row", async () => {
       const result = await Blog.insert({
         name: "insert one row",
         tagline: "insert one row",
@@ -923,12 +923,12 @@ describe("Model Tests", () => {
       await Blog.delete({ name: "insert one row" }).exec();
     });
 
-    it("插入单行数据并返回特定字段", async () => {
+    it("insert single row and return specific fields", async () => {
       const result = await Blog.insert({
         name: "Return Test Blog",
         tagline: "Return test tagline",
       })
-        .returning(["id", "name"])
+        .returning("id", "name")
         .exec();
 
       expect(result[0]).toHaveProperty("id");
@@ -939,12 +939,12 @@ describe("Model Tests", () => {
       await Blog.delete({ id: result[0].id }).exec();
     });
 
-    it("returning使用vararg和table等效", () => {
+    it("returning using vararg and table are equivalent", () => {
       const s1 = Blog.insert({
         name: "Return Test Blog",
         tagline: "Return test tagline",
       })
-        .returning(["id", "name"])
+        .returning("id", "name")
         .statement();
       const s2 = Blog.insert({
         name: "Return Test Blog",
@@ -955,7 +955,7 @@ describe("Model Tests", () => {
       expect(s1).toBe(s2);
     });
 
-    it("批量插入多行数据", async () => {
+    it("bulk insert multiple rows", async () => {
       const result = await Blog.insert([
         { name: "bulk insert 1", tagline: "bulk insert 1" },
         { name: "bulk insert 2", tagline: "bulk insert 2" },
@@ -966,7 +966,7 @@ describe("Model Tests", () => {
       await Blog.delete({ name__startswith: "bulk insert" }).exec();
     });
 
-    it("批量插入并返回所有字段", async () => {
+    it("bulk insert and return all fields", async () => {
       const result = await Blog.insert([
         { name: "bulk insert return 1", tagline: "bulk insert return 1" },
         { name: "bulk insert return 2", tagline: "bulk insert return 2" },
@@ -982,19 +982,19 @@ describe("Model Tests", () => {
       await Blog.delete({ name__startswith: "bulk insert return" }).exec();
     });
 
-    it("从子查询select插入数据", async () => {
+    it("insert data from subquery select", async () => {
       const result = await BlogBin.insert(
         Blog.where({ name: "Second Blog" }).select("name", "tagline"),
       ).exec();
       expect(result.count).toEqual(1);
     });
 
-    it("检验上面插入的数据", async () => {
+    it("verify the inserted data above", async () => {
       const result = await BlogBin.where({ name: "Second Blog" }).select("tagline").get();
       expect(result).toHaveProperty("tagline", "Another interesting blog");
     });
 
-    it("从子查询select_literal插入数据", async () => {
+    it("insert data from subquery select_literal", async () => {
       const result = await BlogBin.insert(
         Blog.where({ name: "First Blog" })
           .select("name", "tagline")
@@ -1004,21 +1004,21 @@ describe("Model Tests", () => {
       expect(result.count).toEqual(1);
     });
 
-    it("检验上面插入的数据select_literal", async () => {
+    it("verify the inserted data above select_literal", async () => {
       const result = await BlogBin.where({ name: "First Blog" }).select("note").get();
       expect(result).toHaveProperty("note", "select from another blog");
     });
 
-    it("从子查询update+returning插入数据", async () => {
+    it("insert data from subquery update+returning", async () => {
       await Blog.insert({ name: "update returning" }).exec();
       const result = await BlogBin.insert(
         Blog.update({ name: "update returning 2" })
           .where({ name: "update returning" })
-          .returning(["name", "tagline"])
+          .returning("name", "tagline")
           .returning_literal("update from another blog"),
         ["name", "tagline", "note"],
       )
-        .returning(["name", "tagline", "note"])
+        .returning("name", "tagline", "note")
         .exec();
 
       const inserted = await BlogBin.where({ name: "update returning 2" })
@@ -1036,15 +1036,15 @@ describe("Model Tests", () => {
       await Blog.delete({ name: "update returning 2" }).exec();
     });
 
-    it("从子查询delete+returning插入数据", async () => {
+    it("insert data from subquery delete+returning", async () => {
       await Blog.insert({ name: "delete returning", tagline: "delete returning tagline" }).exec();
       const result = await BlogBin.insert(
         Blog.delete({ name: "delete returning" })
-          .returning(["name", "tagline"])
+          .returning("name", "tagline")
           .returning_literal("deleted from another blog"),
         ["name", "tagline", "note"],
       )
-        .returning(["name", "tagline", "note"])
+        .returning("name", "tagline", "note")
         .exec();
 
       expect(result).toEqual([
@@ -1060,12 +1060,12 @@ describe("Model Tests", () => {
       expect(deleted.count).toEqual(0); // already deleted
     });
 
-    it("从子查询delete+returning插入数据,未明确指定列", async () => {
+    it("insert data from subquery delete+returning, without explicitly specifying columns", async () => {
       await Blog.insert({ name: "delete returning", tagline: "no column" }).exec();
       const result = await BlogBin.insert(
-        Blog.delete({ name: "delete returning" }).returning(["name", "tagline"]),
+        Blog.delete({ name: "delete returning" }).returning("name", "tagline"),
       )
-        .returning(["name", "tagline", "note"])
+        .returning("name", "tagline", "note")
         .exec();
 
       expect(result).toEqual([{ name: "delete returning", tagline: "no column", note: "" }]);
@@ -1075,7 +1075,7 @@ describe("Model Tests", () => {
       expect(deleted.count).toEqual(0); // already deleted
     });
 
-    it("指定列名插入数据", async () => {
+    it("insert data with specified column names", async () => {
       const result = await BlogBin.insert(
         {
           name: "Column Test Blog",
@@ -1095,9 +1095,9 @@ describe("Model Tests", () => {
       await BlogBin.delete({ name: "Column Test Blog" }).exec();
     });
 
-    it("插入数据并使用默认值", async () => {
+    it("insert data and use default values", async () => {
       const result = await Blog.insert({ name: "Default Test Blog" })
-        .returning(["name", "tagline"])
+        .returning("name", "tagline")
         .exec();
       expect(result[0]).toHaveProperty("tagline", "default tagline");
       expect(result[0]).toHaveProperty("name", "Default Test Blog");
@@ -1107,14 +1107,14 @@ describe("Model Tests", () => {
     });
   });
 
-  describe("Xodel:insert抛出异常的情况", () => {
-    it("唯一性错误", async () => {
+  describe("Xodel:insert exception cases", () => {
+    it("uniqueness error", async () => {
       await expect(async () => {
         await Blog.insert({ name: "First Blog" }).exec();
       }).rejects.toThrow();
     });
 
-    it("传入名称过长", async () => {
+    it("name too long", async () => {
       await expect(async () => {
         await Blog.insert({
           name: "This name is way too long and exceeds the maximum length",
@@ -1123,7 +1123,7 @@ describe("Model Tests", () => {
       }).rejects.toThrow();
     });
 
-    it("插入多行时其中某行名称过长", async () => {
+    it("one of multiple rows has name too long", async () => {
       await expect(async () => {
         await Blog.insert([
           { name: "Valid Blog", tagline: "Valid tagline" },
@@ -1135,7 +1135,7 @@ describe("Model Tests", () => {
       }).rejects.toThrow();
     });
 
-    it("插入复合字段出错(Author的resume字段)", async () => {
+    it("insert composite field error (Author's resume field)", async () => {
       await expect(async () => {
         await Author.insert({
           resume: [{ company: "123456789012345678901234567890" }],
@@ -1143,13 +1143,13 @@ describe("Model Tests", () => {
       }).rejects.toThrow();
     });
 
-    it("插入多行复合字段出错(Author的resume字段)", async () => {
+    it("insert multiple rows composite field error (Author's resume field)", async () => {
       await expect(async () => {
         await Author.insert([{ resume: [{ company: "123456789012345678901234567890" }] }]).exec();
       }).rejects.toThrow();
     });
 
-    it("从子查询插入数据列数不一致而出错1", async () => {
+    it("insert from subquery with mismatched column count error 1", async () => {
       await expect(async () => {
         await BlogBin.insert(Blog.where({ name: "First Blog" }).select("name", "tagline"), [
           "name",
@@ -1157,7 +1157,7 @@ describe("Model Tests", () => {
       }).rejects.toThrow();
     });
 
-    it("从子查询插入数据列数不一致而出错2", async () => {
+    it("insert from subquery with mismatched column count error 2", async () => {
       await expect(async () => {
         await BlogBin.insert(Blog.where({ name: "First Blog" }).select("name", "tagline"), [
           "name",
@@ -1283,7 +1283,7 @@ describe("Model Tests", () => {
       await Blog.delete({ name: "Blog added by merge" }).exec();
     });
 
-    it("merge抛出异常的情况", async () => {
+    it("merge throw exception cases", async () => {
       await expect(async () => {
         await Author.merge([
           { name: "Tom", age: 11 },
@@ -1330,9 +1330,9 @@ describe("Model Tests", () => {
       ]).exec();
 
       const result = await Blog.upsert(
-        BlogBin.update({ tagline: "updated by upsert returning" }).returning(["name", "tagline"]),
+        BlogBin.update({ tagline: "updated by upsert returning" }).returning("name", "tagline"),
       )
-        .returning(["id", "name", "tagline"])
+        .returning("id", "name", "tagline")
         .exec();
 
       expect(result.length).toBe(2);
@@ -1357,7 +1357,7 @@ describe("Model Tests", () => {
           .select("name", "tagline")
           .distinct("name"),
       )
-        .returning(["id", "name", "tagline"])
+        .returning("id", "name", "tagline")
         .exec();
 
       expect(result.length).toBe(2);
@@ -1365,7 +1365,7 @@ describe("Model Tests", () => {
     });
   });
 
-  describe("upsert抛出异常的情况", () => {
+  describe("upsert exception cases", () => {
     it("single upsert", async () => {
       await expect(async () => {
         await Author.upsert([{ name: "Tom", age: 111 }]).exec();
@@ -1429,13 +1429,11 @@ describe("Model Tests", () => {
         Blog.insert({
           name: "Third Blog",
           tagline: "Third interesting blog",
-        }).returning(["name", "tagline"]),
+        }).returning("name", "tagline"),
       ).exec();
 
       const result = await BlogBin.updates(
-        Blog.where({ name: "Third Blog" })
-          .update({ tagline: "XXX" })
-          .returning(["name", "tagline"]),
+        Blog.where({ name: "Third Blog" }).update({ tagline: "XXX" }).returning("name", "tagline"),
         "name",
       ).exec();
       expect(result.count).toEqual(1);
@@ -1450,7 +1448,7 @@ describe("Model Tests", () => {
     });
   });
 
-  describe("updates抛出异常的情况", () => {
+  describe("updates exception cases", () => {
     it("updates without primary key", async () => {
       await expect(async () => {
         await Blog.updates([{ tagline: "Missing ID" }]).exec();
@@ -1525,8 +1523,8 @@ describe("Model Tests", () => {
     });
   });
 
-  describe("User 模型测试", () => {
-    it("表名是escape了的", async () => {
+  describe("User model tests", () => {
+    it("table name is escaped", async () => {
       const user = await User.create({ username: "testuser", password: "password" });
       expect(user.username).toBe("testuser");
       expect(user.password).toBe("password");

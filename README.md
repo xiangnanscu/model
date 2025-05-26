@@ -116,45 +116,94 @@ const Avg = Model.Avg;
 const Max = Model.Max;
 const Min = Model.Min;
 const Count = Model.Count;
+```
 
+<table>
+<tr>
+<th>JavaScript</th>
+<th>SQL</th>
+</tr>
+<tr>
+<td>
+
+```js
 // Query all records
 const blogs = await Blog.exec();
 ```
 
+</td>
+<td>
+
 ```sql
 SELECT * FROM blog T
 ```
+
+</td>
+</tr>
+<tr>
+<td>
 
 ```js
 // Conditional query
 const blog = await Blog.where({ id: 1 }).get();
 ```
 
+</td>
+<td>
+
 ```sql
 SELECT * FROM blog T
 WHERE T.id = 1
 ```
 
+</td>
+</tr>
+<tr>
+<td>
+
 ```js
 const blogs = await Blog.where({ name: "First Blog" }).exec();
 ```
+
+</td>
+<td>
 
 ```sql
 SELECT * FROM blog T
 WHERE T.name = 'First Blog'
 ```
+
+</td>
+</tr>
+<tr>
+<td>
 
 ```js
 // String condition query
 const result = await Blog.where("name", "First Blog").exec();
 ```
 
+</td>
+<td>
+
 ```sql
 SELECT * FROM blog T
 WHERE T.name = 'First Blog'
 ```
 
+</td>
+</tr>
+</table>
+
 ### Field Selection
+
+<table>
+<tr>
+<th>JavaScript</th>
+<th>SQL</th>
+</tr>
+<tr>
+<td>
 
 ```js
 // Select single field
@@ -162,11 +211,19 @@ const result = await Blog.select("name").where({ id: 1 }).exec();
 // Result: [{ name: "First Blog" }]
 ```
 
+</td>
+<td>
+
 ```sql
 SELECT T.name
 FROM blog T
 WHERE T.id = 1
 ```
+
+</td>
+</tr>
+<tr>
+<td>
 
 ```js
 // Select multiple fields
@@ -175,11 +232,19 @@ const result = await Blog.select("name", "tagline").where({ id: 1 }).exec();
 const result = await Blog.select(["name", "tagline"]).where({ id: 1 }).exec();
 ```
 
+</td>
+<td>
+
 ```sql
 SELECT T.name, T.tagline
 FROM blog T
 WHERE T.id = 1
 ```
+
+</td>
+</tr>
+<tr>
+<td>
 
 ```js
 // Field aliases
@@ -189,11 +254,19 @@ const result = await Blog.select_as({
 }).where({ id: 1 }).exec();
 ```
 
+</td>
+<td>
+
 ```sql
 SELECT T.name AS blog_name, T.tagline AS blog_tagline
 FROM blog T
 WHERE T.id = 1
 ```
+
+</td>
+</tr>
+<tr>
+<td>
 
 ```js
 // Literal selection
@@ -203,11 +276,19 @@ const result = await Blog.select_literal("'Hello World'")
   .exec();
 ```
 
+</td>
+<td>
+
 ```sql
 SELECT 'Hello World' AS "?column?", T.name
 FROM blog T
 WHERE T.id = 1
 ```
+
+</td>
+</tr>
+<tr>
+<td>
 
 ```js
 // Literal aliases
@@ -216,18 +297,36 @@ const result = await Blog.select_literal_as({
 }).select(["id"]).where({ id: 1 }).exec();
 ```
 
+</td>
+<td>
+
 ```sql
 SELECT 'Hello World' AS greeting, T.id
 FROM blog T
 WHERE T.id = 1
 ```
 
+</td>
+</tr>
+</table>
+
 ### Foreign Key Queries
+
+<table>
+<tr>
+<th>JavaScript</th>
+<th>SQL</th>
+</tr>
+<tr>
+<td>
 
 ```js
 // Query foreign key fields
 const result = await Book.select("name", "author__name").where({ id: 1 }).exec();
 ```
+
+</td>
+<td>
 
 ```sql
 SELECT T.name, T1.name AS author__name
@@ -236,10 +335,18 @@ INNER JOIN author T1 ON (T.author = T1.id)
 WHERE T.id = 1
 ```
 
+</td>
+</tr>
+<tr>
+<td>
+
 ```js
 // Nested foreign key query
 const result = await ViewLog.select("entry_id__blog_id__name").where({ id: 1 }).exec();
 ```
+
+</td>
+<td>
 
 ```sql
 SELECT T2.name AS entry_id__blog_id__name
@@ -249,12 +356,20 @@ INNER JOIN blog T2 ON (T1.blog_id = T2.id)
 WHERE T.id = 1
 ```
 
+</td>
+</tr>
+<tr>
+<td>
+
 ```js
 // Reverse foreign key query
 const result = await Blog.select("id", "name", "entry__rating")
   .where({ name: "Second Blog" })
   .exec();
 ```
+
+</td>
+<td>
 
 ```sql
 SELECT T.id, T.name, T1.rating AS entry__rating
@@ -263,122 +378,237 @@ INNER JOIN entry T1 ON (T.id = T1.blog_id)
 WHERE T.name = 'Second Blog'
 ```
 
+</td>
+</tr>
+</table>
+
 ### Conditional Queries
+
+<table>
+<tr>
+<th>JavaScript</th>
+<th>SQL</th>
+</tr>
+<tr>
+<td>
 
 ```js
 // Basic conditions
 const result = await Book.where({ price: 100 }).exec();
 ```
 
+</td>
+<td>
+
 ```sql
 SELECT * FROM book T
 WHERE T.price = 100
 ```
+
+</td>
+</tr>
+<tr>
+<td>
 
 ```js
 // Comparison operators
 const result = await Book.where({ price__gt: 100 }).exec(); // greater than
 ```
 
+</td>
+<td>
+
 ```sql
 SELECT * FROM book T
 WHERE T.price > 100
 ```
 
+</td>
+</tr>
+<tr>
+<td>
+
 ```js
 const result = await Book.where({ price__lt: 100 }).exec(); // less than
 ```
+
+</td>
+<td>
 
 ```sql
 SELECT * FROM book T
 WHERE T.price < 100
 ```
 
+</td>
+</tr>
+<tr>
+<td>
+
 ```js
 const result = await Book.where({ price__gte: 100 }).exec(); // greater than or equal
 ```
+
+</td>
+<td>
 
 ```sql
 SELECT * FROM book T
 WHERE T.price >= 100
 ```
 
+</td>
+</tr>
+<tr>
+<td>
+
 ```js
 const result = await Book.where({ price__lte: 100 }).exec(); // less than or equal
 ```
+
+</td>
+<td>
 
 ```sql
 SELECT * FROM book T
 WHERE T.price <= 100
 ```
 
+</td>
+</tr>
+<tr>
+<td>
+
 ```js
 // String operations
 const result = await Blog.where({ name__contains: "blog" }).exec(); // contains
 ```
+
+</td>
+<td>
 
 ```sql
 SELECT * FROM blog T
 WHERE T.name LIKE '%blog%'
 ```
 
+</td>
+</tr>
+<tr>
+<td>
+
 ```js
 const result = await Blog.where({ name__startswith: "First" }).exec(); // starts with
 ```
+
+</td>
+<td>
 
 ```sql
 SELECT * FROM blog T
 WHERE T.name LIKE 'First%'
 ```
 
+</td>
+</tr>
+<tr>
+<td>
+
 ```js
 const result = await Blog.where({ name__endswith: "Blog" }).exec(); // ends with
 ```
+
+</td>
+<td>
 
 ```sql
 SELECT * FROM blog T
 WHERE T.name LIKE '%Blog'
 ```
 
+</td>
+</tr>
+<tr>
+<td>
+
 ```js
 // List operations
 const result = await Blog.where({ id__in: [1, 2, 3] }).exec(); // in list
 ```
+
+</td>
+<td>
 
 ```sql
 SELECT * FROM blog T
 WHERE T.id IN (1, 2, 3)
 ```
 
+</td>
+</tr>
+<tr>
+<td>
+
 ```js
 const result = await Blog.where({ id__notin: [1, 2, 3] }).exec(); // not in list
 ```
+
+</td>
+<td>
 
 ```sql
 SELECT * FROM blog T
 WHERE T.id NOT IN (1, 2, 3)
 ```
 
+</td>
+</tr>
+<tr>
+<td>
+
 ```js
 // Null checks
 const result = await Blog.where({ tagline__isnull: true }).exec(); // is null
 ```
+
+</td>
+<td>
 
 ```sql
 SELECT * FROM blog T
 WHERE T.tagline IS NULL
 ```
 
+</td>
+</tr>
+<tr>
+<td>
+
 ```js
 const result = await Blog.where({ tagline__notnull: true }).exec(); // is not null
 ```
+
+</td>
+<td>
 
 ```sql
 SELECT * FROM blog T
 WHERE T.tagline IS NOT NULL
 ```
 
+</td>
+</tr>
+</table>
+
 ### Complex Conditional Queries
+
+<table>
+<tr>
+<th>JavaScript</th>
+<th>SQL</th>
+</tr>
+<tr>
+<td>
 
 ```js
 // Using Q objects for complex queries
@@ -387,20 +617,36 @@ const result = await Book.where(
 ).exec();
 ```
 
+</td>
+<td>
+
 ```sql
 SELECT * FROM book T
 WHERE (T.price > 100) OR (T.price < 200)
 ```
+
+</td>
+</tr>
+<tr>
+<td>
 
 ```js
 // Negation conditions
 const result = await Book.where(Q({ price__gt: 100 }).not()).exec();
 ```
 
+</td>
+<td>
+
 ```sql
 SELECT * FROM book T
 WHERE NOT (T.price > 100)
 ```
+
+</td>
+</tr>
+<tr>
+<td>
 
 ```js
 // Combined conditions
@@ -409,12 +655,27 @@ const result = await Book.where(
 ).exec();
 ```
 
+</td>
+<td>
+
 ```sql
 SELECT * FROM book T
 WHERE (T.id = 1) AND ((T.price > 100) OR (T.price < 200))
 ```
 
+</td>
+</tr>
+</table>
+
 ### Foreign Key Conditional Queries
+
+<table>
+<tr>
+<th>JavaScript</th>
+<th>SQL</th>
+</tr>
+<tr>
+<td>
 
 ```js
 // Foreign key equality query
@@ -422,15 +683,26 @@ const result = await Entry.where({ blog_id: 1 }).exec();
 const result = await Entry.where({ blog_id__id: 1 }).exec(); // equivalent
 ```
 
+</td>
+<td>
+
 ```sql
 SELECT * FROM entry T
 WHERE T.blog_id = 1
 ```
 
+</td>
+</tr>
+<tr>
+<td>
+
 ```js
 // Foreign key field query
 const result = await Entry.where({ blog_id__name: "my blog name" }).exec();
 ```
+
+</td>
+<td>
 
 ```sql
 SELECT * FROM entry T
@@ -438,10 +710,18 @@ INNER JOIN blog T1 ON (T.blog_id = T1.id)
 WHERE T1.name = 'my blog name'
 ```
 
+</td>
+</tr>
+<tr>
+<td>
+
 ```js
 // Nested foreign key query
 const result = await ViewLog.where({ entry_id__blog_id__name: "my blog name" }).exec();
 ```
+
+</td>
+<td>
 
 ```sql
 SELECT * FROM view_log T
@@ -450,10 +730,18 @@ INNER JOIN blog T2 ON (T1.blog_id = T2.id)
 WHERE T2.name = 'my blog name'
 ```
 
+</td>
+</tr>
+<tr>
+<td>
+
 ```js
 // Reverse foreign key query
 const result = await Blog.where({ entry__rating: 1 }).exec();
 ```
+
+</td>
+<td>
 
 ```sql
 SELECT * FROM blog T
@@ -461,47 +749,91 @@ INNER JOIN entry T1 ON (T.id = T1.blog_id)
 WHERE T1.rating = 1
 ```
 
+</td>
+</tr>
+</table>
+
 ### JSON Field Queries
+
+<table>
+<tr>
+<th>JavaScript</th>
+<th>SQL</th>
+</tr>
+<tr>
+<td>
 
 ```js
 // JSON key existence check
 const result = await Author.where({ resume__has_key: "start_date" }).exec();
 ```
 
+</td>
+<td>
+
 ```sql
 SELECT * FROM author T
 WHERE (T.resume) ? 'start_date'
 ```
+
+</td>
+</tr>
+<tr>
+<td>
 
 ```js
 // JSON multiple keys existence check
 const result = await Author.where({ resume__0__has_keys: ["a", "b"] }).exec();
 ```
 
+</td>
+<td>
+
 ```sql
 SELECT * FROM author T
 WHERE (T.resume #> ARRAY['0']) ?& ARRAY['a', 'b']
 ```
+
+</td>
+</tr>
+<tr>
+<td>
 
 ```js
 // JSON any keys existence check
 const result = await Author.where({ resume__has_any_keys: ["a", "b"] }).exec();
 ```
 
+</td>
+<td>
+
 ```sql
 SELECT * FROM author T
 WHERE (T.resume) ?| ARRAY['a', 'b']
 ```
+
+</td>
+</tr>
+<tr>
+<td>
 
 ```js
 // JSON path access
 const result = await Author.where({ resume__start_date__time: "12:00:00" }).exec();
 ```
 
+</td>
+<td>
+
 ```sql
 SELECT * FROM author T
 WHERE (T.resume #> ARRAY['start_date', 'time']) = '"12:00:00"'
 ```
+
+</td>
+</tr>
+<tr>
+<td>
 
 ```js
 // JSON contains check
@@ -510,10 +842,18 @@ const result = await Author.where({
 }).exec();
 ```
 
+</td>
+<td>
+
 ```sql
 SELECT * FROM author T
 WHERE (T.resume) @> '{"start_date":"2025-01-01"}'
 ```
+
+</td>
+</tr>
+<tr>
+<td>
 
 ```js
 // JSON contained by check
@@ -522,79 +862,152 @@ const result = await Author.where({
 }).exec();
 ```
 
+</td>
+<td>
+
 ```sql
 SELECT * FROM author T
 WHERE (T.resume) <@ '{"start_date":"2025-01-01"}'
 ```
 
+</td>
+</tr>
+</table>
+
 ### Date Queries
+
+<table>
+<tr>
+<th>JavaScript</th>
+<th>SQL</th>
+</tr>
+<tr>
+<td>
 
 ```js
 // Year query
 const result = await ViewLog.where({ ctime__year: 2025 }).exec();
 ```
 
+</td>
+<td>
+
 ```sql
 SELECT * FROM view_log T
 WHERE T.ctime BETWEEN '2025-01-01' AND '2025-12-31'
 ```
+
+</td>
+</tr>
+<tr>
+<td>
 
 ```js
 // Month query
 const result = await ViewLog.where({ ctime__month: 1 }).exec();
 ```
 
+</td>
+<td>
+
 ```sql
 SELECT * FROM view_log T
 WHERE EXTRACT(MONTH FROM T.ctime) = 1
 ```
+
+</td>
+</tr>
+<tr>
+<td>
 
 ```js
 // Day query
 const result = await ViewLog.where({ ctime__day: 15 }).exec();
 ```
 
+</td>
+<td>
+
 ```sql
 SELECT * FROM view_log T
 WHERE EXTRACT(DAY FROM T.ctime) = 15
 ```
 
+</td>
+</tr>
+</table>
+
 ### Ordering
+
+<table>
+<tr>
+<th>JavaScript</th>
+<th>SQL</th>
+</tr>
+<tr>
+<td>
 
 ```js
 // Single field ordering
 const result = await Blog.order_by(["name"]).exec();
 ```
 
+</td>
+<td>
+
 ```sql
 SELECT * FROM blog T
 ORDER BY T.name
 ```
+
+</td>
+</tr>
+<tr>
+<td>
 
 ```js
 // Descending order
 const result = await Blog.order_by(["-name"]).exec();
 ```
 
+</td>
+<td>
+
 ```sql
 SELECT * FROM blog T
 ORDER BY T.name DESC
 ```
+
+</td>
+</tr>
+<tr>
+<td>
 
 ```js
 // Multiple field ordering
 const result = await Blog.order_by(["name", "-id"]).exec();
 ```
 
+</td>
+<td>
+
 ```sql
 SELECT * FROM blog T
 ORDER BY T.name, T.id DESC
 ```
 
+</td>
+</tr>
+<tr>
+<td>
+
 ```js
 // Foreign key field ordering
 const result = await Entry.order_by(["blog_id__name"]).exec();
 ```
+
+</td>
+<td>
 
 ```sql
 SELECT * FROM entry T
@@ -602,7 +1015,19 @@ INNER JOIN blog T1 ON (T.blog_id = T1.id)
 ORDER BY T1.name
 ```
 
+</td>
+</tr>
+</table>
+
 ### Aggregation Queries
+
+<table>
+<tr>
+<th>JavaScript</th>
+<th>SQL</th>
+</tr>
+<tr>
+<td>
 
 ```js
 // Group by query
@@ -611,30 +1036,54 @@ const result = await Book.group_by(["name"])
   .exec();
 ```
 
+</td>
+<td>
+
 ```sql
 SELECT T.name, SUM(T.price) AS price_total
 FROM book T
 GROUP BY T.name
 ```
 
+</td>
+</tr>
+<tr>
+<td>
+
 ```js
 // Aggregation functions
 const result = await Book.annotate({ price_total: Sum("price") }).exec();
 ```
+
+</td>
+<td>
 
 ```sql
 SELECT SUM(T.price) AS price_total
 FROM book T
 ```
 
+</td>
+</tr>
+<tr>
+<td>
+
 ```js
 const result = await Book.annotate([Sum("price")]).exec(); // auto alias as price_sum
 ```
+
+</td>
+<td>
 
 ```sql
 SELECT SUM(T.price) AS price_sum
 FROM book T
 ```
+
+</td>
+</tr>
+<tr>
+<td>
 
 ```js
 // Multiple aggregations
@@ -647,6 +1096,9 @@ const result = await Book.annotate({
 }).exec();
 ```
 
+</td>
+<td>
+
 ```sql
 SELECT
   SUM(T.price) AS price_sum,
@@ -657,6 +1109,11 @@ SELECT
 FROM book T
 ```
 
+</td>
+</tr>
+<tr>
+<td>
+
 ```js
 // HAVING clause
 const result = await Book.group_by(["name"])
@@ -665,12 +1122,20 @@ const result = await Book.group_by(["name"])
   .exec();
 ```
 
+</td>
+<td>
+
 ```sql
 SELECT T.name, SUM(T.price) AS price_sum
 FROM book T
 GROUP BY T.name
 HAVING SUM(T.price) > 100
 ```
+
+</td>
+</tr>
+<tr>
+<td>
 
 ```js
 // Complex HAVING conditions
@@ -680,6 +1145,9 @@ const result = await Book.group_by(["name"])
   .exec();
 ```
 
+</td>
+<td>
+
 ```sql
 SELECT T.name, SUM(T.price) AS price_sum
 FROM book T
@@ -687,7 +1155,19 @@ GROUP BY T.name
 HAVING (SUM(T.price) < 100) OR (SUM(T.price) > 200)
 ```
 
+</td>
+</tr>
+</table>
+
 ### Field Expressions
+
+<table>
+<tr>
+<th>JavaScript</th>
+<th>SQL</th>
+</tr>
+<tr>
+<td>
 
 ```js
 // Field operations
@@ -696,10 +1176,18 @@ const result = await Book.annotate({
 }).exec();
 ```
 
+</td>
+<td>
+
 ```sql
 SELECT (T.price * 2) AS double_price
 FROM book T
 ```
+
+</td>
+</tr>
+<tr>
+<td>
 
 ```js
 // Field-to-field operations
@@ -708,10 +1196,18 @@ const result = await Book.annotate({
 }).exec();
 ```
 
+</td>
+<td>
+
 ```sql
 SELECT (T.price / T.pages) AS price_per_page
 FROM book T
 ```
+
+</td>
+</tr>
+<tr>
+<td>
 
 ```js
 // String concatenation
@@ -720,13 +1216,28 @@ const result = await Entry.update({
 }).where({ id: 1 }).exec();
 ```
 
+</td>
+<td>
+
 ```sql
 UPDATE entry T
 SET headline = (T.headline || ' suffix by function')
 WHERE T.id = 1
 ```
 
+</td>
+</tr>
+</table>
+
 ### Related Query Counting
+
+<table>
+<tr>
+<th>JavaScript</th>
+<th>SQL</th>
+</tr>
+<tr>
+<td>
 
 ```js
 // Left join counting
@@ -735,15 +1246,30 @@ const result = await Blog.annotate({
 }).exec();
 ```
 
+</td>
+<td>
+
 ```sql
 SELECT COUNT(T1.id) AS entry_count
 FROM blog T
 LEFT JOIN entry T1 ON (T.id = T1.blog_id)
 ```
 
+</td>
+</tr>
+</table>
+
 ## Insert Operations
 
 ### Basic Insert
+
+<table>
+<tr>
+<th>JavaScript</th>
+<th>SQL</th>
+</tr>
+<tr>
+<td>
 
 ```js
 // Insert single record
@@ -753,10 +1279,18 @@ const result = await Blog.insert({
 }).exec();
 ```
 
+</td>
+<td>
+
 ```sql
 INSERT INTO blog (name, tagline)
 VALUES ('New Blog', 'New blog tagline')
 ```
+
+</td>
+</tr>
+<tr>
+<td>
 
 ```js
 // Insert and return specified fields
@@ -766,11 +1300,19 @@ const result = await Blog.insert({
 }).returning(["id", "name"]).exec();
 ```
 
+</td>
+<td>
+
 ```sql
 INSERT INTO blog (name, tagline)
 VALUES ('Return Test Blog', 'Return test tagline')
 RETURNING id, name
 ```
+
+</td>
+</tr>
+<tr>
+<td>
 
 ```js
 // Return all fields
@@ -779,13 +1321,28 @@ const result = await Blog.insert({
 }).returning("*").exec();
 ```
 
+</td>
+<td>
+
 ```sql
 INSERT INTO blog (name)
 VALUES ('All Fields Blog')
 RETURNING *
 ```
 
+</td>
+</tr>
+</table>
+
 ### Bulk Insert
+
+<table>
+<tr>
+<th>JavaScript</th>
+<th>SQL</th>
+</tr>
+<tr>
+<td>
 
 ```js
 // Bulk insert
@@ -795,12 +1352,20 @@ const result = await Blog.insert([
 ]).exec();
 ```
 
+</td>
+<td>
+
 ```sql
 INSERT INTO blog (name, tagline)
 VALUES
   ('bulk insert 1', 'bulk insert 1'),
   ('bulk insert 2', 'bulk insert 2')
 ```
+
+</td>
+</tr>
+<tr>
+<td>
 
 ```js
 // Bulk insert with return
@@ -810,6 +1375,9 @@ const result = await Blog.insert([
 ]).returning("*").exec();
 ```
 
+</td>
+<td>
+
 ```sql
 INSERT INTO blog (name, tagline)
 VALUES
@@ -818,7 +1386,19 @@ VALUES
 RETURNING *
 ```
 
+</td>
+</tr>
+</table>
+
 ### Insert from Subquery
+
+<table>
+<tr>
+<th>JavaScript</th>
+<th>SQL</th>
+</tr>
+<tr>
+<td>
 
 ```js
 // Insert from SELECT subquery
@@ -827,12 +1407,20 @@ const result = await BlogBin.insert(
 ).exec();
 ```
 
+</td>
+<td>
+
 ```sql
 INSERT INTO blog_bin (name, tagline)
 SELECT T.name, T.tagline
 FROM blog T
 WHERE T.name = 'Second Blog'
 ```
+
+</td>
+</tr>
+<tr>
+<td>
 
 ```js
 // Insert with specified column names
@@ -844,12 +1432,20 @@ const result = await BlogBin.insert(
 ).exec();
 ```
 
+</td>
+<td>
+
 ```sql
 INSERT INTO blog_bin (name, tagline, note)
 SELECT T.name, T.tagline, 'select from another blog'
 FROM blog T
 WHERE T.name = 'First Blog'
 ```
+
+</td>
+</tr>
+<tr>
+<td>
 
 ```js
 // Insert from UPDATE RETURNING
@@ -861,6 +1457,9 @@ const result = await BlogBin.insert(
   ["name", "tagline", "note"]
 ).returning(["name", "tagline", "note"]).exec();
 ```
+
+</td>
+<td>
 
 ```sql
 INSERT INTO blog_bin (name, tagline, note)
@@ -874,6 +1473,11 @@ SELECT * FROM updated
 RETURNING name, tagline, note
 ```
 
+</td>
+</tr>
+<tr>
+<td>
+
 ```js
 // Insert from DELETE RETURNING
 const result = await BlogBin.insert(
@@ -883,6 +1487,9 @@ const result = await BlogBin.insert(
   ["name", "tagline", "note"]
 ).returning(["name", "tagline", "note"]).exec();
 ```
+
+</td>
+<td>
 
 ```sql
 INSERT INTO blog_bin (name, tagline, note)
@@ -895,7 +1502,19 @@ SELECT * FROM deleted
 RETURNING name, tagline, note
 ```
 
+</td>
+</tr>
+</table>
+
 ### Column-Specific Insert
+
+<table>
+<tr>
+<th>JavaScript</th>
+<th>SQL</th>
+</tr>
+<tr>
+<td>
 
 ```js
 // Insert only specified columns
@@ -909,15 +1528,30 @@ const result = await BlogBin.insert(
 ).returning("name", "tagline", "note").exec();
 ```
 
+</td>
+<td>
+
 ```sql
 INSERT INTO blog_bin (name, tagline)
 VALUES ('Column Test Blog', 'Column test tagline')
 RETURNING name, tagline, note
 ```
 
+</td>
+</tr>
+</table>
+
 ## Update Operations
 
 ### Basic Update
+
+<table>
+<tr>
+<th>JavaScript</th>
+<th>SQL</th>
+</tr>
+<tr>
+<td>
 
 ```js
 // Basic update
@@ -927,12 +1561,20 @@ const result = await Blog.where({ name: "First Blog" })
   .exec();
 ```
 
+</td>
+<td>
+
 ```sql
 UPDATE blog T
 SET tagline = 'changed tagline'
 WHERE T.name = 'First Blog'
 RETURNING *
 ```
+
+</td>
+</tr>
+<tr>
+<td>
 
 ```js
 // Update using field expressions
@@ -942,6 +1584,9 @@ const result = await Entry.update({ headline: F("blog_id__name") })
   .exec();
 ```
 
+</td>
+<td>
+
 ```sql
 UPDATE entry T
 SET headline = T1.name
@@ -950,12 +1595,20 @@ WHERE T.blog_id = T1.id AND T.id = 1
 RETURNING T.headline
 ```
 
+</td>
+</tr>
+<tr>
+<td>
+
 ```js
 // Field arithmetic update
 const result = await Entry.update({
   headline: F("headline") + " suffix by function"
 }).where({ id: 1 }).returning("headline").exec();
 ```
+
+</td>
+<td>
 
 ```sql
 UPDATE entry T
@@ -964,7 +1617,19 @@ WHERE T.id = 1
 RETURNING T.headline
 ```
 
+</td>
+</tr>
+</table>
+
 ### Field Increment
+
+<table>
+<tr>
+<th>JavaScript</th>
+<th>SQL</th>
+</tr>
+<tr>
+<td>
 
 ```js
 // Single field increment
@@ -974,12 +1639,20 @@ const result = await Entry.increase({ rating: 1 })
   .exec();
 ```
 
+</td>
+<td>
+
 ```sql
 UPDATE entry T
 SET rating = (T.rating + 1)
 WHERE T.id = 1
 RETURNING T.rating
 ```
+
+</td>
+</tr>
+<tr>
+<td>
 
 ```js
 // Multiple field increment
@@ -988,6 +1661,9 @@ const result = await Entry.increase({
   number_of_pingbacks: 2
 }).where({ id: 1 }).returning("*").exec();
 ```
+
+</td>
+<td>
 
 ```sql
 UPDATE entry T
@@ -998,6 +1674,11 @@ WHERE T.id = 1
 RETURNING *
 ```
 
+</td>
+</tr>
+<tr>
+<td>
+
 ```js
 // String parameter increment
 const result = await Entry.increase("rating", 2)
@@ -1006,6 +1687,9 @@ const result = await Entry.increase("rating", 2)
   .exec();
 ```
 
+</td>
+<td>
+
 ```sql
 UPDATE entry T
 SET rating = (T.rating + 2)
@@ -1013,7 +1697,19 @@ WHERE T.id = 1
 RETURNING T.rating
 ```
 
+</td>
+</tr>
+</table>
+
 ### Update with Joins
+
+<table>
+<tr>
+<th>JavaScript</th>
+<th>SQL</th>
+</tr>
+<tr>
+<td>
 
 ```js
 // Update with foreign key conditions
@@ -1024,6 +1720,9 @@ const result = await Entry.update({
 }).returning("id", "headline").exec();
 ```
 
+</td>
+<td>
+
 ```sql
 UPDATE entry T
 SET headline = (T.headline || ' from first blog')
@@ -1032,9 +1731,21 @@ WHERE T.blog_id = T1.id AND T1.name = 'First Blog'
 RETURNING T.id, T.headline
 ```
 
+</td>
+</tr>
+</table>
+
 ## Advanced Operations
 
 ### MERGE Operations
+
+<table>
+<tr>
+<th>JavaScript</th>
+<th>SQL</th>
+</tr>
+<tr>
+<td>
 
 ```js
 // Basic merge (update if exists, insert if not)
@@ -1043,6 +1754,9 @@ const result = await Blog.merge([
   { name: "Blog added by merge", tagline: "inserted by merge" }
 ]).exec();
 ```
+
+</td>
+<td>
 
 ```sql
 INSERT INTO blog (name, tagline)
@@ -1053,6 +1767,11 @@ ON CONFLICT (name)
 DO UPDATE SET tagline = EXCLUDED.tagline
 ```
 
+</td>
+</tr>
+<tr>
+<td>
+
 ```js
 // Insert only non-existing records
 const result = await Blog.merge([
@@ -1061,13 +1780,28 @@ const result = await Blog.merge([
 ]).exec();
 ```
 
+</td>
+<td>
+
 ```sql
 INSERT INTO blog (name)
 VALUES ('First Blog'), ('Blog added by merge')
 ON CONFLICT (name) DO NOTHING
 ```
 
+</td>
+</tr>
+</table>
+
 ### UPSERT Operations
+
+<table>
+<tr>
+<th>JavaScript</th>
+<th>SQL</th>
+</tr>
+<tr>
+<td>
 
 ```js
 // UPSERT (update if exists, insert if not, return both)
@@ -1076,6 +1810,9 @@ const result = await Blog.upsert([
   { name: "Blog added by upsert", tagline: "inserted by upsert" }
 ]).exec();
 ```
+
+</td>
+<td>
 
 ```sql
 INSERT INTO blog (name, tagline)
@@ -1087,6 +1824,11 @@ DO UPDATE SET tagline = EXCLUDED.tagline
 RETURNING *
 ```
 
+</td>
+</tr>
+<tr>
+<td>
+
 ```js
 // UPSERT from subquery
 const result = await Blog.upsert(
@@ -1094,6 +1836,9 @@ const result = await Blog.upsert(
     .returning(["name", "tagline"])
 ).returning(["id", "name", "tagline"]).exec();
 ```
+
+</td>
+<td>
 
 ```sql
 WITH source AS (
@@ -1108,6 +1853,11 @@ DO UPDATE SET tagline = EXCLUDED.tagline
 RETURNING id, name, tagline
 ```
 
+</td>
+</tr>
+<tr>
+<td>
+
 ```js
 // UPSERT from SELECT subquery
 const result = await Blog.upsert(
@@ -1116,6 +1866,9 @@ const result = await Blog.upsert(
   }).select(["name", "tagline"]).distinct("name")
 ).returning(["id", "name", "tagline"]).exec();
 ```
+
+</td>
+<td>
 
 ```sql
 INSERT INTO blog (name, tagline)
@@ -1129,7 +1882,19 @@ DO UPDATE SET tagline = EXCLUDED.tagline
 RETURNING id, name, tagline
 ```
 
+</td>
+</tr>
+</table>
+
 ### UPDATES Operations
+
+<table>
+<tr>
+<th>JavaScript</th>
+<th>SQL</th>
+</tr>
+<tr>
+<td>
 
 ```js
 // Bulk update (only update existing records)
@@ -1138,6 +1903,9 @@ const result = await Blog.updates([
   { name: "Fourth Blog", tagline: "wont update" } // doesn't exist, no update
 ]).exec();
 ```
+
+</td>
+<td>
 
 ```sql
 WITH V(name, tagline) AS (
@@ -1151,6 +1919,11 @@ FROM V
 WHERE V.name = T.name
 ```
 
+</td>
+</tr>
+<tr>
+<td>
+
 ```js
 // Bulk update from SELECT subquery
 const result = await BlogBin.updates(
@@ -1158,6 +1931,9 @@ const result = await BlogBin.updates(
   "name" // match field
 ).returning("*").exec();
 ```
+
+</td>
+<td>
 
 ```sql
 WITH V(name, tagline) AS (
@@ -1172,6 +1948,11 @@ WHERE V.name = T.name
 RETURNING *
 ```
 
+</td>
+</tr>
+<tr>
+<td>
+
 ```js
 // Bulk update from UPDATE subquery
 const result = await BlogBin.updates(
@@ -1181,6 +1962,9 @@ const result = await BlogBin.updates(
   "name"
 ).exec();
 ```
+
+</td>
+<td>
 
 ```sql
 WITH V(name, tagline) AS (
@@ -1195,7 +1979,19 @@ FROM V
 WHERE V.name = T.name
 ```
 
+</td>
+</tr>
+</table>
+
 ### MERGE_GETS Operations
+
+<table>
+<tr>
+<th>JavaScript</th>
+<th>SQL</th>
+</tr>
+<tr>
+<td>
 
 ```js
 // Merge then query
@@ -1207,6 +2003,9 @@ const result = await Blog.select("name")
   .exec();
 ```
 
+</td>
+<td>
+
 ```sql
 WITH V(id, name) AS (
   VALUES (1, 'Merged First Blog'), (2, 'Merged Second Blog')
@@ -1220,6 +2019,11 @@ SELECT T.name
 FROM blog T
 WHERE T.id IN (1, 2)
 ```
+
+</td>
+</tr>
+<tr>
+<td>
 
 ```js
 // Merge then query (query after)
@@ -1231,6 +2035,9 @@ const result = await Blog.merge_gets([
 .exec();
 ```
 
+</td>
+<td>
+
 ```sql
 WITH V(id, name) AS (
   VALUES (1, 'Merged First Blog'), (2, 'Merged Second Blog')
@@ -1245,17 +2052,37 @@ FROM blog T
 WHERE T.id IN (1, 2)
 ```
 
+</td>
+</tr>
+</table>
+
 ## Delete Operations
+
+<table>
+<tr>
+<th>JavaScript</th>
+<th>SQL</th>
+</tr>
+<tr>
+<td>
 
 ```js
 // Basic delete
 const result = await Blog.delete({ name: "Blog to delete" }).exec();
 ```
 
+</td>
+<td>
+
 ```sql
 DELETE FROM blog T
 WHERE T.name = 'Blog to delete'
 ```
+
+</td>
+</tr>
+<tr>
+<td>
 
 ```js
 // Delete with return
@@ -1264,34 +2091,65 @@ const result = await Blog.delete({ name: "Blog to delete" })
   .exec();
 ```
 
+</td>
+<td>
+
 ```sql
 DELETE FROM blog T
 WHERE T.name = 'Blog to delete'
 RETURNING *
 ```
 
+</td>
+</tr>
+<tr>
+<td>
+
 ```js
 // Conditional delete
 const result = await Blog.delete({ name__startswith: "temp" }).exec();
 ```
+
+</td>
+<td>
 
 ```sql
 DELETE FROM blog T
 WHERE T.name LIKE 'temp%'
 ```
 
+</td>
+</tr>
+<tr>
+<td>
+
 ```js
 // Delete all records
 const result = await Blog.delete().exec();
 ```
 
+</td>
+<td>
+
 ```sql
 DELETE FROM blog T
 ```
 
+</td>
+</tr>
+</table>
+
 ## Convenience Methods
 
 ### Create Records
+
+<table>
+<tr>
+<th>JavaScript</th>
+<th>SQL</th>
+</tr>
+<tr>
+<td>
 
 ```js
 // Create single record and return complete object
@@ -1301,27 +2159,36 @@ const blog = await Blog.create({
 });
 ```
 
+</td>
+<td>
+
 ```sql
 INSERT INTO blog (name, tagline)
 VALUES ('Created Blog', 'Created tagline')
 RETURNING *
 ```
 
-```js
-// Equivalent to
-const result = await Blog.insert({
-  name: "Created Blog",
-  tagline: "Created tagline"
-}).returning("*").exec();
-const blog = result[0];
-```
+</td>
+</tr>
+</table>
 
 ### Get Single Record
+
+<table>
+<tr>
+<th>JavaScript</th>
+<th>SQL</th>
+</tr>
+<tr>
+<td>
 
 ```js
 // Get single record
 const blog = await Blog.where({ id: 1 }).get();
 ```
+
+</td>
+<td>
 
 ```sql
 SELECT * FROM blog T
@@ -1329,10 +2196,18 @@ WHERE T.id = 1
 LIMIT 1
 ```
 
+</td>
+</tr>
+<tr>
+<td>
+
 ```js
 // Get specific fields of single record
 const blog = await Blog.where({ id: 1 }).select(["name"]).get();
 ```
+
+</td>
+<td>
 
 ```sql
 SELECT T.name
@@ -1341,17 +2216,37 @@ WHERE T.id = 1
 LIMIT 1
 ```
 
+</td>
+</tr>
+</table>
+
 ### Flatten Results
+
+<table>
+<tr>
+<th>JavaScript</th>
+<th>SQL</th>
+</tr>
+<tr>
+<td>
 
 ```js
 // Get array of single column values
 const names = await Blog.flat("name");
 ```
 
+</td>
+<td>
+
 ```sql
 SELECT T.name
 FROM blog T
 ```
+
+</td>
+</tr>
+<tr>
+<td>
 
 ```js
 // Flatten with conditions
@@ -1360,6 +2255,9 @@ const names = await Blog.where({ tagline__contains: "blog" })
   .flat("name");
 ```
 
+</td>
+<td>
+
 ```sql
 SELECT T.name
 FROM blog T
@@ -1367,12 +2265,27 @@ WHERE T.tagline LIKE '%blog%'
 ORDER BY T.name
 ```
 
+</td>
+</tr>
+</table>
+
 ## Raw Queries
+
+<table>
+<tr>
+<th>JavaScript</th>
+<th>SQL</th>
+</tr>
+<tr>
+<td>
 
 ```js
 // Execute raw SQL
 const result = await Blog.query("SELECT * FROM blog WHERE id = $1", [1]);
 ```
+
+</td>
+<td>
 
 ```sql
 -- Execute raw SQL (parameterized query)
@@ -1380,11 +2293,28 @@ SELECT * FROM blog WHERE id = $1
 -- Parameters: [1]
 ```
 
+</td>
+</tr>
+<tr>
+<td>
+
 ```js
 // Get SQL statement (without execution)
 const sql = Blog.where({ id: 1 }).statement();
 console.log(sql); // "SELECT * FROM blog T WHERE T.id = 1"
 ```
+
+</td>
+<td>
+
+```sql
+-- Returns SQL string without execution
+SELECT * FROM blog T WHERE T.id = 1
+```
+
+</td>
+</tr>
+</table>
 
 ## Field Types
 

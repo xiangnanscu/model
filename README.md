@@ -270,8 +270,8 @@ WHERE T.id = 1
 
 ```js
 // Literal selection
-const result = await Blog.select_literal("'Hello World'")
-  .select(["name"])
+const result = await Blog.select_literal("Hello World")
+  .select("name")
   .where({ id: 1 })
   .exec();
 ```
@@ -293,8 +293,8 @@ WHERE T.id = 1
 ```js
 // Literal aliases
 const result = await Blog.select_literal_as({
-  "'Hello World'": "greeting"
-}).select(["id"]).where({ id: 1 }).exec();
+  "Hello World": "greeting"
+}).select("id").where({ id: 1 }).exec();
 ```
 
 </td>
@@ -1403,7 +1403,7 @@ RETURNING *
 ```js
 // Insert from SELECT subquery
 const result = await BlogBin.insert(
-  Blog.where({ name: "Second Blog" }).select(["name", "tagline"])
+  Blog.where({ name: "Second Blog" }).select("name", "tagline")
 ).exec();
 ```
 
@@ -1426,8 +1426,8 @@ WHERE T.name = 'Second Blog'
 // Insert with specified column names
 const result = await BlogBin.insert(
   Blog.where({ name: "First Blog" })
-    .select(["name", "tagline"])
-    .select_literal("'select from another blog'"),
+    .select("name", "tagline")
+    .select_literal("select from another blog"),
   ["name", "tagline", "note"]
 ).exec();
 ```
@@ -1862,8 +1862,8 @@ RETURNING id, name, tagline
 // UPSERT from SELECT subquery
 const result = await Blog.upsert(
   BlogBin.where({
-    name__notin: Blog.select(["name"]).distinct()
-  }).select(["name", "tagline"]).distinct("name")
+    name__notin: Blog.select("name").distinct()
+  }).select("name", "tagline").distinct("name")
 ).returning(["id", "name", "tagline"]).exec();
 ```
 
@@ -1927,7 +1927,7 @@ WHERE V.name = T.name
 ```js
 // Bulk update from SELECT subquery
 const result = await BlogBin.updates(
-  Blog.where({ name: "Second Blog" }).select(["name", "tagline"]),
+  Blog.where({ name: "Second Blog" }).select("name", "tagline"),
   "name" // match field
 ).returning("*").exec();
 ```
@@ -2203,7 +2203,7 @@ LIMIT 1
 
 ```js
 // Get specific fields of single record
-const blog = await Blog.where({ id: 1 }).select(["name"]).get();
+const blog = await Blog.where({ id: 1 }).select("name").get();
 ```
 
 </td>

@@ -210,8 +210,8 @@ WHERE T.id = 1
 
 ```js
 // 字面量选择
-const result = await Blog.select_literal("'Hello World'")
-  .select(["name"])
+const result = await Blog.select_literal("Hello World")
+  .select("name")
   .where({ id: 1 })
   .exec();
 ```
@@ -227,8 +227,8 @@ WHERE T.id = 1
 ```js
 // 字面量别名
 const result = await Blog.select_literal_as({
-  "'Hello World'": "greeting"
-}).select(["id"]).where({ id: 1 }).exec();
+  "Hello World": "greeting"
+}).select("id").where({ id: 1 }).exec();
 ```
 
 ```sql
@@ -912,7 +912,7 @@ RETURNING *
 ```js
 // 从 SELECT 子查询插入
 const result = await BlogBin.insert(
-  Blog.where({ name: "Second Blog" }).select(["name", "tagline"])
+  Blog.where({ name: "Second Blog" }).select("name", "tagline")
 ).exec();
 ```
 
@@ -929,8 +929,8 @@ WHERE T.name = 'Second Blog'
 // 指定列名插入
 const result = await BlogBin.insert(
   Blog.where({ name: "First Blog" })
-    .select(["name", "tagline"])
-    .select_literal("'select from another blog'"),
+    .select("name", "tagline")
+    .select_literal("select from another blog"),
   ["name", "tagline", "note"]
 ).exec();
 ```
@@ -1221,8 +1221,8 @@ RETURNING id, name, tagline
 // 从 SELECT 子查询 UPSERT
 const result = await Blog.upsert(
   BlogBin.where({
-    name__notin: Blog.select(["name"]).distinct()
-  }).select(["name", "tagline"]).distinct("name")
+    name__notin: Blog.select("name").distinct()
+  }).select("name", "tagline").distinct("name")
 ).returning(["id", "name", "tagline"]).exec();
 ```
 
@@ -1265,7 +1265,7 @@ WHERE V.name = T.name
 ```js
 // 从 SELECT 子查询批量更新
 const result = await BlogBin.updates(
-  Blog.where({ name: "Second Blog" }).select(["name", "tagline"]),
+  Blog.where({ name: "Second Blog" }).select("name", "tagline"),
   "name" // 匹配字段
 ).returning("*").exec();
 ```
@@ -1456,7 +1456,7 @@ LIMIT 1
 
 ```js
 // 获取单条记录的特定字段
-const blog = await Blog.where({ id: 1 }).select(["name"]).get();
+const blog = await Blog.where({ id: 1 }).select("name").get();
 ```
 
 ```sql

@@ -363,14 +363,14 @@ describe("Model Tests", () => {
     });
 
     it("select literal without alias", async () => {
-      const result = await Blog.select_literal("XXX").select(["name"]).where({ id: 1 }).exec();
+      const result = await Blog.select_literal("XXX").select("name").where({ id: 1 }).exec();
       expect(result[0]).toHaveProperty("name", "First Blog");
       expect(result[0]).toHaveProperty("?column?", "XXX");
     });
 
     it("select literal as", async () => {
       const result = await Blog.select_literal_as({ "XXX YYY": "blog_name" })
-        .select(["id"])
+        .select("id")
         .where({ id: 1 })
         .exec();
       expect(result[0]).toHaveProperty("blog_name", "XXX YYY");
@@ -379,7 +379,7 @@ describe("Model Tests", () => {
 
     it("select literal as with underscore", async () => {
       const result = await Blog.select_literal_as({ XXX_YYY: "blog_name" })
-        .select(["id"])
+        .select("id")
         .where({ id: 2 })
         .exec();
       expect(result[0]).toHaveProperty("blog_name", "XXX_YYY");
@@ -984,20 +984,20 @@ describe("Model Tests", () => {
 
     it("从子查询select插入数据", async () => {
       const result = await BlogBin.insert(
-        Blog.where({ name: "Second Blog" }).select(["name", "tagline"]),
+        Blog.where({ name: "Second Blog" }).select("name", "tagline"),
       ).exec();
       expect(result.count).toEqual(1);
     });
 
     it("检验上面插入的数据", async () => {
-      const result = await BlogBin.where({ name: "Second Blog" }).select(["tagline"]).get();
+      const result = await BlogBin.where({ name: "Second Blog" }).select("tagline").get();
       expect(result).toHaveProperty("tagline", "Another interesting blog");
     });
 
     it("从子查询select_literal插入数据", async () => {
       const result = await BlogBin.insert(
         Blog.where({ name: "First Blog" })
-          .select(["name", "tagline"])
+          .select("name", "tagline")
           .select_literal("select from another blog"),
         ["name", "tagline", "note"],
       ).exec();
@@ -1005,7 +1005,7 @@ describe("Model Tests", () => {
     });
 
     it("检验上面插入的数据select_literal", async () => {
-      const result = await BlogBin.where({ name: "First Blog" }).select(["note"]).get();
+      const result = await BlogBin.where({ name: "First Blog" }).select("note").get();
       expect(result).toHaveProperty("note", "select from another blog");
     });
 
@@ -1022,7 +1022,7 @@ describe("Model Tests", () => {
         .exec();
 
       const inserted = await BlogBin.where({ name: "update returning 2" })
-        .select(["name", "tagline", "note"])
+        .select("name", "tagline", "note")
         .exec();
       expect(inserted).toEqual([
         {
@@ -1151,7 +1151,7 @@ describe("Model Tests", () => {
 
     it("从子查询插入数据列数不一致而出错1", async () => {
       await expect(async () => {
-        await BlogBin.insert(Blog.where({ name: "First Blog" }).select(["name", "tagline"]), [
+        await BlogBin.insert(Blog.where({ name: "First Blog" }).select("name", "tagline"), [
           "name",
         ]).exec();
       }).rejects.toThrow();
@@ -1159,7 +1159,7 @@ describe("Model Tests", () => {
 
     it("从子查询插入数据列数不一致而出错2", async () => {
       await expect(async () => {
-        await BlogBin.insert(Blog.where({ name: "First Blog" }).select(["name", "tagline"]), [
+        await BlogBin.insert(Blog.where({ name: "First Blog" }).select("name", "tagline"), [
           "name",
           "tagline",
           "note",
@@ -1186,7 +1186,7 @@ describe("Model Tests", () => {
         .returning("headline")
         .exec();
 
-      const entry = await Entry.where({ id: 1 }).select(["headline"]).get();
+      const entry = await Entry.where({ id: 1 }).select("headline").get();
       expect(result[0]).toEqual(entry);
     });
 
@@ -1198,12 +1198,12 @@ describe("Model Tests", () => {
         .returning("headline")
         .exec();
 
-      const entry = await Entry.where({ id: 1 }).select(["headline"]).get();
+      const entry = await Entry.where({ id: 1 }).select("headline").get();
       expect(result[0]).toEqual(entry);
     });
 
     it("increase", async () => {
-      const entry = await Entry.where({ id: 1 }).select(["rating"]).get();
+      const entry = await Entry.where({ id: 1 }).select("rating").get();
       const result = await Entry.increase({ rating: 1 })
         .where({ id: 1 })
         .returning("rating")
@@ -1226,7 +1226,7 @@ describe("Model Tests", () => {
     });
 
     it("increase string args", async () => {
-      const entry = await Entry.where({ id: 1 }).select(["rating"]).get();
+      const entry = await Entry.where({ id: 1 }).select("rating").get();
       const result = await Entry.increase("rating", 2).where({ id: 1 }).returning("rating").exec();
       expect(result[0].rating).toBe(entry.rating + 2);
     });
@@ -1242,7 +1242,7 @@ describe("Model Tests", () => {
         .exec();
 
       const updated = await Entry.where({ headline__endswith: " from first blog" })
-        .select(["id", "headline"])
+        .select("id", "headline")
         .exec();
       expect(result).toEqual(updated);
     });
@@ -1256,7 +1256,7 @@ describe("Model Tests", () => {
       ]).exec();
       expect(result.count).toEqual(1);
 
-      const updated = await Blog.where({ name: "First Blog" }).select(["tagline"]).get();
+      const updated = await Blog.where({ name: "First Blog" }).select("tagline").get();
       expect(updated.tagline).toBe("updated by merge");
 
       // Cleanup
@@ -1275,7 +1275,7 @@ describe("Model Tests", () => {
       expect(updated).toEqual(origin);
 
       const inserted = await Blog.where({ name: "Blog added by merge" })
-        .select(["name", "tagline"])
+        .select("name", "tagline")
         .get();
       expect(inserted).toEqual({ name: "Blog added by merge", tagline: "default tagline" });
 
@@ -1309,11 +1309,11 @@ describe("Model Tests", () => {
       ]).exec();
       expect(result.count).toEqual(2);
 
-      const updated = await Blog.where({ name: "First Blog" }).select(["tagline"]).get();
+      const updated = await Blog.where({ name: "First Blog" }).select("tagline").get();
       expect(updated.tagline).toBe("updated by upsert");
 
       const inserted = await Blog.where({ name: "Blog added by upsert" })
-        .select(["name", "tagline"])
+        .select("name", "tagline")
         .get();
       expect(inserted).toEqual({ name: "Blog added by upsert", tagline: "inserted by upsert" });
 
@@ -1352,9 +1352,9 @@ describe("Model Tests", () => {
     it("upsert from select", async () => {
       const result = await Blog.upsert(
         BlogBin.where({
-          name__notin: Blog.select(["name"]).distinct(),
+          name__notin: Blog.select("name").distinct(),
         })
-          .select(["name", "tagline"])
+          .select("name", "tagline")
           .distinct("name"),
       )
         .returning(["id", "name", "tagline"])
@@ -1391,7 +1391,7 @@ describe("Model Tests", () => {
       ]).exec();
       expect(result.count).toEqual(1);
 
-      const updated_blog = await Blog.where({ name: "Third Blog" }).select(["tagline"]).get();
+      const updated_blog = await Blog.where({ name: "Third Blog" }).select("tagline").get();
       expect(updated_blog.tagline).toBe("Updated by updates");
 
       // Cleanup
@@ -1400,7 +1400,7 @@ describe("Model Tests", () => {
 
     it("updates from SELECT subquery", async () => {
       const result = await BlogBin.updates(
-        Blog.where({ name: "Second Blog" }).select(["name", "tagline"]),
+        Blog.where({ name: "Second Blog" }).select("name", "tagline"),
         "name",
       )
         .returning("*")
@@ -1420,7 +1420,7 @@ describe("Model Tests", () => {
       // `);
       expect(result.count).toEqual(1);
 
-      const updated = await BlogBin.where({ name: "Second Blog" }).select(["tagline"]).get();
+      const updated = await BlogBin.where({ name: "Second Blog" }).select("tagline").get();
       expect(updated.tagline).toBe("Another interesting blog");
     });
 
@@ -1440,8 +1440,8 @@ describe("Model Tests", () => {
       ).exec();
       expect(result.count).toEqual(1);
 
-      const updated1 = await BlogBin.where({ name: "Third Blog" }).select(["tagline"]).get();
-      const updated2 = await Blog.where({ name: "Third Blog" }).select(["tagline"]).get();
+      const updated1 = await BlogBin.where({ name: "Third Blog" }).select("tagline").get();
+      const updated2 = await Blog.where({ name: "Third Blog" }).select("tagline").get();
       expect(updated2.tagline).toBe("XXX");
       expect(updated1.tagline).toBe("XXX");
 

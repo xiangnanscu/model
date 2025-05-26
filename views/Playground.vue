@@ -7,7 +7,7 @@ import prettier from "prettier/standalone";
 import prettierPluginBabel from "prettier/plugins/babel";
 import prettierPluginEstree from "prettier/plugins/estree";
 import { format as sqlFormatter } from "sql-formatter";
-import Model from "~/lib/model";
+import Model from "~/lib/sqlmodel";
 import modelsSrc from "@/assets/models.mjs?raw";
 import testSrc from "@/assets/test.mjs?raw";
 
@@ -32,11 +32,12 @@ const gotoLine = (i) => {
 const models = computed(() =>
   eval(`(() => {
 ${srcCode.value}
-return { ${Array.from(srcCode.value.matchAll(/const\s+([\w_]+)\s+=\s+(Model.create|new Model)/g))
+return { ${Array.from(srcCode.value.matchAll(/const\s+([\w_]+)\s+=\s+Model/g))
     .map((e) => e[1])
     .join(", ")} };
 })()`),
 );
+console.log({ models });
 watch(models, () => Object.assign(self, models.value), { immediate: true });
 const jsQueryLines = computed(() =>
   testCode.value
@@ -44,14 +45,17 @@ const jsQueryLines = computed(() =>
     .map((e) => e.trim())
     .filter((e) => e),
 );
+console.log({ jsQueryLines });
 const queryObjects = ref([]);
 watch(
   jsQueryLines,
   (value, old) => {
+    console.log(value.join(","));
     try {
       queryObjects.value = eval(`[${value.join(",")}]`);
     } catch (error) {
-      queryObjects.value = eval(`[${old.join(",")}]`);
+      console.log(error);
+      // queryObjects.value = eval(`[${old.join(",")}]`);
     }
   },
   { immediate: true },
@@ -61,6 +65,7 @@ watch(
   queryObjects,
   async () => {
     const res = [];
+    console.log({ queryObjects });
     for (const [i, sql] of Object.entries(queryObjects.value)) {
       if (sql.statement) {
         res.push({ js: await formatJs(jsQueryLines.value[i]), sql: pgFormat(sql.statement()) });
@@ -77,7 +82,9 @@ watch(
 <template>
   <div class="row">
     <div style="width: 50%">
-      <button @click="editModelsStatus = !editModelsStatus">{{ !editModelsStatus ? "edit" : "save" }} models</button>
+      <button @click="editModelsStatus = !editModelsStatus">
+        {{ !editModelsStatus ? "edit" : "save" }} models
+      </button>
       <div v-if="editModelsStatus" style="display: flex; justify-content: space-between">
         <textarea
           v-model="srcCode"
@@ -91,7 +98,9 @@ watch(
         <highlightjs id="srcCode" language="javascript" :code="srcCode" />
         <!-- <pre>{{ srcCode }}</pre> -->
       </div>
-      <button @click="editTestStatus = !editTestStatus">{{ !editTestStatus ? "edit" : "save" }} test code</button>
+      <button @click="editTestStatus = !editTestStatus">
+        {{ !editTestStatus ? "edit" : "save" }} test code
+      </button>
       <div v-if="editTestStatus" style="display: flex; justify-content: space-between">
         <textarea
           v-model.lazy="testCode"

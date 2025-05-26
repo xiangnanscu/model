@@ -18,7 +18,7 @@
 // XX._js_default => XX.default
 // for循环: i = 2 => i = 1
 // 正则: %w => \w
-import * as Fields from "../lib/field.mjs";
+import * as Fields from "../lib/fields.mjs";
 import {
   clone,
   assert,

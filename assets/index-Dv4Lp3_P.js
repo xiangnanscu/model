@@ -304,22 +304,22 @@ Blog.where({ name__startswith: "temp" }).delete();
 
 // Aggregation queries
 Book.annotate({ price_total: Sum("price") });
-Book.group_by(["name"]).annotate({ price_sum: Sum("price") });
-Book.group_by(["name"])
+Book.group_by("name").annotate({ price_sum: Sum("price") });
+Book.group_by("name")
   .annotate({ price_total: Sum("price") })
   .having({ price_total__gt: 100 });
 
 // Advanced queries
-BlogBin.insert(Blog.where({ name: "Second Blog" }).select(["name", "tagline"]));
+BlogBin.insert(Blog.where({ name: "Second Blog" }).select("name", "tagline"));
 Blog.upsert([
   { name: "First Blog", tagline: "updated by upsert" },
   { name: "New Blog", tagline: "inserted by upsert" },
 ]);
 
 // Order by queries
-Blog.select("name").order_by(["name"]);
-Blog.select("name").order_by(["-name"]);
-Entry.where({ blog_id: 1 }).order_by(["pub_date", "-rating"]);
+Blog.select("name").order_by("name");
+Blog.select("name").order_by("-name");
+Entry.where({ blog_id: 1 }).order_by("pub_date", "-rating");
 `,_hoisted_1={class:"playground-container"},_hoisted_2={class:"toolbar"},_hoisted_3={class:"main-content"},_hoisted_4={class:"test-code-section"},_hoisted_5={key:0,class:"edit-area"},_hoisted_6={key:1,class:"code-display"},_hoisted_7=["onClick"],_hoisted_8={class:"sql-output-section"},_hoisted_9={class:"sql-output"},_hoisted_10=["id"],_hoisted_11={class:"js-code"},_hoisted_12={class:"sql-code"},_hoisted_13={class:"drawer-header"},_hoisted_14={class:"drawer-content"},_hoisted_15={class:"drawer-toolbar"},_hoisted_16={key:0,class:"edit-area"},_hoisted_17={key:1,class:"code-display"},_sfc_main={__name:"Playground",setup(__props){const{Q,F,Sum,Avg,Max,Min,Count}=Model,formatJs=async e=>await mc$1.format(e,{parser:"babel",plugins:[Cn$1,lx]}),highlightjs=o.component,pgFormat=e=>format(e,{language:"postgresql"}),editModelsStatus=ref(!1),editTestStatus=ref(!1),modelsDrawerOpen=ref(!1),srcCode=ref(modelsSrc),testCode=ref(testSrc);ref(testSrc);const openModelsDrawer=()=>{modelsDrawerOpen.value=!0,editModelsStatus.value=!0},gotoLine=e=>{const t=document.getElementById(`line-${e}`);t&&t.scrollIntoView({behavior:"smooth"})},models=computed(()=>eval(`(() => {
 ${srcCode.value}
 return { ${Array.from(srcCode.value.matchAll(/const\s+([\w_]+)\s+=\s+Model/g)).map(e=>e[1]).join(", ")} };

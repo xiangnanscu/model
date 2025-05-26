@@ -11,6 +11,7 @@ import Model from "~/lib/sqlmodel";
 import modelsSrc from "@/assets/models.mjs?raw";
 import testSrc from "@/assets/test.mjs?raw";
 
+const { Q, F, Sum, Avg, Max, Min, Count } = Model;
 const formatJs = async (js) =>
   await prettier.format(js, {
     parser: "babel",
@@ -37,7 +38,7 @@ return { ${Array.from(srcCode.value.matchAll(/const\s+([\w_]+)\s+=\s+Model/g))
     .join(", ")} };
 })()`),
 );
-console.log({ models });
+
 watch(models, () => Object.assign(self, models.value), { immediate: true });
 const jsQueryLines = computed(() =>
   testCode.value
@@ -45,16 +46,15 @@ const jsQueryLines = computed(() =>
     .map((e) => e.trim())
     .filter((e) => e),
 );
-console.log({ jsQueryLines });
+
 const queryObjects = ref([]);
 watch(
   jsQueryLines,
   (value, old) => {
-    console.log(value.join(","));
     try {
       queryObjects.value = eval(`[${value.join(",")}]`);
     } catch (error) {
-      console.log(error);
+      console.error(error);
       // queryObjects.value = eval(`[${old.join(",")}]`);
     }
   },
@@ -65,7 +65,6 @@ watch(
   queryObjects,
   async () => {
     const res = [];
-    console.log({ queryObjects });
     for (const [i, sql] of Object.entries(queryObjects.value)) {
       if (sql.statement) {
         res.push({ js: await formatJs(jsQueryLines.value[i]), sql: pgFormat(sql.statement()) });

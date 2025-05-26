@@ -1,44 +1,99 @@
-const Usr = Model.create_model({
-  table_name: "usr",
+// Model definitions based on model_spec.test.mjs
+
+const User = Model({
+  table_name: "user",
   fields: {
-    id: { type: "integer", primary_key: true, serial: true },
-    name: { type: "string", unique: true, maxlength: 4, minlength: 1, required: true },
-    age: { type: "integer", max: 100, min: 1, default: 1 },
-    parent: { type: "foreignkey", reference: "self" },
-    child: { reference: "self" },
+    username: { maxlength: 20, minlength: 2, unique: true },
+    password: { type: "text" },
   },
 });
 
-// define abstract model for table field
-const ResumeItem = Model.create_model({
+const Blog = Model({
+  table_name: "blog",
   fields: {
-    start_time: { type: "date", required: true },
-    end_time: { type: "date" },
-    content: { required: true },
+    name: { maxlength: 20, minlength: 2, unique: true },
+    tagline: { type: "text", default: "default tagline" },
   },
 });
 
-const Profile = Model.create_model({
-  table_name: "profile",
+const BlogBin = Model({
+  table_name: "blog_bin",
+  mixins: [Blog],
   fields: {
-    usr: { reference: Usr },
-    info: { type: "text", maxlength: 50 },
-    resume: { type: "table", model: ResumeItem },
+    name: { unique: false },
+    note: { type: "text" },
   },
 });
 
-const Org = Model.create_model({
-  table_name: "org",
-  auto_primary_key: true, // auto insert a primary key named id
+const Resume = Model({
+  auto_primary_key: false,
+  table_name: "resume",
+  unique_together: ["start_date", "end_date", "company", "position"],
   fields: {
-    name: { type: "string", unique: true },
+    start_date: { type: "date" },
+    end_date: { type: "date" },
+    company: { maxlength: 20 },
+    position: { maxlength: 20 },
+    description: { maxlength: 200 },
   },
 });
 
-const OrgAdmin = Model.create_model({
-  table_name: "org_admin",
+const Author = Model({
+  table_name: "author",
   fields: {
-    usr: { reference: Usr },
-    org: { reference: Org },
+    name: { label: "姓名", maxlength: 200, unique: true },
+    email: { type: "email" },
+    age: { type: "integer", max: 100, min: 10 },
+    resume: { model: Resume },
+  },
+});
+
+const Entry = Model({
+  table_name: "entry",
+  fields: {
+    blog_id: { reference: Blog, related_query_name: "entry" },
+    reposted_blog_id: { reference: Blog, related_query_name: "reposted_entry" },
+    headline: { maxlength: 255, compact: false },
+    body_text: { type: "text" },
+    pub_date: { type: "date" },
+    mod_date: { type: "date" },
+    number_of_comments: { type: "integer" },
+    number_of_pingbacks: { type: "integer" },
+    rating: { type: "integer" },
+  },
+});
+
+const ViewLog = Model({
+  table_name: "view_log",
+  fields: {
+    entry_id: { reference: Entry },
+    ctime: { type: "datetime" },
+  },
+});
+
+const Publisher = Model({
+  table_name: "publisher",
+  fields: {
+    name: { maxlength: 300 },
+  },
+});
+
+const Book = Model({
+  table_name: "book",
+  fields: {
+    name: { maxlength: 300, compact: false },
+    pages: { type: "integer" },
+    price: { type: "float" },
+    rating: { type: "float" },
+    author: { reference: Author },
+    publisher_id: { reference: Publisher },
+    pubdate: { type: "date" },
+  },
+});
+
+const Store = Model({
+  table_name: "store",
+  fields: {
+    name: { maxlength: 300 },
   },
 });

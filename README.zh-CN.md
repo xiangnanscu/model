@@ -4,6 +4,15 @@
 
 [English](./README.md) | 简体中文
 
+## 特性
+
+- **声明式模型定义**: 使用简单的JavaScript对象定义数据库模型
+- **自动迁移生成**: 从模型变更生成SQL迁移脚本
+- **类型安全**: 完整的TypeScript支持和类型推断
+- **查询构建器**: 直观的链式查询构建
+- **关系管理**: 支持外键和复杂关系
+- **模式验证**: 内置字段验证和约束
+
 ## 安装
 
 ```sh
@@ -16,7 +25,8 @@ npm install -g @xiangnanscu/model
 
 ```js
 import Model from "@xiangnanscu/model";
-import postgres from "postgres";
+import { create_table_sql } from "@xiangnanscu/model/lib/migrate.mjs";
+const { Q, F, Sum, Avg, Max, Min, Count } = Model;
 
 // 配置数据库连接
 Model.db_config = {
@@ -34,11 +44,11 @@ Model.db_config = {
 ### 模型定义
 
 ```js
-// 基础模型定义
+// 模型定义
 const User = Model({
   table_name: "user",
   fields: {
-    username: { maxlength: 20, minlength: 2, unique: true },
+    username: { type: "string", maxlength: 20, minlength: 2, unique: true },
     password: { type: "text" },
   },
 });
@@ -46,49 +56,20 @@ const User = Model({
 const Blog = Model({
   table_name: "blog",
   fields: {
-    name: { maxlength: 20, minlength: 2, unique: true },
+    name: { type: "string", maxlength: 20, minlength: 2, unique: true },
     tagline: { type: "text", default: "default tagline" },
   },
 });
 
-// 带外键关系的模型
-const Entry = Model({
-  table_name: "entry",
-  fields: {
-    blog_id: { reference: Blog, related_query_name: "entry" },
-    reposted_blog_id: { reference: Blog, related_query_name: "reposted_entry" },
-    headline: { maxlength: 255, compact: false },
-    body_text: { type: "text" },
-    pub_date: { type: "date" },
-    mod_date: { type: "date" },
-    number_of_comments: { type: "integer" },
-    number_of_pingbacks: { type: "integer" },
-    rating: { type: "integer" },
-  },
-});
-
-// 带复合字段的模型
-const Author = Model({
-  table_name: "author",
-  fields: {
-    name: { label: "姓名", maxlength: 200, unique: true },
-    email: { type: "email" },
-    age: { type: "integer", max: 100, min: 10 },
-    resume: { model: Resume }, // JSON 字段
-  },
-});
-
-// 模型继承（mixins）
 const BlogBin = Model({
   table_name: "blog_bin",
   mixins: [Blog],
   fields: {
-    name: { unique: false }, // 覆盖父模型的 unique 属性
-    note: { type: "text" },
+    name: { type: "string", unique: false },
+    note: { type: "text", default: "" },
   },
 });
 
-// 无自动主键的模型
 const Resume = Model({
   auto_primary_key: false,
   table_name: "resume",
@@ -96,11 +77,211 @@ const Resume = Model({
   fields: {
     start_date: { type: "date" },
     end_date: { type: "date" },
-    company: { maxlength: 20 },
-    position: { maxlength: 20 },
-    description: { maxlength: 200 },
+    company: { type: "string", maxlength: 20 },
+    position: { type: "string", maxlength: 20 },
+    description: { type: "string", maxlength: 200 },
   },
 });
+
+const Author = Model({
+  table_name: "author",
+  fields: {
+    name: { label: "姓名", type: "string", maxlength: 200, unique: true },
+    email: { type: "email" },
+    age: { type: "integer", max: 100, min: 10 },
+    resume: { type: "table", model: Resume },
+  },
+});
+
+const Entry = Model({
+  table_name: "entry",
+  fields: {
+    blog_id: { type: "foreignkey", reference: Blog, related_query_name: "entry" },
+    reposted_blog_id: { type: "foreignkey", reference: Blog, related_query_name: "reposted_entry" },
+    headline: { type: "string", maxlength: 255, compact: false },
+    body_text: { type: "text" },
+    pub_date: { type: "date" },
+    mod_date: { type: "date" },
+    number_of_comments: { type: "integer", default: 0 },
+    number_of_pingbacks: { type: "integer", default: 0 },
+    rating: { type: "integer" },
+  },
+});
+
+const ViewLog = Model({
+  table_name: "view_log",
+  fields: {
+    entry_id: { type: "foreignkey", reference: Entry },
+    ctime: { type: "datetime" },
+  },
+});
+
+const Publisher = Model({
+  table_name: "publisher",
+  fields: {
+    name: { type: "string", maxlength: 300 },
+  },
+});
+
+const Book = Model({
+  table_name: "book",
+  fields: {
+    name: { type: "string", maxlength: 300, compact: false },
+    pages: { type: "integer" },
+    price: { type: "float" },
+    rating: { type: "float" },
+    author: { type: "foreignkey", reference: Author },
+    publisher_id: { type: "foreignkey", reference: Publisher },
+    pubdate: { type: "date" },
+  },
+});
+
+const Store = Model({
+  table_name: "store",
+  fields: {
+    name: { type: "string", maxlength: 300 },
+  },
+});
+```
+
+### 表创建
+```js
+import { create_table_sql } from "@xiangnanscu/model/lib/migrate.mjs";
+
+const model_list = [User, Blog, BlogBin, Author, Entry, ViewLog, Publisher, Book, Store];
+
+// 从模型定义创建表
+for (const model of model_list) {
+  const createSQL = create_table_sql(model);
+  await Model.query(createSQL);
+}
+```
+
+## 完整示例
+
+```js
+import Model from "@xiangnanscu/model";
+import { create_table_sql } from "@xiangnanscu/model/lib/migrate.mjs";
+const { Q, F, Sum, Avg, Max, Min, Count } = Model;
+
+// 配置数据库连接
+Model.db_config = {
+  host: "localhost",
+  port: "5432",
+  user: "postgres",
+  password: "postgres",
+  database: "test",
+  max: 20,
+  idle_timeout: 20,
+  connect_timeout: 3,
+};
+
+// 模型定义
+const User = Model({
+  table_name: "user",
+  fields: {
+    username: { type: "string", maxlength: 20, minlength: 2, unique: true },
+    password: { type: "text" },
+  },
+});
+
+const Blog = Model({
+  table_name: "blog",
+  fields: {
+    name: { type: "string", maxlength: 20, minlength: 2, unique: true },
+    tagline: { type: "text", default: "default tagline" },
+  },
+});
+
+const BlogBin = Model({
+  table_name: "blog_bin",
+  mixins: [Blog],
+  fields: {
+    name: { type: "string", unique: false },
+    note: { type: "text", default: "" },
+  },
+});
+
+const Resume = Model({
+  auto_primary_key: false,
+  table_name: "resume",
+  unique_together: ["start_date", "end_date", "company", "position"],
+  fields: {
+    start_date: { type: "date" },
+    end_date: { type: "date" },
+    company: { type: "string", maxlength: 20 },
+    position: { type: "string", maxlength: 20 },
+    description: { type: "string", maxlength: 200 },
+  },
+});
+
+const Author = Model({
+  table_name: "author",
+  fields: {
+    name: { label: "姓名", type: "string", maxlength: 200, unique: true },
+    email: { type: "email" },
+    age: { type: "integer", max: 100, min: 10 },
+    resume: { type: "table", model: Resume },
+  },
+});
+
+const Entry = Model({
+  table_name: "entry",
+  fields: {
+    blog_id: { type: "foreignkey", reference: Blog, related_query_name: "entry" },
+    reposted_blog_id: { type: "foreignkey", reference: Blog, related_query_name: "reposted_entry" },
+    headline: { type: "string", maxlength: 255, compact: false },
+    body_text: { type: "text" },
+    pub_date: { type: "date" },
+    mod_date: { type: "date" },
+    number_of_comments: { type: "integer", default: 0 },
+    number_of_pingbacks: { type: "integer", default: 0 },
+    rating: { type: "integer" },
+  },
+});
+
+const ViewLog = Model({
+  table_name: "view_log",
+  fields: {
+    entry_id: { type: "foreignkey", reference: Entry },
+    ctime: { type: "datetime" },
+  },
+});
+
+const Publisher = Model({
+  table_name: "publisher",
+  fields: {
+    name: { type: "string", maxlength: 300 },
+  },
+});
+
+const Book = Model({
+  table_name: "book",
+  fields: {
+    name: { type: "string", maxlength: 300, compact: false },
+    pages: { type: "integer" },
+    price: { type: "float" },
+    rating: { type: "float" },
+    author: { type: "foreignkey", reference: Author },
+    publisher_id: { type: "foreignkey", reference: Publisher },
+    pubdate: { type: "date" },
+  },
+});
+
+const Store = Model({
+  table_name: "store",
+  fields: {
+    name: { type: "string", maxlength: 300 },
+  },
+});
+
+const model_list = [User, Blog, BlogBin, Author, Entry, ViewLog, Publisher, Book, Store];
+
+// 从模型定义创建表
+for (const model of model_list) {
+  const createSQL = create_table_sql(model);
+  await Model.query(createSQL);
+}
 ```
 
 ## 查询操作
@@ -1655,4 +1836,128 @@ process.env.SQL_WHOLE_MATCH = true;
 6. **索引优化**: 为经常查询的字段添加数据库索引
 
 这个 ORM 提供了丰富的查询接口和灵活的数据操作方法，能够满足大多数 PostgreSQL 应用的需求。
-</rewritten_file>
+
+## 数据库迁移工具
+
+该库包含一个强大的数据库迁移工具，可以通过比较模型定义来生成SQL迁移脚本。
+
+### 使用方法
+
+```javascript
+import { generate_migration_sql, create_table_sql } from './lib/migrate.mjs';
+
+// 定义你的模型
+const user_model = {
+  table_name: "users",
+  field_names: ["id", "name", "email", "created_at"],
+  fields: {
+    id: {
+      name: "id",
+      type: "integer",
+      primary_key: true,
+      serial: true,
+      null: false,
+    },
+    name: {
+      name: "name",
+      type: "string",
+      maxlength: 100,
+      null: false,
+    },
+    email: {
+      name: "email",
+      type: "email",
+      maxlength: 255,
+      unique: true,
+      null: false,
+    },
+    created_at: {
+      name: "created_at",
+      type: "datetime",
+      auto_now_add: true,
+      null: false,
+    },
+  },
+};
+
+// 创建表SQL
+const create_sql = create_table_sql(user_model);
+console.log(create_sql);
+
+// 生成迁移SQL（从旧模型到新模型）
+const migration_sql = generate_migration_sql(old_model, new_model);
+console.log(migration_sql);
+```
+
+### 支持的字段类型
+
+- **string**: 指定长度的VARCHAR
+- **text**: 长内容的TEXT字段
+- **integer**: 整数
+- **float**: 可选精度的浮点数
+- **boolean**: 布尔值true/false
+- **date**: 仅日期（YYYY-MM-DD）
+- **datetime**: 可选时区的时间戳
+- **time**: 可选时区的仅时间
+- **uuid**: 自动生成的UUID
+- **json**: 结构化数据的JSONB
+- **foreignkey**: 外键关系
+- **year/month**: 年/月的整数字段
+- **year_month**: 年-月组合的VARCHAR
+
+### 迁移功能
+
+- **表创建**: 生成CREATE TABLE语句
+- **字段添加/删除**: 添加或删除列
+- **类型更改**: 在兼容的字段类型之间转换
+- **约束管理**: 处理PRIMARY KEY、UNIQUE、NOT NULL约束
+- **索引管理**: 创建和删除索引
+- **外键管理**: 添加、删除和修改外键关系
+- **默认值**: 处理默认值更改
+- **字段重命名**: 自动检测字段重命名
+- **联合唯一**: 管理复合唯一约束
+
+### 迁移输出示例
+
+```sql
+-- 创建新表
+CREATE TABLE users(
+  id SERIAL PRIMARY KEY NOT NULL,
+  name varchar(100) NOT NULL,
+  email varchar(255) NOT NULL UNIQUE,
+  created_at timestamp(0) NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 添加字段
+ALTER TABLE users ADD COLUMN phone varchar(20);
+
+-- 修改字段类型
+ALTER TABLE users ALTER COLUMN name TYPE text;
+
+-- 添加外键
+ALTER TABLE products ADD CONSTRAINT products_category_id_fkey
+FOREIGN KEY (category_id) REFERENCES "categories" ("id")
+ON DELETE CASCADE ON UPDATE CASCADE;
+```
+
+## 测试
+
+运行测试套件：
+
+```bash
+npm test
+```
+
+专门运行迁移工具测试：
+
+```bash
+npm test __test__/migrate.test.mjs
+```
+
+## 许可证
+
+MIT
+
+## 贡献
+
+欢迎贡献！请随时提交Pull Request。

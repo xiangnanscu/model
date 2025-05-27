@@ -2,6 +2,7 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import Model from "~/lib/xodel";
 import { create_table_sql } from "~/lib/migrate.mjs";
+const { Q, F, Sum, Avg, Max, Min, Count } = Model;
 
 process.env.SQL_WHOLE_MATCH = true;
 
@@ -16,14 +17,6 @@ Model.db_config = {
   idle_timeout: 20,
   connect_timeout: 3,
 };
-
-const Q = Model.Q;
-const F = Model.F;
-const Sum = Model.Sum;
-const Avg = Model.Avg;
-const Max = Model.Max;
-const Min = Model.Min;
-const Count = Model.Count;
 
 // Model definitions
 const User = Model({

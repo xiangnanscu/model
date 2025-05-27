@@ -1,6 +1,7 @@
 /* eslint-disable no-undef */
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import Model from "~/lib/xodel";
+import { create_table_sql } from "~/lib/migrate.mjs";
 
 process.env.SQL_WHOLE_MATCH = true;
 
@@ -28,7 +29,7 @@ const Count = Model.Count;
 const User = Model({
   table_name: "user",
   fields: {
-    username: { maxlength: 20, minlength: 2, unique: true },
+    username: { type: "string", maxlength: 20, minlength: 2, unique: true },
     password: { type: "text" },
   },
 });
@@ -36,7 +37,7 @@ const User = Model({
 const Blog = Model({
   table_name: "blog",
   fields: {
-    name: { maxlength: 20, minlength: 2, unique: true },
+    name: { type: "string", maxlength: 20, minlength: 2, unique: true },
     tagline: { type: "text", default: "default tagline" },
   },
 });
@@ -45,8 +46,8 @@ const BlogBin = Model({
   table_name: "blog_bin",
   mixins: [Blog],
   fields: {
-    name: { unique: false },
-    note: { type: "text" },
+    name: { type: "string", unique: false },
+    note: { type: "text", default: "" },
   },
 });
 
@@ -57,33 +58,33 @@ const Resume = Model({
   fields: {
     start_date: { type: "date" },
     end_date: { type: "date" },
-    company: { maxlength: 20 },
-    position: { maxlength: 20 },
-    description: { maxlength: 200 },
+    company: { type: "string", maxlength: 20 },
+    position: { type: "string", maxlength: 20 },
+    description: { type: "string", maxlength: 200 },
   },
 });
 
 const Author = Model({
   table_name: "author",
   fields: {
-    name: { label: "Name", maxlength: 200, unique: true },
+    name: { label: "Name", type: "string", maxlength: 200, unique: true },
     email: { type: "email" },
     age: { type: "integer", max: 100, min: 10 },
-    resume: { model: Resume },
+    resume: { type: "table", model: Resume },
   },
 });
 
 const Entry = Model({
   table_name: "entry",
   fields: {
-    blog_id: { reference: Blog, related_query_name: "entry" },
-    reposted_blog_id: { reference: Blog, related_query_name: "reposted_entry" },
-    headline: { maxlength: 255, compact: false },
+    blog_id: { type: "foreignkey", reference: Blog, related_query_name: "entry" },
+    reposted_blog_id: { type: "foreignkey", reference: Blog, related_query_name: "reposted_entry" },
+    headline: { type: "string", maxlength: 255, compact: false },
     body_text: { type: "text" },
     pub_date: { type: "date" },
     mod_date: { type: "date" },
-    number_of_comments: { type: "integer" },
-    number_of_pingbacks: { type: "integer" },
+    number_of_comments: { type: "integer", default: 0 },
+    number_of_pingbacks: { type: "integer", default: 0 },
     rating: { type: "integer" },
   },
 });
@@ -91,7 +92,7 @@ const Entry = Model({
 const ViewLog = Model({
   table_name: "view_log",
   fields: {
-    entry_id: { reference: Entry },
+    entry_id: { type: "foreignkey", reference: Entry },
     ctime: { type: "datetime" },
   },
 });
@@ -99,19 +100,19 @@ const ViewLog = Model({
 const Publisher = Model({
   table_name: "publisher",
   fields: {
-    name: { maxlength: 300 },
+    name: { type: "string", maxlength: 300 },
   },
 });
 
 const Book = Model({
   table_name: "book",
   fields: {
-    name: { maxlength: 300, compact: false },
+    name: { type: "string", maxlength: 300, compact: false },
     pages: { type: "integer" },
     price: { type: "float" },
     rating: { type: "float" },
-    author: { reference: Author },
-    publisher_id: { reference: Publisher },
+    author: { type: "foreignkey", reference: Author },
+    publisher_id: { type: "foreignkey", reference: Publisher },
     pubdate: { type: "date" },
   },
 });
@@ -119,103 +120,28 @@ const Book = Model({
 const Store = Model({
   table_name: "store",
   fields: {
-    name: { maxlength: 300 },
+    name: { type: "string", maxlength: 300 },
   },
 });
 
 const model_list = [User, Blog, BlogBin, Author, Entry, ViewLog, Publisher, Book, Store];
 
-// Helper function to create tables
+// Helper function to create tables using migrate.mjs
 async function createTablesFromModels() {
   // Drop tables in reverse order
-  for (let i = model_list.length - 1; i >= 0; i--) {
-    const model = model_list[i];
+  for (const model of [...model_list].reverse()) {
     await Model.query(`DROP TABLE IF EXISTS "${model.table_name}" CASCADE`);
     // Also drop sequences to avoid conflicts
     await Model.query(`DROP SEQUENCE IF EXISTS "${model.table_name}_id_seq" CASCADE`);
   }
 
-  // Create all tables with complete SQL definitions
-  const createTablesSQL = `
-    -- Create user table
-    CREATE TABLE IF NOT EXISTS "user" (
-      id SERIAL PRIMARY KEY,
-      username VARCHAR(20) UNIQUE NOT NULL,
-      password TEXT
-    );
-
-    -- Create blog table
-    CREATE TABLE IF NOT EXISTS "blog" (
-      id SERIAL PRIMARY KEY,
-      name VARCHAR(20) UNIQUE NOT NULL,
-      tagline TEXT DEFAULT 'default tagline'
-    );
-
-    -- Create author table
-    CREATE TABLE IF NOT EXISTS "author" (
-      id SERIAL PRIMARY KEY,
-      name VARCHAR(200) UNIQUE NOT NULL,
-      email VARCHAR(255),
-      age INTEGER CHECK (age >= 10 AND age <= 100),
-      resume JSONB
-    );
-
-    -- Create publisher table
-    CREATE TABLE IF NOT EXISTS "publisher" (
-      id SERIAL PRIMARY KEY,
-      name VARCHAR(300)
-    );
-
-    -- Create entry table
-    CREATE TABLE IF NOT EXISTS "entry" (
-      id SERIAL PRIMARY KEY,
-      blog_id INTEGER REFERENCES blog(id),
-      reposted_blog_id INTEGER REFERENCES blog(id),
-      headline VARCHAR(255),
-      body_text TEXT,
-      pub_date DATE,
-      mod_date DATE,
-      number_of_comments INTEGER DEFAULT 0,
-      number_of_pingbacks INTEGER DEFAULT 0,
-      rating INTEGER
-    );
-
-    -- Create view_log table
-    CREATE TABLE IF NOT EXISTS "view_log" (
-      id SERIAL PRIMARY KEY,
-      entry_id INTEGER REFERENCES entry(id),
-      ctime TIMESTAMP
-    );
-
-    -- Create book table
-    CREATE TABLE IF NOT EXISTS "book" (
-      id SERIAL PRIMARY KEY,
-      name VARCHAR(300),
-      pages INTEGER,
-      price FLOAT,
-      rating FLOAT,
-      author INTEGER REFERENCES author(id),
-      publisher_id INTEGER REFERENCES publisher(id),
-      pubdate DATE
-    );
-
-    -- Create store table
-    CREATE TABLE IF NOT EXISTS "store" (
-      id SERIAL PRIMARY KEY,
-      name VARCHAR(300)
-    );
-
-    -- Create blog_bin table (inherits from blog structure but without unique constraint on name)
-    CREATE TABLE IF NOT EXISTS "blog_bin" (
-      id SERIAL PRIMARY KEY,
-      name VARCHAR(20),
-      tagline TEXT,
-      note TEXT DEFAULT ''
-    );
-  `;
-
-  // Execute the SQL to create all tables
-  await Model.query(createTablesSQL);
+  // Create tables using migrate.mjs
+  for (const model of model_list) {
+    const createSQL = create_table_sql(model);
+    console.log(`Creating table ${model.table_name}:`);
+    console.log(createSQL);
+    await Model.query(createSQL);
+  }
 }
 
 // Initialize test data

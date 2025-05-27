@@ -24,9 +24,7 @@ npm install -g @xiangnanscu/model
 ### 数据库配置
 
 ```js
-import Model from "@xiangnanscu/model";
-import { create_table_sql } from "@xiangnanscu/model/lib/migrate.mjs";
-const { Q, F, Sum, Avg, Max, Min, Count } = Model;
+import { Model, Q, F, Sum, Avg, Max, Min, Count, create_table_sql } from "@xiangnanscu/model";
 
 // 配置数据库连接
 Model.db_config = {
@@ -146,8 +144,6 @@ const Store = Model({
 
 ### 表创建
 ```js
-import { create_table_sql } from "@xiangnanscu/model/lib/migrate.mjs";
-
 const model_list = [User, Blog, BlogBin, Author, Entry, ViewLog, Publisher, Book, Store];
 
 // 从模型定义创建表
@@ -160,9 +156,7 @@ for (const model of model_list) {
 ## 完整示例
 
 ```js
-import Model from "@xiangnanscu/model";
-import { create_table_sql } from "@xiangnanscu/model/lib/migrate.mjs";
-const { Q, F, Sum, Avg, Max, Min, Count } = Model;
+import { Model, Q, F, Sum, Avg, Max, Min, Count, create_table_sql } from "@xiangnanscu/model";
 
 // 配置数据库连接
 Model.db_config = {

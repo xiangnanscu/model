@@ -1,6 +1,4 @@
-import Model from "@xiangnanscu/model";
-import { create_table_sql } from "@xiangnanscu/model/lib/migrate.mjs";
-const { Q, F, Sum, Avg, Max, Min, Count } = Model;
+import { Model, Q, F, Sum, Avg, Max, Min, Count, create_table_sql } from "@xiangnanscu/model";
 
 // Configure database connection
 Model.db_config = {

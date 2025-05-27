@@ -1,8 +1,6 @@
 /* eslint-disable no-undef */
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import Model from "~/lib/xodel";
-import { create_table_sql } from "~/lib/migrate.mjs";
-const { Q, F, Sum, Avg, Max, Min, Count } = Model;
+import { Model, Q, F, Sum, Avg, Max, Min, Count, create_table_sql } from "~/lib";
 
 process.env.SQL_WHOLE_MATCH = true;
 

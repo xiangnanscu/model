@@ -24,9 +24,7 @@ npm install -g @xiangnanscu/model
 ### Database Configuration
 
 ```js
-import Model from "@xiangnanscu/model";
-import { create_table_sql } from "@xiangnanscu/model/lib/migrate.mjs";
-const { Q, F, Sum, Avg, Max, Min, Count } = Model;
+import { Model, Q, F, Sum, Avg, Max, Min, Count, create_table_sql } from "@xiangnanscu/model";
 
 // Configure database connection
 Model.db_config = {
@@ -146,8 +144,6 @@ const Store = Model({
 
 ### Table creation
 ```js
-import { create_table_sql } from "@xiangnanscu/model/lib/migrate.mjs";
-
 const model_list = [User, Blog, BlogBin, Author, Entry, ViewLog, Publisher, Book, Store];
 
 // Create tables from model definitions
@@ -160,9 +156,7 @@ for (const model of model_list) {
 ## All in one
 
 ```js
-import Model from "@xiangnanscu/model";
-import { create_table_sql } from "@xiangnanscu/model/lib/migrate.mjs";
-const { Q, F, Sum, Avg, Max, Min, Count } = Model;
+import { Model, Q, F, Sum, Avg, Max, Min, Count, create_table_sql } from "@xiangnanscu/model";
 
 // Configure database connection
 Model.db_config = {

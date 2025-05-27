@@ -4,6 +4,15 @@
 
 English | [简体中文](./README.zh-CN.md)
 
+## Features
+
+- **Declarative Model Definition**: Define your database models using simple JavaScript objects
+- **Automatic Migration Generation**: Generate SQL migration scripts from model changes
+- **Type Safety**: Full TypeScript support with type inference
+- **Query Builder**: Intuitive query building with method chaining
+- **Relationship Management**: Support for foreign keys and complex relationships
+- **Schema Validation**: Built-in field validation and constraints
+
 ## Installation
 
 ```sh
@@ -2456,3 +2465,128 @@ process.env.SQL_WHOLE_MATCH = true;
 6. **Index Optimization**: Add database indexes for frequently queried fields
 
 This ORM provides rich query interfaces and flexible data manipulation methods that can meet the needs of most PostgreSQL applications.
+
+## Database Migration Tool
+
+The library includes a powerful database migration tool that can generate SQL migration scripts by comparing model definitions.
+
+### Usage
+
+```javascript
+import { generate_migration_sql, create_table_sql } from './lib/migrate.mjs';
+
+// Define your model
+const user_model = {
+  table_name: "users",
+  field_names: ["id", "name", "email", "created_at"],
+  fields: {
+    id: {
+      name: "id",
+      type: "integer",
+      primary_key: true,
+      serial: true,
+      null: false,
+    },
+    name: {
+      name: "name",
+      type: "string",
+      maxlength: 100,
+      null: false,
+    },
+    email: {
+      name: "email",
+      type: "email",
+      maxlength: 255,
+      unique: true,
+      null: false,
+    },
+    created_at: {
+      name: "created_at",
+      type: "datetime",
+      auto_now_add: true,
+      null: false,
+    },
+  },
+};
+
+// Create table SQL
+const create_sql = create_table_sql(user_model);
+console.log(create_sql);
+
+// Generate migration SQL (from old model to new model)
+const migration_sql = generate_migration_sql(old_model, new_model);
+console.log(migration_sql);
+```
+
+### Supported Field Types
+
+- **string**: VARCHAR with specified length
+- **text**: TEXT field for long content
+- **integer**: Integer numbers
+- **float**: Floating point numbers with optional precision
+- **boolean**: Boolean true/false values
+- **date**: Date only (YYYY-MM-DD)
+- **datetime**: Timestamp with optional timezone
+- **time**: Time only with optional timezone
+- **uuid**: UUID with automatic generation
+- **json**: JSONB for structured data
+- **foreignkey**: Foreign key relationships
+- **year/month**: Integer fields for year/month values
+- **year_month**: VARCHAR for year-month combinations
+
+### Migration Features
+
+- **Table Creation**: Generate CREATE TABLE statements
+- **Field Addition/Removal**: Add or remove columns
+- **Type Changes**: Convert between compatible field types
+- **Constraint Management**: Handle PRIMARY KEY, UNIQUE, NOT NULL constraints
+- **Index Management**: Create and drop indexes
+- **Foreign Key Management**: Add, remove, and modify foreign key relationships
+- **Default Values**: Handle default value changes
+- **Field Renaming**: Automatic detection of field renames
+- **Unique Together**: Manage composite unique constraints
+
+### Example Migration Output
+
+```sql
+-- Creating a new table
+CREATE TABLE users(
+  id SERIAL PRIMARY KEY NOT NULL,
+  name varchar(100) NOT NULL,
+  email varchar(255) NOT NULL UNIQUE,
+  created_at timestamp(0) NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Adding a field
+ALTER TABLE users ADD COLUMN phone varchar(20);
+
+-- Modifying field type
+ALTER TABLE users ALTER COLUMN name TYPE text;
+
+-- Adding foreign key
+ALTER TABLE products ADD CONSTRAINT products_category_id_fkey
+FOREIGN KEY (category_id) REFERENCES "categories" ("id")
+ON DELETE CASCADE ON UPDATE CASCADE;
+```
+
+## Testing
+
+Run the test suite:
+
+```bash
+npm test
+```
+
+Run migration tool tests specifically:
+
+```bash
+npm test __test__/migrate.test.mjs
+```
+
+## License
+
+MIT
+
+## Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.

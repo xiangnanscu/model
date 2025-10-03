@@ -1,6 +1,6 @@
 /* eslint-disable no-undef */
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { Model, Q, F, Sum, Avg, Max, Min, Count, create_table_sql } from "~/lib";
+import { Xodel as Model, Q, F, Sum, Avg, Max, Min, Count, create_table_sql } from "~/lib";
 
 process.env.SQL_WHOLE_MATCH = true;
 
@@ -28,7 +28,7 @@ const User = Model({
 const Blog = Model({
   table_name: "blog",
   fields: {
-    name: { type: "string", maxlength: 20, minlength: 2, unique: true },
+    name: { type: "string", maxlength: 20, minlength: 2, unique: true, compact: false },
     tagline: { type: "text", default: "default tagline" },
   },
 });
@@ -482,7 +482,7 @@ describe("Model Tests", () => {
         expect(result).toContain("%my blog%");
         process.env.SQL_WHOLE_MATCH &&
           expect(result).toBe(
-            "SELECT * FROM entry T INNER JOIN blog T1 ON (T.blog_id = T1.id) WHERE T1.name LIKE '%my blog%'",
+            `SELECT * FROM entry T INNER JOIN blog T1 ON (T.blog_id = T1.id) WHERE T1.name LIKE '%my blog%' ESCAPE '\\'`,
           );
       });
     });
@@ -530,7 +530,7 @@ describe("Model Tests", () => {
         expect(result).toContain("my%");
         process.env.SQL_WHOLE_MATCH &&
           expect(result).toBe(
-            "SELECT * FROM view_log T INNER JOIN entry T1 ON (T.entry_id = T1.id) INNER JOIN blog T2 ON (T1.blog_id = T2.id) WHERE T2.name LIKE 'my%'",
+            "SELECT * FROM view_log T INNER JOIN entry T1 ON (T.entry_id = T1.id) INNER JOIN blog T2 ON (T1.blog_id = T2.id) WHERE T2.name LIKE 'my%' ESCAPE '\\'",
           );
       });
     });
@@ -544,7 +544,7 @@ describe("Model Tests", () => {
         expect(result).toContain("AND");
         process.env.SQL_WHOLE_MATCH &&
           expect(result).toBe(
-            "SELECT * FROM view_log T INNER JOIN entry T1 ON (T.entry_id = T1.id) INNER JOIN blog T2 ON (T1.blog_id = T2.id) WHERE (T2.name LIKE 'my%') AND (T1.headline = 'aa')",
+            "SELECT * FROM view_log T INNER JOIN entry T1 ON (T.entry_id = T1.id) INNER JOIN blog T2 ON (T1.blog_id = T2.id) WHERE (T2.name LIKE 'my%' ESCAPE '\\') AND (T1.headline = 'aa')",
           );
       });
     });

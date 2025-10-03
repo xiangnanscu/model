@@ -1,18 +1,10 @@
-function foo(n) {
-  if (n === 1) {
-    return 1;
-  } else {
-    return Promise.resolve(2);
+class Foo {
+  constructor() {
+    this.name2 = "Foo";
   }
 }
 
-console.log(foo(1));
-console.log(await foo(2));
-console.log(foo(3));
-console.log(foo(4));
-console.log(foo(5));
-console.log(foo(6));
-console.log(foo(7));
-console.log(foo(8));
-console.log(foo(9));
-console.log(foo(10));
+Foo.prototype.name = "Bar";
+const f = new Foo();
+console.log(f.name);
+console.log(Object.getOwnPropertyDescriptor(f, "name")?.value);

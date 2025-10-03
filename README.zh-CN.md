@@ -1,6 +1,6 @@
-# @xiangnanscu/model
+# xodel
 
-[@xiangnanscu/model](https://xiangnanscu.github.io/model/) 一个声明式的、直观且强大的PostgreSQL ORM库。
+[xodel](https://xiangnanscu.github.io/model/) 一个声明式的、直观且强大的PostgreSQL ORM库。
 
 [English](./README.md) | 简体中文
 
@@ -16,13 +16,13 @@
 ## 安装
 
 ```sh
-npm install @xiangnanscu/model
+npm install xodel
 ```
 
 ## 快速开始
 
 ```js
-import { Model, Q, F, Sum, Avg, Max, Min, Count, create_table_sql } from "@xiangnanscu/model";
+import { Model, Q, F, Sum, Avg, Max, Min, Count, create_table_sql } from "xodel";
 
 // 配置数据库连接
 Model.db_config = {

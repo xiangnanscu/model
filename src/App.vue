@@ -1,7 +1,7 @@
 <script setup></script>
 
 <template>
-  <h1>@xiangnanscu/model</h1>
+  <h1>xodel</h1>
   <p>Declarative, intuitive and powerful PostgreSQL ORM library</p>
   <router-link to="/">Home</router-link>
   <!-- <router-link to="/Playground" style="margin-left: 1em">Playground</router-link> -->

@@ -1,4 +1,4 @@
-import { Model, Q, F, Sum, Avg, Max, Min, Count, create_table_sql } from "@xiangnanscu/model";
+import { Model, Q, F, Sum, Avg, Max, Min, Count, create_table_sql } from "xodel";
 
 // Configure database connection
 Model.db_config = {

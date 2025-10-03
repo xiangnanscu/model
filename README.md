@@ -1,6 +1,6 @@
-# @xiangnanscu/model
+# xodel
 
-[@xiangnanscu/model](https://xiangnanscu.github.io/model/) Declarative, intuitive and powerful PostgreSQL ORM library.
+[xodel](https://xiangnanscu.github.io/model/) Declarative, intuitive and powerful PostgreSQL ORM library.
 
 English | [简体中文](./README.zh-CN.md)
 
@@ -16,13 +16,13 @@ English | [简体中文](./README.zh-CN.md)
 ## Installation
 
 ```sh
-npm install @xiangnanscu/model
+npm install xodel
 ```
 
 ## Quick Start
 
 ```js
-import { Model, Q, F, Sum, Avg, Max, Min, Count, create_table_sql } from "@xiangnanscu/model";
+import { Model, Q, F, Sum, Avg, Max, Min, Count, create_table_sql } from "xodel";
 
 // Configure database connection
 Model.db_config = {

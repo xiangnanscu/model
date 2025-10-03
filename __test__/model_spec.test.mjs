@@ -1,11 +1,11 @@
 /* eslint-disable no-undef */
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { Xodel as Model, Q, F, Sum, Avg, Max, Min, Count, create_table_sql } from "~/lib";
+import { Xodel, Q, F, Sum, Avg, Max, Min, Count, create_table_sql } from "~/lib";
 
 process.env.SQL_WHOLE_MATCH = true;
 
 // Database configuration
-Model.db_config = {
+Xodel.db_config = {
   host: "localhost",
   port: "5432",
   database: "test",
@@ -17,7 +17,7 @@ Model.db_config = {
 };
 
 // Model definitions
-const User = Model({
+const User = Xodel({
   table_name: "user",
   fields: {
     username: { type: "string", maxlength: 20, minlength: 2, unique: true },
@@ -25,7 +25,7 @@ const User = Model({
   },
 });
 
-const Blog = Model({
+const Blog = Xodel({
   table_name: "blog",
   fields: {
     name: { type: "string", maxlength: 20, minlength: 2, unique: true, compact: false },
@@ -33,7 +33,7 @@ const Blog = Model({
   },
 });
 
-const BlogBin = Model({
+const BlogBin = Xodel({
   table_name: "blog_bin",
   mixins: [Blog],
   fields: {
@@ -42,7 +42,7 @@ const BlogBin = Model({
   },
 });
 
-const Resume = Model({
+const Resume = Xodel({
   auto_primary_key: false,
   table_name: "resume",
   unique_together: ["start_date", "end_date", "company", "position"],
@@ -55,7 +55,7 @@ const Resume = Model({
   },
 });
 
-const Author = Model({
+const Author = Xodel({
   table_name: "author",
   fields: {
     name: { label: "Name", type: "string", maxlength: 200, unique: true },
@@ -65,7 +65,7 @@ const Author = Model({
   },
 });
 
-const Entry = Model({
+const Entry = Xodel({
   table_name: "entry",
   fields: {
     blog_id: { type: "foreignkey", reference: Blog, related_query_name: "entry" },
@@ -80,7 +80,7 @@ const Entry = Model({
   },
 });
 
-const ViewLog = Model({
+const ViewLog = Xodel({
   table_name: "view_log",
   fields: {
     entry_id: { type: "foreignkey", reference: Entry },
@@ -88,14 +88,14 @@ const ViewLog = Model({
   },
 });
 
-const Publisher = Model({
+const Publisher = Xodel({
   table_name: "publisher",
   fields: {
     name: { type: "string", maxlength: 300 },
   },
 });
 
-const Book = Model({
+const Book = Xodel({
   table_name: "book",
   fields: {
     name: { type: "string", maxlength: 300, compact: false },
@@ -108,7 +108,7 @@ const Book = Model({
   },
 });
 
-const Store = Model({
+const Store = Xodel({
   table_name: "store",
   fields: {
     name: { type: "string", maxlength: 300 },
@@ -121,9 +121,9 @@ const model_list = [User, Blog, BlogBin, Author, Entry, ViewLog, Publisher, Book
 async function createTablesFromModels() {
   // Drop tables in reverse order
   for (const model of [...model_list].reverse()) {
-    await Model.query(`DROP TABLE IF EXISTS "${model.table_name}" CASCADE`);
+    await Xodel.query(`DROP TABLE IF EXISTS "${model.table_name}" CASCADE`);
     // Also drop sequences to avoid conflicts
-    await Model.query(`DROP SEQUENCE IF EXISTS "${model.table_name}_id_seq" CASCADE`);
+    await Xodel.query(`DROP SEQUENCE IF EXISTS "${model.table_name}_id_seq" CASCADE`);
   }
 
   // Create tables using migrate.mjs
@@ -131,7 +131,7 @@ async function createTablesFromModels() {
     const createSQL = create_table_sql(model);
     console.log(`Creating table ${model.table_name}:`);
     console.log(createSQL);
-    await Model.query(createSQL);
+    await Xodel.query(createSQL);
   }
 }
 

@@ -256,7 +256,7 @@ afterAll(async () => {
 });
 
 describe("Model Tests", () => {
-  describe("Model:create_model mixins: unique property overridden by mixed model", () => {
+  describe("Xodel:create_model mixins: unique property overridden by mixed model", () => {
     it("should override unique property from mixed model", () => {
       expect(BlogBin.fields.name.unique).toBe(false);
     });

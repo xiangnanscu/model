@@ -1,6 +1,6 @@
 // Model definitions based on model_spec.test.mjs
 
-const User = Model({
+const User = Xodel({
   table_name: "user",
   fields: {
     username: { maxlength: 20, minlength: 2, unique: true },
@@ -8,7 +8,7 @@ const User = Model({
   },
 });
 
-const Blog = Model({
+const Blog = Xodel({
   table_name: "blog",
   fields: {
     name: { maxlength: 20, minlength: 2, unique: true },
@@ -16,7 +16,7 @@ const Blog = Model({
   },
 });
 
-const BlogBin = Model({
+const BlogBin = Xodel({
   table_name: "blog_bin",
   mixins: [Blog],
   fields: {
@@ -25,7 +25,7 @@ const BlogBin = Model({
   },
 });
 
-const Resume = Model({
+const Resume = Xodel({
   auto_primary_key: false,
   table_name: "resume",
   unique_together: ["start_date", "end_date", "company", "position"],
@@ -38,7 +38,7 @@ const Resume = Model({
   },
 });
 
-const Author = Model({
+const Author = Xodel({
   table_name: "author",
   fields: {
     name: { label: "姓名", maxlength: 200, unique: true },
@@ -48,7 +48,7 @@ const Author = Model({
   },
 });
 
-const Entry = Model({
+const Entry = Xodel({
   table_name: "entry",
   fields: {
     blog_id: { reference: Blog, related_query_name: "entry" },
@@ -63,7 +63,7 @@ const Entry = Model({
   },
 });
 
-const ViewLog = Model({
+const ViewLog = Xodel({
   table_name: "view_log",
   fields: {
     entry_id: { reference: Entry },
@@ -71,14 +71,14 @@ const ViewLog = Model({
   },
 });
 
-const Publisher = Model({
+const Publisher = Xodel({
   table_name: "publisher",
   fields: {
     name: { maxlength: 300 },
   },
 });
 
-const Book = Model({
+const Book = Xodel({
   table_name: "book",
   fields: {
     name: { maxlength: 300, compact: false },
@@ -91,7 +91,7 @@ const Book = Model({
   },
 });
 
-const Store = Model({
+const Store = Xodel({
   table_name: "store",
   fields: {
     name: { maxlength: 300 },

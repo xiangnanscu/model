@@ -7,11 +7,11 @@ import prettier from "prettier/standalone";
 import prettierPluginBabel from "prettier/plugins/babel";
 import prettierPluginEstree from "prettier/plugins/estree";
 import { format as sqlFormatter } from "sql-formatter";
-import Model from "~/lib/sqlmodel";
+import Xodel from "~/lib/sqlmodel";
 import modelsSrc from "@/assets/models.mjs?raw";
 import testSrc from "@/assets/test.mjs?raw";
 
-const { Q, F, Sum, Avg, Max, Min, Count } = Model;
+const { Q, F, Sum, Avg, Max, Min, Count } = Xodel;
 const formatJs = async (js) =>
   await prettier.format(js, {
     parser: "babel",
@@ -40,7 +40,7 @@ const gotoLine = (i) => {
 const models = computed(() =>
   eval(`(() => {
 ${srcCode.value}
-return { ${Array.from(srcCode.value.matchAll(/const\s+([\w_]+)\s+=\s+Model/g))
+return { ${Array.from(srcCode.value.matchAll(/const\s+([\w_]+)\s+=\s+Xodel/g))
     .map((e) => e[1])
     .join(", ")} };
 })()`),

@@ -22,10 +22,10 @@ npm install xodel
 ## 快速开始
 
 ```js
-import { Model, Q, F, Sum, Avg, Max, Min, Count, create_table_sql } from "xodel";
+import { Xodel, Q, F, Sum, Avg, Max, Min, Count, create_table_sql } from "xodel";
 
 // 配置数据库连接
-Model.db_config = {
+Xodel.db_config = {
   host: "localhost",
   port: "5432",
   user: "postgres",
@@ -37,7 +37,7 @@ Model.db_config = {
 };
 
 // 模型定义
-const User = Model({
+const User = Xodel({
   table_name: "user",
   fields: {
     username: { type: "string", maxlength: 20, minlength: 2, unique: true },
@@ -45,7 +45,7 @@ const User = Model({
   },
 });
 
-const Blog = Model({
+const Blog = Xodel({
   table_name: "blog",
   fields: {
     name: { type: "string", maxlength: 20, minlength: 2, unique: true },
@@ -53,7 +53,7 @@ const Blog = Model({
   },
 });
 
-const BlogBin = Model({
+const BlogBin = Xodel({
   table_name: "blog_bin",
   mixins: [Blog],
   fields: {
@@ -62,7 +62,7 @@ const BlogBin = Model({
   },
 });
 
-const Resume = Model({
+const Resume = Xodel({
   auto_primary_key: false,
   table_name: "resume",
   unique_together: ["start_date", "end_date", "company", "position"],
@@ -75,7 +75,7 @@ const Resume = Model({
   },
 });
 
-const Author = Model({
+const Author = Xodel({
   table_name: "author",
   fields: {
     name: { label: "姓名", type: "string", maxlength: 200, unique: true },
@@ -85,7 +85,7 @@ const Author = Model({
   },
 });
 
-const Entry = Model({
+const Entry = Xodel({
   table_name: "entry",
   fields: {
     blog_id: { type: "foreignkey", reference: Blog, related_query_name: "entry" },
@@ -100,7 +100,7 @@ const Entry = Model({
   },
 });
 
-const ViewLog = Model({
+const ViewLog = Xodel({
   table_name: "view_log",
   fields: {
     entry_id: { type: "foreignkey", reference: Entry },
@@ -108,14 +108,14 @@ const ViewLog = Model({
   },
 });
 
-const Publisher = Model({
+const Publisher = Xodel({
   table_name: "publisher",
   fields: {
     name: { type: "string", maxlength: 300 },
   },
 });
 
-const Book = Model({
+const Book = Xodel({
   table_name: "book",
   fields: {
     name: { type: "string", maxlength: 300, compact: false },
@@ -128,7 +128,7 @@ const Book = Model({
   },
 });
 
-const Store = Model({
+const Store = Xodel({
   table_name: "store",
   fields: {
     name: { type: "string", maxlength: 300 },
@@ -140,7 +140,7 @@ const model_list = [User, Blog, BlogBin, Author, Entry, ViewLog, Publisher, Book
 // 从模型定义创建表
 for (const model of model_list) {
   const createSQL = create_table_sql(model);
-  await Model.query(createSQL);
+  await Xodel.query(createSQL);
 }
 ```
 
@@ -148,13 +148,13 @@ for (const model of model_list) {
 
 ```js
 // 获取辅助函数
-const Q = Model.Q;
-const F = Model.F;
-const Sum = Model.Sum;
-const Avg = Model.Avg;
-const Max = Model.Max;
-const Min = Model.Min;
-const Count = Model.Count;
+const Q = Xodel.Q;
+const F = Xodel.F;
+const Sum = Xodel.Sum;
+const Avg = Xodel.Avg;
+const Max = Xodel.Max;
+const Min = Xodel.Min;
+const Count = Xodel.Count;
 ```
 ### 基础查询
 
@@ -1561,7 +1561,7 @@ console.log(sql); // "SELECT * FROM blog T WHERE T.id = 1"
 ### 基础类型
 
 ```js
-const Model = Model({
+const Model = Xodel({
   table_name: "example",
   fields: {
     // 字符串类型
@@ -1604,7 +1604,7 @@ const Model = Model({
 ### 字段约束
 
 ```js
-const Model = Model({
+const Model = Xodel({
   table_name: "example",
   fields: {
     // 唯一约束
@@ -1628,7 +1628,7 @@ const Model = Model({
 ### 模型选项
 
 ```js
-const Model = Model({
+const Model = Xodel({
   // 表名
   table_name: "my_table",
 

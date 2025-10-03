@@ -7,6 +7,7 @@ export {}
 declare global {
   const EffectScope: typeof import('vue')['EffectScope']
   const Model: typeof import('../../globals/index.mjs')['Model']
+  const Xodel: typeof import('../../globals/index.mjs')['Xodel']
   const asyncComputed: typeof import('@vueuse/core')['asyncComputed']
   const autoResetRef: typeof import('@vueuse/core')['autoResetRef']
   const computed: typeof import('vue')['computed']

@@ -8,7 +8,7 @@
     "ExtractPropTypes": true,
     "ExtractPublicPropTypes": true,
     "InjectionKey": true,
-    "Model": true,
+    "Xodel": true,
     "PropType": true,
     "Ref": true,
     "VNode": true,
@@ -295,6 +295,7 @@
     "watchTriggerable": true,
     "watchWithFilter": true,
     "whenever": true,
-    "p": true
+    "p": true,
+    "Model": true
   }
 }

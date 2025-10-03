@@ -22,10 +22,10 @@ npm install xodel
 ## Quick Start
 
 ```js
-import { Model, Q, F, Sum, Avg, Max, Min, Count, create_table_sql } from "xodel";
+import { Xodel, Q, F, Sum, Avg, Max, Min, Count, create_table_sql } from "xodel";
 
 // Configure database connection
-Model.db_config = {
+Xodel.db_config = {
   host: "localhost",
   port: "5432",
   user: "postgres",
@@ -36,8 +36,8 @@ Model.db_config = {
   connect_timeout: 3,
 };
 
-// Model definitions
-const User = Model({
+// Xodel definitions
+const User = Xodel({
   table_name: "user",
   fields: {
     username: { type: "string", maxlength: 20, minlength: 2, unique: true },
@@ -45,7 +45,7 @@ const User = Model({
   },
 });
 
-const Blog = Model({
+const Blog = Xodel({
   table_name: "blog",
   fields: {
     name: { type: "string", maxlength: 20, minlength: 2, unique: true },
@@ -53,7 +53,7 @@ const Blog = Model({
   },
 });
 
-const BlogBin = Model({
+const BlogBin = Xodel({
   table_name: "blog_bin",
   mixins: [Blog],
   fields: {
@@ -62,7 +62,7 @@ const BlogBin = Model({
   },
 });
 
-const Resume = Model({
+const Resume = Xodel({
   auto_primary_key: false,
   table_name: "resume",
   unique_together: ["start_date", "end_date", "company", "position"],
@@ -75,7 +75,7 @@ const Resume = Model({
   },
 });
 
-const Author = Model({
+const Author = Xodel({
   table_name: "author",
   fields: {
     name: { label: "Name", type: "string", maxlength: 200, unique: true },
@@ -85,7 +85,7 @@ const Author = Model({
   },
 });
 
-const Entry = Model({
+const Entry = Xodel({
   table_name: "entry",
   fields: {
     blog_id: { type: "foreignkey", reference: Blog, related_query_name: "entry" },
@@ -100,7 +100,7 @@ const Entry = Model({
   },
 });
 
-const ViewLog = Model({
+const ViewLog = Xodel({
   table_name: "view_log",
   fields: {
     entry_id: { type: "foreignkey", reference: Entry },
@@ -108,14 +108,14 @@ const ViewLog = Model({
   },
 });
 
-const Publisher = Model({
+const Publisher = Xodel({
   table_name: "publisher",
   fields: {
     name: { type: "string", maxlength: 300 },
   },
 });
 
-const Book = Model({
+const Book = Xodel({
   table_name: "book",
   fields: {
     name: { type: "string", maxlength: 300, compact: false },
@@ -128,7 +128,7 @@ const Book = Model({
   },
 });
 
-const Store = Model({
+const Store = Xodel({
   table_name: "store",
   fields: {
     name: { type: "string", maxlength: 300 },
@@ -140,7 +140,7 @@ const model_list = [User, Blog, BlogBin, Author, Entry, ViewLog, Publisher, Book
 // Create tables from model definitions
 for (const model of model_list) {
   const createSQL = create_table_sql(model);
-  await Model.query(createSQL);
+  await Xodel.query(createSQL);
 }
 ```
 
@@ -2351,7 +2351,7 @@ SELECT * FROM blog T WHERE T.id = 1
 ### Basic Types
 
 ```js
-const Model = Model({
+const Model = Xodel({
   table_name: "example",
   fields: {
     // String type
@@ -2394,7 +2394,7 @@ const Model = Model({
 ### Field Constraints
 
 ```js
-const Model = Model({
+const Model = Xodel({
   table_name: "example",
   fields: {
     // Unique constraint
@@ -2418,7 +2418,7 @@ const Model = Model({
 ### Model Options
 
 ```js
-const Model = Model({
+const Model = Xodel({
   // Table name
   table_name: "my_table",
 

@@ -18,7 +18,7 @@
     "preview": "vite preview",
     "test": "vitest",
     "build-only": "vite build",
-    "type-check": "vue-tsc --build --force",
+    "sync": "cp -r  ~/create/template/lib/model/* lib",
     "lint": "eslint . --ext .vue,.js,.jsx,.cjs,.mjs,.ts,.tsx,.cts,.mts --fix --ignore-path .gitignore",
     "prerc": "npm --no-git-tag-version version minor",
     "rc": "npm run push",

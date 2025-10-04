@@ -1,6 +1,6 @@
 {
   "name": "xodel",
-  "version": "0.40.0",
+  "version": "0.41.0",
   "type": "module",
   "main": "lib/index.mjs",
   "description": "A declarative, intuitive, and powerful PostgreSQL ORM library.",
